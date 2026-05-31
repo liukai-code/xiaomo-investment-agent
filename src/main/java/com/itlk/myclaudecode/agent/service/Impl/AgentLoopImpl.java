@@ -8,6 +8,7 @@ import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -27,7 +28,7 @@ public class AgentLoopImpl implements AgentLoop {
 
     private AnthropicChatModel chatModel;
 
-    private List<Message> history = new ArrayList<>();
+    private final List<Message> history = new ArrayList<>();
 
     private AnthropicChatModel getChatModel() {
         if (chatModel == null) {
@@ -48,7 +49,9 @@ public class AgentLoopImpl implements AgentLoop {
 
     @Override
     public String chat(String message) {
-
+        if (history.isEmpty()) {
+            history.add(new SystemMessage(anthropicConfig.getSystemPrompt()));
+        }
         Message userMessage = new UserMessage(message);
         history.add(userMessage);
         ChatResponse response = getChatModel().call(new Prompt(history));
@@ -59,13 +62,24 @@ public class AgentLoopImpl implements AgentLoop {
 
     @Override
     public Flux<String> chatStream(String message) {
+        if (history.isEmpty()) {
+            history.add(new SystemMessage(anthropicConfig.getSystemPrompt()));
+        }
         Message userMessage = new UserMessage(message);
         history.add(userMessage);
 
         StringBuilder accumulated = new StringBuilder();
 
-        return getChatModel().stream(new Prompt(history))
+        AnthropicChatOptions options = AnthropicChatOptions.builder()
+                .model(anthropicConfig.getModel())
+                .maxTokens(4096)
+                .thinking(AnthropicApi.ThinkingType.DISABLED, null)
+                .build();
+
+        return getChatModel().stream(new Prompt(history, options))
+                .filter(chatResponse -> chatResponse.getResult() != null && chatResponse.getResult().getOutput() != null)
                 .mapNotNull(chatResponse -> chatResponse.getResult().getOutput().getText())
+                .filter(text -> text != null && !text.isEmpty())
                 .doOnNext(accumulated::append)
                 .doOnComplete(() -> {
                     AssistantMessage assistantMessage = new AssistantMessage(accumulated.toString());

@@ -18,4 +18,7 @@ public class AnthropicConfig {
     @Value("${spring.ai.anthropic.model-id}")
     private String model;
 
+    @Value("${system-default-prompt}")
+    private String systemPrompt;
+
 }
