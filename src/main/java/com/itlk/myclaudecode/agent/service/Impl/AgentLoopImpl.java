@@ -1,31 +1,46 @@
 package com.itlk.myclaudecode.agent.service.Impl;
 
+import com.itlk.myclaudecode.agent.Entity.*;
+import com.itlk.myclaudecode.agent.repository.ChatMessageRepository;
+import com.itlk.myclaudecode.agent.repository.ConversationRepository;
 import com.itlk.myclaudecode.agent.service.AgentLoop;
 import com.itlk.myclaudecode.tool.FileListTool;
 import com.itlk.myclaudecode.tool.FileReadTool;
 import com.itlk.myclaudecode.tool.FileWriteTool;
+import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Service
+@Slf4j
 public class AgentLoopImpl implements AgentLoop {
 
+    private static final int MAX_CONTEXT_MESSAGES = 50;
+
     private final ChatModel chatModel;
-    private final List<Message> history = new ArrayList<>();
     private final String systemPrompt;
     private final ChatClient chatClient;
+
+    @Resource
+    private ConversationRepository conversationRepository;
+
+    @Resource
+    private ChatMessageRepository chatMessageRepository;
 
     public AgentLoopImpl(ChatModel chatModel,
                          FileReadTool fileReadTool,
@@ -35,41 +50,67 @@ public class AgentLoopImpl implements AgentLoop {
         this.chatModel = chatModel;
         this.systemPrompt = systemPrompt;
 
-        // 创建 ChatClient 并注册 Tool
         this.chatClient = ChatClient.builder(chatModel)
                 .defaultTools(fileReadTool, fileWriteTool, fileListTool)
                 .build();
     }
 
     @Override
-    public String chat(String message) {
-        if (history.isEmpty()) {
-            history.add(new SystemMessage(systemPrompt));
-        }
-        Message userMessage = new UserMessage(message);
-        history.add(userMessage);
+    @Transactional
+    public Conversation createConversation(String title) {
+        Conversation conversation = new Conversation();
+        conversation.setTitle(title);
+        return conversationRepository.save(conversation);
+    }
+
+    @Override
+    public List<Conversation> listConversations() {
+        return conversationRepository.findAllByOrderByUpdatedAtDesc();
+    }
+
+    @Override
+    public List<ChatMessage> getHistory(Long conversationId) {
+        return chatMessageRepository.findByConversationIdOrderByIdAsc(conversationId);
+    }
+
+    @Override
+    @Transactional
+    public String chat(Long conversationId, String message) {
+        Conversation conversation = getOrCreateConversation(conversationId);
+
+        // 保存用户消息
+        saveMessage(conversation, MessageRole.USER, message, null, null);
+
+        // 构建上下文
+        List<Message> context = buildContext(conversation.getId());
 
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
                 .build();
 
         String response = chatClient.prompt()
-                .messages(history.toArray(new Message[0]))
+                .messages(context.toArray(new Message[0]))
                 .options(options)
                 .call()
                 .content();
 
-        history.add(new AssistantMessage(response));
+        // 保存助手回复
+        saveMessage(conversation, MessageRole.ASSISTANT, response, null, null);
+
         return response;
     }
 
     @Override
-    public Flux<String> chatStream(String message) {
-        if (history.isEmpty()) {
-            history.add(new SystemMessage(systemPrompt));
-        }
-        Message userMessage = new UserMessage(message);
-        history.add(userMessage);
+    @Transactional
+    public Flux<String> chatStream(Long conversationId, String message) {
+        Conversation conversation = getOrCreateConversation(conversationId);
+
+        // 保存用户消息
+        saveMessage(conversation, MessageRole.USER, message, null, null);
+
+        // 构建上下文
+        List<Message> context = buildContext(conversation.getId());
+        Long convId = conversation.getId();
 
         StringBuilder accumulated = new StringBuilder();
 
@@ -78,15 +119,65 @@ public class AgentLoopImpl implements AgentLoop {
                 .build();
 
         return chatClient.prompt()
-                .messages(history.toArray(new Message[0]))
+                .messages(context.toArray(new Message[0]))
                 .options(options)
                 .stream()
                 .content()
                 .doOnNext(accumulated::append)
                 .doOnComplete(() -> {
-                    AssistantMessage assistantMessage = new AssistantMessage(accumulated.toString());
-                    history.add(assistantMessage);
+                    String fullResponse = accumulated.toString();
+                    // 需要在新事务中保存，因为 doOnComplete 可能在不同线程
+                    saveAssistantMessage(convId, fullResponse);
                 });
     }
 
+    private Conversation getOrCreateConversation(Long conversationId) {
+        if (conversationId != null) {
+            return conversationRepository.findById(conversationId)
+                    .orElseThrow(() -> new RuntimeException("会话不存在: " + conversationId));
+        }
+        return createConversation("新对话");
+    }
+
+    private List<Message> buildContext(Long conversationId) {
+        List<Message> context = new ArrayList<>();
+
+        // 注入 system prompt
+        context.add(new SystemMessage(systemPrompt));
+
+        // 从 DB 加载最近的消息
+        List<ChatMessage> recentMessages = chatMessageRepository
+                .findRecentByConversationId(conversationId, MAX_CONTEXT_MESSAGES);
+
+        // 查询返回的是倒序，需要反转
+        Collections.reverse(recentMessages);
+
+        for (ChatMessage msg : recentMessages) {
+            switch (msg.getRole()) {
+                case USER -> context.add(new UserMessage(msg.getContent()));
+                case ASSISTANT -> context.add(new AssistantMessage(msg.getContent()));
+                // SYSTEM 和 TOOL 消息暂不回放给上下文
+            }
+        }
+
+        return context;
+    }
+
+    private void saveMessage(Conversation conversation, MessageRole role, String content,
+                             String toolName, String toolCallId) {
+        ChatMessage msg = new ChatMessage();
+        msg.setConversation(conversation);
+        msg.setRole(role);
+        msg.setContent(content);
+        msg.setToolName(toolName);
+        msg.setToolCallId(toolCallId);
+        chatMessageRepository.save(msg);
+    }
+
+    @Transactional
+    public void saveAssistantMessage(Long conversationId, String content) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("会话不存在: " + conversationId));
+        saveMessage(conversation, MessageRole.ASSISTANT, content, null, null);
+    }
 }
