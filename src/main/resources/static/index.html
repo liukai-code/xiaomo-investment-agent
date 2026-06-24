@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Terminal</title>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <style>
     :root {
       --bg: #0a0a0c;
@@ -180,6 +183,121 @@
       padding-left: 16px;
     }
 
+    /* Markdown 样式 */
+    .message.ai .bubble h1,
+    .message.ai .bubble h2,
+    .message.ai .bubble h3 {
+      margin-top: 16px;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .message.ai .bubble h1 { font-size: 18px; }
+    .message.ai .bubble h2 { font-size: 16px; }
+    .message.ai .bubble h3 { font-size: 14px; }
+
+    .message.ai .bubble p {
+      margin-bottom: 10px;
+      line-height: 1.7;
+    }
+
+    .message.ai .bubble ul,
+    .message.ai .bubble ol {
+      margin: 8px 0;
+      padding-left: 24px;
+      list-style-position: outside;
+    }
+
+    .message.ai .bubble ul {
+      list-style-type: disc;
+    }
+
+    .message.ai .bubble ol {
+      list-style-type: decimal;
+    }
+
+    .message.ai .bubble li {
+      margin-bottom: 6px;
+      line-height: 1.6;
+      display: list-item;
+    }
+
+    .message.ai .bubble li::marker {
+      color: var(--accent);
+    }
+
+    .message.ai .bubble strong {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .message.ai .bubble em {
+      color: #a0a0b0;
+      font-style: italic;
+    }
+
+    .message.ai .bubble code {
+      background: var(--surface-2);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: #e0e0e0;
+    }
+
+    .message.ai .bubble pre {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      margin: 10px 0;
+      overflow-x: auto;
+    }
+
+    .message.ai .bubble pre code {
+      background: none;
+      padding: 0;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .message.ai .bubble blockquote {
+      border-left: 3px solid var(--text-dim);
+      padding-left: 12px;
+      margin: 10px 0;
+      color: var(--text-dim);
+    }
+
+    .message.ai .bubble table {
+      border-collapse: collapse;
+      margin: 10px 0;
+      width: 100%;
+    }
+
+    .message.ai .bubble th,
+    .message.ai .bubble td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+    }
+
+    .message.ai .bubble th {
+      background: var(--surface-2);
+      font-weight: 600;
+    }
+
+    .message.ai .bubble hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 16px 0;
+    }
+
+    /* 光标容器 */
+    .cursor-wrapper {
+      display: inline;
+    }
+
     .cursor-blink {
       display: inline-block;
       width: 7px;
@@ -324,6 +442,18 @@
 </div>
 
 <script>
+  // 配置 marked.js
+  marked.setOptions({
+    highlight: function(code, lang) {
+      if (lang && hljs.getLanguage(lang)) {
+        return hljs.highlight(code, { language: lang }).value;
+      }
+      return hljs.highlightAuto(code).value;
+    },
+    breaks: true,
+    gfm: true
+  });
+
   const messagesEl = document.getElementById('messages');
   const inputEl = document.getElementById('input');
   const sendBtn = document.getElementById('sendBtn');
@@ -350,6 +480,24 @@
     }
   }
 
+  function renderMarkdown(text) {
+    return marked.parse(text);
+  }
+
+  function appendCursor(html) {
+    // 在最后一个块级元素内部添加光标
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    const children = temp.children;
+    if (children.length > 0) {
+      const lastEl = children[children.length - 1];
+      lastEl.innerHTML += '<span class="cursor-blink"></span>';
+    } else {
+      temp.innerHTML += '<span class="cursor-blink"></span>';
+    }
+    return temp.innerHTML;
+  }
+
   function addMessage(text, role) {
     removeWelcome();
     const wrapper = document.createElement('div');
@@ -358,7 +506,12 @@
       <div class="label">${role === 'user' ? 'YOU' : 'AI'}</div>
       <div class="bubble"></div>
     `;
-    wrapper.querySelector('.bubble').textContent = text;
+    const bubble = wrapper.querySelector('.bubble');
+    if (role === 'user') {
+      bubble.textContent = text;
+    } else {
+      bubble.innerHTML = renderMarkdown(text);
+    }
     messagesEl.appendChild(wrapper);
     messagesEl.scrollTop = messagesEl.scrollHeight;
     return wrapper;
@@ -377,9 +530,7 @@
 
     const aiMessage = addMessage('', 'ai');
     const bubble = aiMessage.querySelector('.bubble');
-    const cursor = document.createElement('span');
-    cursor.className = 'cursor-blink';
-    bubble.appendChild(cursor);
+    bubble.innerHTML = '<span class="cursor-blink"></span>';
 
     try {
       const url = `/agent/chat/stream?message=${encodeURIComponent(text)}`;
@@ -402,8 +553,7 @@
             const chunk = line.substring(5);
             if (chunk) {
               fullText += chunk;
-              bubble.textContent = fullText;
-              bubble.appendChild(cursor);
+              bubble.innerHTML = appendCursor(renderMarkdown(fullText));
               messagesEl.scrollTop = messagesEl.scrollHeight;
             }
           }
@@ -414,12 +564,11 @@
         const chunk = buffer.substring(5);
         if (chunk) {
           fullText += chunk;
-          bubble.textContent = fullText;
+          bubble.innerHTML = renderMarkdown(fullText);
         }
       }
 
       if (!fullText) bubble.textContent = '(empty)';
-      cursor.remove();
 
     } catch (err) {
       bubble.textContent = 'ERROR: ' + err.message;
