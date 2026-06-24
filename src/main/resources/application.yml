@@ -1,6 +1,15 @@
 spring:
   application:
     name: my-claude-code
+  datasource:
+    url: jdbc:postgresql://REDACTED_SERVER_IP:5432/postgres
+    username: postgres
+    password: 123456
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
   ai:
     anthropic:
       api-key: REDACTED_API_KEY
