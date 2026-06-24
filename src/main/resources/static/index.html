@@ -640,6 +640,21 @@
     }
   }
 
+  async function generateTitle(convId) {
+    const conv = conversations.find(c => c.id === convId);
+    if (!conv || conv.title !== '新对话') return;
+    try {
+      const res = await fetch(`/agent/conversation/${convId}/generate-title`, { method: 'POST' });
+      const data = await res.json();
+      if (data.code === 1 && data.data) {
+        convTitleEl.textContent = data.data;
+        await loadConversations();
+      }
+    } catch (e) {
+      console.error('生成标题失败:', e);
+    }
+  }
+
   function showWelcome() {
     messagesEl.innerHTML = `
       <div class="welcome">
@@ -782,13 +797,16 @@
 
       // 流结束后最终渲染（完整 markdown）
       if (fullText) {
-        bubble.innerHTML = renderMarkdown(fullText);
+        bubble.innerHTML = renderMarkdown(sentenceBuffer(fullText));
       } else {
         bubble.textContent = '(empty)';
       }
 
       // 刷新会话列表（updatedAt 会变）
       loadConversations();
+
+      // 自动生成会话标题
+      generateTitle(currentConvId);
 
     } catch (err) {
       bubble.textContent = 'ERROR: ' + err.message;

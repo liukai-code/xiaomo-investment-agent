@@ -39,6 +39,12 @@ public class agentLoopController {
         return Result.success(agentLoop.getHistory(id));
     }
 
+    @PostMapping("/conversation/{id}/generate-title")
+    public Result<String> generateTitle(@PathVariable Long id) {
+        String title = agentLoop.generateTitle(id);
+        return Result.success(title);
+    }
+
     // ========== 聊天 ==========
 
     @GetMapping("/chat")

@@ -16,4 +16,6 @@ public interface AgentLoop {
     String chat(Long conversationId, String message);
 
     Flux<String> chatStream(Long conversationId, String message);
+
+    String generateTitle(Long conversationId);
 }

@@ -180,4 +180,47 @@ public class AgentLoopImpl implements AgentLoop {
                 .orElseThrow(() -> new RuntimeException("会话不存在: " + conversationId));
         saveMessage(conversation, MessageRole.ASSISTANT, content, null, null);
     }
+
+    @Override
+    @Transactional
+    public String generateTitle(Long conversationId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("会话不存在: " + conversationId));
+
+        // 只有默认标题才需要生成
+        if (!"新对话".equals(conversation.getTitle())) {
+            return conversation.getTitle();
+        }
+
+        // 取前几条消息作为上下文
+        List<ChatMessage> messages = chatMessageRepository
+                .findRecentByConversationId(conversationId, 4);
+        Collections.reverse(messages);
+
+        StringBuilder prompt = new StringBuilder("根据以下对话内容，生成一个简短的标题,聚焦于用户提出的问题（不超过15个字，不要加引号）：\n\n");
+        for (ChatMessage msg : messages) {
+            if (msg.getRole() == MessageRole.USER) {
+                prompt.append("用户：").append(msg.getContent()).append("\n");
+            } else if (msg.getRole() == MessageRole.ASSISTANT) {
+                prompt.append("助手：").append(msg.getContent(), 0, Math.min(100, msg.getContent().length())).append("\n");
+            }
+        }
+
+        AnthropicChatOptions options = AnthropicChatOptions.builder()
+                .thinking(AnthropicApi.ThinkingType.DISABLED, null)
+                .maxTokens(50)
+                .build();
+
+        String title = chatClient.prompt()
+                .user(prompt.toString())
+                .options(options)
+                .call()
+                .content()
+                .trim();
+
+        conversation.setTitle(title);
+        conversationRepository.save(conversation);
+
+        return title;
+    }
 }
