@@ -250,7 +250,7 @@
       font-size: 10px;
       letter-spacing: 1.5px;
       text-transform: uppercase;
-      margin-bottom: 6px;
+      margin-bottom: 3px;
       padding: 0 2px;
     }
 
@@ -291,8 +291,8 @@
     .message.ai .bubble h1,
     .message.ai .bubble h2,
     .message.ai .bubble h3 {
-      margin-top: 16px;
-      margin-bottom: 8px;
+      margin-top: 8px;
+      margin-bottom: 4px;
       font-weight: 600;
       color: var(--accent);
     }
@@ -302,13 +302,13 @@
     .message.ai .bubble h3 { font-size: 14px; }
 
     .message.ai .bubble p {
-      margin-bottom: 10px;
+      margin-bottom: 0;
       line-height: 1.7;
     }
 
     .message.ai .bubble ul,
     .message.ai .bubble ol {
-      margin: 8px 0;
+      margin: 4px 0;
       padding-left: 24px;
       list-style-position: outside;
     }
@@ -317,7 +317,7 @@
     .message.ai .bubble ol { list-style-type: decimal; }
 
     .message.ai .bubble li {
-      margin-bottom: 6px;
+      margin-bottom: 3px;
       line-height: 1.6;
       display: list-item;
     }
@@ -340,7 +340,7 @@
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 12px;
-      margin: 10px 0;
+      margin: 4px 0;
       overflow-x: auto;
     }
 
@@ -354,13 +354,13 @@
     .message.ai .bubble blockquote {
       border-left: 3px solid var(--text-dim);
       padding-left: 12px;
-      margin: 10px 0;
+      margin: 4px 0;
       color: var(--text-dim);
     }
 
     .message.ai .bubble table {
       border-collapse: collapse;
-      margin: 10px 0;
+      margin: 4px 0;
       width: 100%;
     }
 
@@ -379,7 +379,7 @@
     .message.ai .bubble hr {
       border: none;
       border-top: 1px solid var(--border);
-      margin: 16px 0;
+      margin: 8px 0;
     }
 
     .cursor-blink {
@@ -668,74 +668,6 @@
     return marked.parse(text);
   }
 
-  // 流式自愈：补全未闭合的 markdown 结构，让 marked 能正确解析
-  function healMarkdown(text) {
-    // 补全未闭合的代码块
-    const codeFences = (text.match(/```/g) || []).length;
-    if (codeFences % 2 !== 0) {
-      text += '\n```';
-    }
-
-    // 补全未闭合的行内代码
-    const backticks = (text.match(/(?<!`)`(?!`)/g) || []).length;
-    if (backticks % 2 !== 0) {
-      text += '`';
-    }
-
-    // 补全未闭合的粗体
-    const boldMarkers = (text.match(/\*\*/g) || []).length;
-    if (boldMarkers % 2 !== 0) {
-      text += '**';
-    }
-
-    // 补全未闭合的斜体（单个 *）
-    const italicMarkers = (text.match(/(?<!\*)\*(?!\*)/g) || []).length;
-    if (italicMarkers % 2 !== 0) {
-      text += '*';
-    }
-
-    // 补全不完整的表格（有表头但没有分隔行）
-    const lines = text.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line.startsWith('|') && line.endsWith('|')) {
-        const nextLine = (lines[i + 1] || '').trim();
-        // 当前行是表格行，但下一行不是分隔行也不是表格行
-        if (nextLine && !nextLine.startsWith('|') && !nextLine.match(/^\|[-:| ]+\|$/)) {
-          // 在当前行后补一个分隔行
-          const colCount = (line.match(/\|/g) || []).length - 1;
-          const separator = '|' + Array(colCount).fill('---').join('|') + '|';
-          lines.splice(i + 1, 0, separator);
-          text = lines.join('\n');
-          break;
-        }
-        // 当前行是表格行，下一行不存在（表格刚开始）
-        if (!nextLine && i > 0) {
-          const colCount = (line.match(/\|/g) || []).length - 1;
-          const separator = '|' + Array(colCount).fill('---').join('|') + '|';
-          lines.splice(i + 1, 0, separator);
-          text = lines.join('\n');
-          break;
-        }
-      }
-    }
-
-    return text;
-  }
-
-  function appendCursor(html) {
-    const temp = document.createElement('div');
-    temp.innerHTML = html;
-    const children = temp.children;
-    if (children.length > 0) {
-      const lastEl = children[children.length - 1];
-      lastEl.innerHTML += '<span class="cursor-blink"></span>';
-    } else {
-      temp.innerHTML += '<span class="cursor-blink"></span>';
-    }
-    return temp.innerHTML;
-  }
-
   function addMessage(text, role) {
     // 移除欢迎页
     const welcome = messagesEl.querySelector('.welcome');
@@ -796,23 +728,34 @@
       const decoder = new TextDecoder();
       let buffer = '';
       let fullText = '';
-      let eventDataLines = [];
+      let lastRenderTime = 0;
 
+      // 断句：在句末标点后加换行，让 markdown 能识别段落
+      function sentenceBuffer(text) {
+        return text
+          .replace(/([。！？])/g, '$1\n')
+          .replace(/(\. |\? |\! )/g, '$1\n');
+      }
+
+      // 流式渲染：markdown 解析 + 光标
       function renderStreaming(text) {
-        const healed = healMarkdown(text);
-        bubble.innerHTML = appendCursor(renderMarkdown(healed));
+        const processed = sentenceBuffer(text);
+        bubble.innerHTML = '';
+        const container = document.createElement('div');
+        container.innerHTML = renderMarkdown(processed);
+        bubble.appendChild(container);
+        const cursor = document.createElement('span');
+        cursor.className = 'cursor-blink';
+        bubble.appendChild(cursor);
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
 
-      function flushEventData() {
-        if (eventDataLines.length > 0) {
-          const chunk = eventDataLines.join('\n');
-          eventDataLines = [];
-          if (chunk) {
-            fullText += chunk;
-            renderStreaming(fullText);
-          }
-        }
+      // 节流：30ms 内只渲染一次
+      function throttledRender(text) {
+        const now = Date.now();
+        if (now - lastRenderTime < 30) return;
+        lastRenderTime = now;
+        renderStreaming(text);
       }
 
       while (true) {
@@ -825,24 +768,19 @@
 
         for (const line of lines) {
           if (line.startsWith('data:')) {
-            eventDataLines.push(line.substring(5));
-          } else if (line === '') {
-            // 空行 = SSE 事件结束，拼接所有 data 行
-            flushEventData();
-          } else if (eventDataLines.length > 0) {
-            // 没有 data: 前缀但属于当前事件的延续行（含换行的 chunk）
-            eventDataLines.push(line);
+            fullText += line.substring(5);
+            throttledRender(fullText);
           }
         }
       }
 
-      // 处理缓冲区中剩余的数据
-      if (buffer.startsWith('data:')) {
-        eventDataLines.push(buffer.substring(5));
+      // 处理缓冲区剩余
+      if (buffer) {
+        const chunk = buffer.startsWith('data:') ? buffer.substring(5) : buffer;
+        if (chunk) fullText += chunk;
       }
-      flushEventData();
 
-      // 流结束后渲染 markdown
+      // 流结束后最终渲染（完整 markdown）
       if (fullText) {
         bubble.innerHTML = renderMarkdown(fullText);
       } else {
