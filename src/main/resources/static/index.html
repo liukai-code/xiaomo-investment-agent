@@ -668,6 +668,61 @@
     return marked.parse(text);
   }
 
+  // 流式自愈：补全未闭合的 markdown 结构，让 marked 能正确解析
+  function healMarkdown(text) {
+    // 补全未闭合的代码块
+    const codeFences = (text.match(/```/g) || []).length;
+    if (codeFences % 2 !== 0) {
+      text += '\n```';
+    }
+
+    // 补全未闭合的行内代码
+    const backticks = (text.match(/(?<!`)`(?!`)/g) || []).length;
+    if (backticks % 2 !== 0) {
+      text += '`';
+    }
+
+    // 补全未闭合的粗体
+    const boldMarkers = (text.match(/\*\*/g) || []).length;
+    if (boldMarkers % 2 !== 0) {
+      text += '**';
+    }
+
+    // 补全未闭合的斜体（单个 *）
+    const italicMarkers = (text.match(/(?<!\*)\*(?!\*)/g) || []).length;
+    if (italicMarkers % 2 !== 0) {
+      text += '*';
+    }
+
+    // 补全不完整的表格（有表头但没有分隔行）
+    const lines = text.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.startsWith('|') && line.endsWith('|')) {
+        const nextLine = (lines[i + 1] || '').trim();
+        // 当前行是表格行，但下一行不是分隔行也不是表格行
+        if (nextLine && !nextLine.startsWith('|') && !nextLine.match(/^\|[-:| ]+\|$/)) {
+          // 在当前行后补一个分隔行
+          const colCount = (line.match(/\|/g) || []).length - 1;
+          const separator = '|' + Array(colCount).fill('---').join('|') + '|';
+          lines.splice(i + 1, 0, separator);
+          text = lines.join('\n');
+          break;
+        }
+        // 当前行是表格行，下一行不存在（表格刚开始）
+        if (!nextLine && i > 0) {
+          const colCount = (line.match(/\|/g) || []).length - 1;
+          const separator = '|' + Array(colCount).fill('---').join('|') + '|';
+          lines.splice(i + 1, 0, separator);
+          text = lines.join('\n');
+          break;
+        }
+      }
+    }
+
+    return text;
+  }
+
   function appendCursor(html) {
     const temp = document.createElement('div');
     temp.innerHTML = html;
@@ -741,6 +796,24 @@
       const decoder = new TextDecoder();
       let buffer = '';
       let fullText = '';
+      let eventDataLines = [];
+
+      function renderStreaming(text) {
+        const healed = healMarkdown(text);
+        bubble.innerHTML = appendCursor(renderMarkdown(healed));
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function flushEventData() {
+        if (eventDataLines.length > 0) {
+          const chunk = eventDataLines.join('\n');
+          eventDataLines = [];
+          if (chunk) {
+            fullText += chunk;
+            renderStreaming(fullText);
+          }
+        }
+      }
 
       while (true) {
         const { done, value } = await reader.read();
@@ -752,25 +825,29 @@
 
         for (const line of lines) {
           if (line.startsWith('data:')) {
-            const chunk = line.substring(5);
-            if (chunk) {
-              fullText += chunk;
-              bubble.innerHTML = appendCursor(renderMarkdown(fullText));
-              messagesEl.scrollTop = messagesEl.scrollHeight;
-            }
+            eventDataLines.push(line.substring(5));
+          } else if (line === '') {
+            // 空行 = SSE 事件结束，拼接所有 data 行
+            flushEventData();
+          } else if (eventDataLines.length > 0) {
+            // 没有 data: 前缀但属于当前事件的延续行（含换行的 chunk）
+            eventDataLines.push(line);
           }
         }
       }
 
+      // 处理缓冲区中剩余的数据
       if (buffer.startsWith('data:')) {
-        const chunk = buffer.substring(5);
-        if (chunk) {
-          fullText += chunk;
-          bubble.innerHTML = renderMarkdown(fullText);
-        }
+        eventDataLines.push(buffer.substring(5));
       }
+      flushEventData();
 
-      if (!fullText) bubble.textContent = '(empty)';
+      // 流结束后渲染 markdown
+      if (fullText) {
+        bubble.innerHTML = renderMarkdown(fullText);
+      } else {
+        bubble.textContent = '(empty)';
+      }
 
       // 刷新会话列表（updatedAt 会变）
       loadConversations();
