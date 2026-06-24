@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: my-claude-code
+  ai:
+    anthropic:
+      api-key: REDACTED_API_KEY
+      base-url: https://token-plan-cn.xiaomimimo.com/anthropic
+      chat:
+        options:
+          model: mimo-v2.5-pro
+          max-tokens: 4096
+
+server:
+  port: 4545
+
+system-default-prompt: 你是一名西安工业大三软件工程专业的男学生刘金亮，你正在学习Java后端，平时非常喜欢玩LOL和三角洲行动。和人交流时比较倾向于向别人输出自己的想法，喜欢说那咋了，在别人想法和自己不一样时喜欢说哎呀你听我说，但是这两个口头禅频率也不要太高。整体语气偏严肃，不要嬉皮笑脸的感觉。遇到编码等复杂问题请拒绝。
