@@ -20,6 +20,9 @@
       --accent-dim: #00e67620;
       --user-bg: #1a1a22;
       --danger: #ff5252;
+      --sidebar-bg: #0e0e11;
+      --sidebar-hover: #1a1a22;
+      --sidebar-active: #1a1a2a;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -45,11 +48,112 @@
       z-index: 9999;
     }
 
-    .chat-container {
-      width: 720px;
+    .app {
+      width: 960px;
       height: 92vh;
-      background: var(--surface);
+      display: flex;
       border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    /* ========== 侧边栏 ========== */
+    .sidebar {
+      width: 240px;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sidebar-header .logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 2px;
+    }
+
+    .sidebar-header button {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--accent);
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .sidebar-header button:hover {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+    }
+
+    .conversation-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .conversation-list::-webkit-scrollbar { width: 3px; }
+    .conversation-list::-webkit-scrollbar-track { background: transparent; }
+    .conversation-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .conv-item {
+      padding: 10px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-bottom: 4px;
+      transition: all 0.15s;
+      border: 1px solid transparent;
+    }
+
+    .conv-item:hover {
+      background: var(--sidebar-hover);
+      border-color: var(--border);
+    }
+
+    .conv-item.active {
+      background: var(--sidebar-active);
+      border-color: var(--accent);
+    }
+
+    .conv-item .conv-title {
+      font-size: 13px;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .conv-item.active .conv-title {
+      color: var(--accent);
+    }
+
+    .conv-item .conv-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    /* ========== 主聊天区 ========== */
+    .chat-container {
+      flex: 1;
+      background: var(--surface);
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -209,13 +313,8 @@
       list-style-position: outside;
     }
 
-    .message.ai .bubble ul {
-      list-style-type: disc;
-    }
-
-    .message.ai .bubble ol {
-      list-style-type: decimal;
-    }
+    .message.ai .bubble ul { list-style-type: disc; }
+    .message.ai .bubble ol { list-style-type: decimal; }
 
     .message.ai .bubble li {
       margin-bottom: 6px;
@@ -223,19 +322,9 @@
       display: list-item;
     }
 
-    .message.ai .bubble li::marker {
-      color: var(--accent);
-    }
-
-    .message.ai .bubble strong {
-      color: var(--accent);
-      font-weight: 600;
-    }
-
-    .message.ai .bubble em {
-      color: #a0a0b0;
-      font-style: italic;
-    }
+    .message.ai .bubble li::marker { color: var(--accent); }
+    .message.ai .bubble strong { color: var(--accent); font-weight: 600; }
+    .message.ai .bubble em { color: #a0a0b0; font-style: italic; }
 
     .message.ai .bubble code {
       background: var(--surface-2);
@@ -291,11 +380,6 @@
       border: none;
       border-top: 1px solid var(--border);
       margin: 16px 0;
-    }
-
-    /* 光标容器 */
-    .cursor-wrapper {
-      display: inline;
     }
 
     .cursor-blink {
@@ -416,33 +500,53 @@
       border: 1px solid var(--border);
       font-size: 11px;
     }
+
+    .empty-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      color: var(--text-dim);
+      font-size: 13px;
+    }
   </style>
 </head>
 <body>
 
-<div class="chat-container">
-  <div class="chat-header">
-    <div class="left">
-      <span class="dot"></span>
-      <span class="title">Terminal</span>
+<div class="app">
+  <!-- 侧边栏 -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <span class="logo">>_</span>
+      <button onclick="createConversation()" title="新建会话">+</button>
     </div>
-    <span class="status" id="status">READY</span>
+    <div class="conversation-list" id="convList"></div>
   </div>
-  <div class="chat-messages" id="messages">
-    <div class="welcome">
-      <div class="logo">> _</div>
-      <div class="sub">AI Terminal v1.0</div>
-      <div class="hint"><kbd>Enter</kbd> 发送 &nbsp; <kbd>Shift+Enter</kbd> 换行</div>
+
+  <!-- 聊天区 -->
+  <div class="chat-container">
+    <div class="chat-header">
+      <div class="left">
+        <span class="dot"></span>
+        <span class="title" id="convTitle">Terminal</span>
+      </div>
+      <span class="status" id="status">READY</span>
     </div>
-  </div>
-  <div class="chat-input">
-    <textarea id="input" rows="1" placeholder="输入消息..."></textarea>
-    <button id="sendBtn" onclick="send()">SEND</button>
+    <div class="chat-messages" id="messages">
+      <div class="welcome">
+        <div class="logo">> _</div>
+        <div class="sub">AI Terminal v1.0</div>
+        <div class="hint"><kbd>Enter</kbd> 发送 &nbsp; <kbd>Shift+Enter</kbd> 换行</div>
+      </div>
+    </div>
+    <div class="chat-input">
+      <textarea id="input" rows="1" placeholder="输入消息..."></textarea>
+      <button id="sendBtn" onclick="send()">SEND</button>
+    </div>
   </div>
 </div>
 
 <script>
-  // 配置 marked.js
   marked.setOptions({
     highlight: function(code, lang) {
       if (lang && hljs.getLanguage(lang)) {
@@ -458,7 +562,95 @@
   const inputEl = document.getElementById('input');
   const sendBtn = document.getElementById('sendBtn');
   const statusEl = document.getElementById('status');
-  let welcomeRemoved = false;
+  const convListEl = document.getElementById('convList');
+  const convTitleEl = document.getElementById('convTitle');
+
+  let currentConvId = null;
+  let conversations = [];
+
+  // ========== 会话管理 ==========
+
+  async function loadConversations() {
+    try {
+      const res = await fetch('/agent/conversation/list');
+      const data = await res.json();
+      if (data.code === 1) {
+        conversations = data.data || [];
+        renderConvList();
+      }
+    } catch (e) {
+      console.error('加载会话列表失败:', e);
+    }
+  }
+
+  function renderConvList() {
+    if (conversations.length === 0) {
+      convListEl.innerHTML = '<div class="empty-state">暂无会话</div>';
+      return;
+    }
+    convListEl.innerHTML = conversations.map(c => `
+      <div class="conv-item ${c.id === currentConvId ? 'active' : ''}"
+           onclick="switchConversation(${c.id})">
+        <div class="conv-title">${escapeHtml(c.title)}</div>
+        <div class="conv-time">${formatTime(c.updatedAt)}</div>
+      </div>
+    `).join('');
+  }
+
+  async function createConversation() {
+    try {
+      const res = await fetch('/agent/conversation?title=新对话', { method: 'POST' });
+      const data = await res.json();
+      if (data.code === 1) {
+        await loadConversations();
+        switchConversation(data.data.id);
+      }
+    } catch (e) {
+      console.error('创建会话失败:', e);
+    }
+  }
+
+  async function switchConversation(id) {
+    currentConvId = id;
+    const conv = conversations.find(c => c.id === id);
+    convTitleEl.textContent = conv ? conv.title : 'Terminal';
+    renderConvList();
+    await loadHistory(id);
+  }
+
+  async function loadHistory(convId) {
+    messagesEl.innerHTML = '';
+    try {
+      const res = await fetch(`/agent/conversation/${convId}/messages`);
+      const data = await res.json();
+      if (data.code === 1 && data.data && data.data.length > 0) {
+        for (const msg of data.data) {
+          if (msg.role === 'USER') {
+            addMessage(msg.content, 'user');
+          } else if (msg.role === 'ASSISTANT') {
+            addMessage(msg.content, 'ai');
+          }
+        }
+      } else {
+        showWelcome();
+      }
+    } catch (e) {
+      console.error('加载历史失败:', e);
+      showWelcome();
+    }
+  }
+
+  function showWelcome() {
+    messagesEl.innerHTML = `
+      <div class="welcome">
+        <div class="logo">> _</div>
+        <div class="sub">AI Terminal v1.0</div>
+        <div class="hint"><kbd>Enter</kbd> 发送 &nbsp; <kbd>Shift+Enter</kbd> 换行</div>
+      </div>
+    `;
+  }
+
+  // ========== 聊天 ==========
 
   inputEl.addEventListener('input', () => {
     inputEl.style.height = 'auto';
@@ -472,20 +664,11 @@
     }
   });
 
-  function removeWelcome() {
-    if (!welcomeRemoved) {
-      const w = messagesEl.querySelector('.welcome');
-      if (w) w.remove();
-      welcomeRemoved = true;
-    }
-  }
-
   function renderMarkdown(text) {
     return marked.parse(text);
   }
 
   function appendCursor(html) {
-    // 在最后一个块级元素内部添加光标
     const temp = document.createElement('div');
     temp.innerHTML = html;
     const children = temp.children;
@@ -499,7 +682,10 @@
   }
 
   function addMessage(text, role) {
-    removeWelcome();
+    // 移除欢迎页
+    const welcome = messagesEl.querySelector('.welcome');
+    if (welcome) welcome.remove();
+
     const wrapper = document.createElement('div');
     wrapper.className = `message ${role}`;
     wrapper.innerHTML = `
@@ -521,6 +707,22 @@
     const text = inputEl.value.trim();
     if (!text) return;
 
+    // 没有当前会话时自动创建
+    if (!currentConvId) {
+      try {
+        const res = await fetch('/agent/conversation?title=新对话', { method: 'POST' });
+        const data = await res.json();
+        if (data.code === 1) {
+          currentConvId = data.data.id;
+          await loadConversations();
+          convTitleEl.textContent = data.data.title;
+        }
+      } catch (e) {
+        console.error('自动创建会话失败:', e);
+        return;
+      }
+    }
+
     addMessage(text, 'user');
     inputEl.value = '';
     inputEl.style.height = 'auto';
@@ -533,7 +735,7 @@
     bubble.innerHTML = '<span class="cursor-blink"></span>';
 
     try {
-      const url = `/agent/chat/stream?message=${encodeURIComponent(text)}`;
+      const url = `/agent/chat/stream?conversationId=${currentConvId}&message=${encodeURIComponent(text)}`;
       const res = await fetch(url);
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -570,10 +772,12 @@
 
       if (!fullText) bubble.textContent = '(empty)';
 
+      // 刷新会话列表（updatedAt 会变）
+      loadConversations();
+
     } catch (err) {
       bubble.textContent = 'ERROR: ' + err.message;
       bubble.style.color = 'var(--danger)';
-      cursor.remove();
     } finally {
       sendBtn.disabled = false;
       statusEl.textContent = 'READY';
@@ -581,6 +785,29 @@
       inputEl.focus();
     }
   }
+
+  // ========== 工具函数 ==========
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function formatTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    if (isToday) {
+      return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    }
+    return d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+  }
+
+  // ========== 初始化 ==========
+
+  loadConversations();
 </script>
 
 </body>
