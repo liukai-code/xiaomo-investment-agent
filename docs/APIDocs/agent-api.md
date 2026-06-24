@@ -146,9 +146,41 @@ curl "http://localhost:4545/agent/conversation/1/messages"
 
 ---
 
+### 4. 生成会话标题
+
+```
+POST /agent/conversation/{id}/generate-title
+```
+
+LLM 根据会话前几条消息自动生成简短标题（≤15字）。仅当标题为默认值"新对话"时才会生成新标题。
+
+**路径参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| id | Long | 会话 ID |
+
+**请求示例：**
+
+```bash
+curl -X POST "http://localhost:4545/agent/conversation/1/generate-title"
+```
+
+**响应示例：**
+
+```json
+{
+  "code": 1,
+  "msg": null,
+  "data": "基金投资入门指南"
+}
+```
+
+---
+
 ## 二、聊天
 
-### 4. 同步聊天
+### 5. 同步聊天
 
 ```
 GET /agent/chat
@@ -181,7 +213,7 @@ curl "http://localhost:4545/agent/chat?conversationId=1&message=什么是基金"
 
 ---
 
-### 5. 流式聊天
+### 6. 流式聊天
 
 ```
 GET /agent/chat/stream
