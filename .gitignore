@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Logs ###
+app.log
+/.claude/settings.local.json
