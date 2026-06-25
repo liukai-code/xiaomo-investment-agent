@@ -166,6 +166,8 @@ public class AgentLoopImpl implements AgentLoop {
         if (user != null) {
             enrichedPrompt += "\n\n[用户信息]\n当前用户：" + user.getUsername() + "（ID: " + userId + "）";
         }
+        enrichedPrompt += "\n\n[当前时间]\n" + java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm:ss EEEE"));
         context.add(new SystemMessage(enrichedPrompt));
 
         List<ChatMessage> recentMessages = chatMessageRepository
