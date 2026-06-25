@@ -3,6 +3,7 @@ package com.itlk.myclaudecode.agent.service.Impl;
 import com.itlk.myclaudecode.agent.Entity.*;
 import com.itlk.myclaudecode.agent.repository.ChatMessageRepository;
 import com.itlk.myclaudecode.agent.repository.ConversationRepository;
+import com.itlk.myclaudecode.agent.repository.UserRepository;
 import com.itlk.myclaudecode.agent.service.AgentLoop;
 import com.itlk.myclaudecode.tool.FileListTool;
 import com.itlk.myclaudecode.tool.FileReadTool;
@@ -41,6 +42,9 @@ public class AgentLoopImpl implements AgentLoop {
 
     @Resource
     private ChatMessageRepository chatMessageRepository;
+
+    @Resource
+    private UserRepository userRepository;
 
     public AgentLoopImpl(ChatModel chatModel,
                          FileReadTool fileReadTool,
@@ -84,7 +88,7 @@ public class AgentLoopImpl implements AgentLoop {
 
         saveMessage(conversation, MessageRole.USER, message, null, null);
 
-        List<Message> context = buildContext(conversation.getId());
+        List<Message> context = buildContext(conversation.getId(), userId);
 
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
@@ -108,7 +112,7 @@ public class AgentLoopImpl implements AgentLoop {
 
         saveMessage(conversation, MessageRole.USER, message, null, null);
 
-        List<Message> context = buildContext(conversation.getId());
+        List<Message> context = buildContext(conversation.getId(), userId);
         Long convId = conversation.getId();
 
         StringBuilder accumulated = new StringBuilder();
@@ -145,10 +149,15 @@ public class AgentLoopImpl implements AgentLoop {
         }
     }
 
-    private List<Message> buildContext(Long conversationId) {
+    private List<Message> buildContext(Long conversationId, Long userId) {
         List<Message> context = new ArrayList<>();
 
-        context.add(new SystemMessage(systemPrompt));
+        String enrichedPrompt = systemPrompt;
+        User user = userRepository.findById(userId).orElse(null);
+        if (user != null) {
+            enrichedPrompt += "\n\n[用户信息]\n当前用户：" + user.getUsername() + "（ID: " + userId + "）";
+        }
+        context.add(new SystemMessage(enrichedPrompt));
 
         List<ChatMessage> recentMessages = chatMessageRepository
                 .findRecentByConversationId(conversationId, MAX_CONTEXT_MESSAGES);
