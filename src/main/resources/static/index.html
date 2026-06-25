@@ -801,12 +801,13 @@
   async function handleLogin(e) {
     e.preventDefault();
     const username = document.getElementById('loginUsername').value.trim();
-    const password = document.getElementById('loginPassword').value;
+    const rawPassword = document.getElementById('loginPassword').value;
     const errorEl = document.getElementById('loginError');
     errorEl.textContent = '';
     errorEl.style.color = '';
 
     try {
+      const password = await sha256(rawPassword);
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -832,17 +833,18 @@
   async function handleRegister(e) {
     e.preventDefault();
     const username = document.getElementById('regUsername').value.trim();
-    const password = document.getElementById('regPassword').value;
-    const password2 = document.getElementById('regPassword2').value;
+    const rawPassword = document.getElementById('regPassword').value;
+    const rawPassword2 = document.getElementById('regPassword2').value;
     const errorEl = document.getElementById('regError');
     errorEl.textContent = '';
 
-    if (password !== password2) {
+    if (rawPassword !== rawPassword2) {
       errorEl.textContent = '两次密码不一致';
       return;
     }
 
     try {
+      const password = await sha256(rawPassword);
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1152,6 +1154,11 @@
   }
 
   // ========== 工具函数 ==========
+
+  async function sha256(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
 
   function escapeHtml(str) {
     const div = document.createElement('div');
