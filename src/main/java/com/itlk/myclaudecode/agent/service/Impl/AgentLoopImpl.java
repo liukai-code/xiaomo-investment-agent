@@ -18,6 +18,8 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,13 +52,20 @@ public class AgentLoopImpl implements AgentLoop {
                          FileReadTool fileReadTool,
                          FileWriteTool fileWriteTool,
                          FileListTool fileListTool,
+                         ToolCallbackProvider toolCallbackProvider,
                          @Value("${system-default-prompt}") String systemPrompt) {
         this.chatModel = chatModel;
         this.systemPrompt = systemPrompt;
 
-        this.chatClient = ChatClient.builder(chatModel)
-                .defaultTools(fileReadTool, fileWriteTool, fileListTool)
-                .build();
+        ChatClient.Builder builder = ChatClient.builder(chatModel)
+                .defaultTools(fileReadTool, fileWriteTool, fileListTool);
+
+        if (toolCallbackProvider != null) {
+            builder.defaultToolCallbacks(toolCallbackProvider);
+            log.info("已注册 MCP 工具: {}", (Object) toolCallbackProvider.getToolCallbacks());
+        }
+
+        this.chatClient = builder.build();
     }
 
     @Override

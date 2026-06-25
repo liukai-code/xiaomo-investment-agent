@@ -24,6 +24,17 @@ spring:
         options:
           model: mimo-v2.5-pro
           max-tokens: 4096
+    mcp:
+      client:
+        enabled: true
+        request-timeout: 60s
+        toolcallback:
+          enabled: true
+        sse:
+          connections:
+            baidu-ai-search:
+              url: "http://appbuilder.baidu.com/v2/ai_search/mcp/"
+              sse-endpoint: "sse?api_key=REDACTED_BAIDU_KEY"
 
 server:
   port: 4545
@@ -43,6 +54,7 @@ system-default-prompt: |
   工具使用：
   - 用户提及文件内容时，先用list_files查找，再用read_file读取
   - 用户要求整理时，用write_file保存
+  - 用户询问实时信息、新闻、市场动态、最新政策时，使用百度搜索工具联网查询
   - 工具失败时告知用户
 
   禁止事项：
