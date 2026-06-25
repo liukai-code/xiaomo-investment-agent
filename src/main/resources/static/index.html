@@ -745,19 +745,11 @@
       let fullText = '';
       let lastRenderTime = 0;
 
-      // 断句：在句末标点后加换行，让 markdown 能识别段落
-      function sentenceBuffer(text) {
-        return text
-          .replace(/([。！？])/g, '$1\n')
-          .replace(/(\. |\? |\! )/g, '$1\n');
-      }
-
       // 流式渲染：markdown 解析 + 光标
       function renderStreaming(text) {
-        const processed = sentenceBuffer(text);
         bubble.innerHTML = '';
         const container = document.createElement('div');
-        container.innerHTML = renderMarkdown(processed);
+        container.innerHTML = renderMarkdown(text);
         bubble.appendChild(container);
         const cursor = document.createElement('span');
         cursor.className = 'cursor-blink';
@@ -773,31 +765,50 @@
         renderStreaming(text);
       }
 
+      // 解析 SSE 事件，保留数据内部换行
+      function processEvents(raw) {
+        const events = raw.split(/\n\n/);
+        const incomplete = events.pop(); // 保留未完成的部分
+        let content = '';
+        for (const event of events) {
+          if (!event.trim()) continue;
+          const lines = event.split(/\n/);
+          for (const line of lines) {
+            if (line.startsWith('data:')) {
+              if (content) content += '\n';
+              content += line.substring(5);
+            }
+          }
+        }
+        return { content, incomplete: incomplete || '' };
+      }
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split(/\r?\n/);
-        buffer = lines.pop();
-
-        for (const line of lines) {
-          if (line.startsWith('data:')) {
-            fullText += line.substring(5);
-            throttledRender(fullText);
-          }
+        const result = processEvents(buffer);
+        buffer = result.incomplete;
+        if (result.content) {
+          fullText += result.content;
+          throttledRender(fullText);
         }
       }
 
       // 处理缓冲区剩余
-      if (buffer) {
-        const chunk = buffer.startsWith('data:') ? buffer.substring(5) : buffer;
-        if (chunk) fullText += chunk;
+      if (buffer.trim()) {
+        const lines = buffer.split(/\n/);
+        for (const line of lines) {
+          if (line.startsWith('data:')) {
+            fullText += line.substring(5);
+          }
+        }
       }
 
       // 流结束后最终渲染（完整 markdown）
       if (fullText) {
-        bubble.innerHTML = renderMarkdown(sentenceBuffer(fullText));
+        bubble.innerHTML = renderMarkdown(fullText);
       } else {
         bubble.textContent = '(empty)';
       }
