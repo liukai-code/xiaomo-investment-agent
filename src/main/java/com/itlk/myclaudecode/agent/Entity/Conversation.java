@@ -18,6 +18,9 @@ public class Conversation {
     @Column(length = 200)
     private String title;
 
+    @Column(name = "user_id")
+    private Long userId;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

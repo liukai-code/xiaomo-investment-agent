@@ -125,6 +125,12 @@
       border-color: var(--accent);
     }
 
+    #logoutBtn:hover {
+      background: rgba(255, 82, 82, 0.15);
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
     .conversation-list {
       flex: 1;
       overflow-y: auto;
@@ -543,18 +549,151 @@
     .light .message.ai .bubble th { background: #f6f8fa; }
     .light .message.ai .bubble th, .light .message.ai .bubble td { border-color: var(--border); }
     .light .chat-container::before { opacity: 0.2; }
+
+    /* ========== 登录页 ========== */
+    #authPage {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+    }
+
+    .auth-container {
+      width: 360px;
+      padding: 40px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .auth-logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--accent);
+      text-align: center;
+      letter-spacing: 4px;
+      margin-bottom: 32px;
+    }
+
+    .auth-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .auth-tab {
+      flex: 1;
+      padding: 10px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .auth-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .auth-form input {
+      padding: 12px 16px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: 'Noto Sans SC', sans-serif;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .auth-form input:focus {
+      border-color: var(--accent);
+    }
+
+    .auth-form input::placeholder {
+      color: var(--text-dim);
+    }
+
+    .auth-submit {
+      padding: 12px;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-top: 8px;
+    }
+
+    .auth-submit:hover {
+      background: #33eb91;
+      box-shadow: 0 0 16px var(--accent-dim);
+    }
+
+    .auth-error {
+      color: var(--danger);
+      font-size: 12px;
+      min-height: 16px;
+      font-family: 'JetBrains Mono', monospace;
+    }
   </style>
 </head>
 <body>
+
+<!-- 登录/注册页 -->
+<div id="authPage" style="display:none;">
+  <div class="auth-container">
+    <div class="auth-logo">>_ TERMINAL</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuthTab('login')">LOGIN</button>
+      <button class="auth-tab" onclick="switchAuthTab('register')">REGISTER</button>
+    </div>
+    <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
+      <input type="text" id="loginUsername" placeholder="用户名" autocomplete="username" required>
+      <input type="password" id="loginPassword" placeholder="密码" autocomplete="current-password" required>
+      <div id="loginError" class="auth-error"></div>
+      <button type="submit" class="auth-submit">LOGIN</button>
+    </form>
+    <form id="registerForm" class="auth-form" style="display:none;" onsubmit="handleRegister(event)">
+      <input type="text" id="regUsername" placeholder="用户名" autocomplete="username" required>
+      <input type="password" id="regPassword" placeholder="密码 (至少6位)" autocomplete="new-password" required>
+      <input type="password" id="regPassword2" placeholder="确认密码" autocomplete="new-password" required>
+      <div id="regError" class="auth-error"></div>
+      <button type="submit" class="auth-submit">REGISTER</button>
+    </form>
+  </div>
+</div>
 
 <div class="app">
   <!-- 侧边栏 -->
   <div class="sidebar">
     <div class="sidebar-header">
-      <span class="logo">>_</span>
+      <span class="logo" id="userLabel">>_</span>
       <div class="header-actions">
         <button onclick="toggleTheme()" title="切换主题" id="themeBtn">☀</button>
         <button onclick="createConversation()" title="新建会话">+</button>
+        <button onclick="logout()" title="退出登录" id="logoutBtn">⏻</button>
       </div>
     </div>
     <div class="conversation-list" id="convList"></div>
@@ -605,11 +744,163 @@
   let currentConvId = null;
   let conversations = [];
 
+  // ========== 认证 ==========
+
+  function getToken() {
+    return localStorage.getItem('token');
+  }
+
+  function setAuth(token, userId, username) {
+    localStorage.setItem('token', token);
+    localStorage.setItem('userId', userId);
+    localStorage.setItem('username', username);
+  }
+
+  function clearAuth() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('username');
+  }
+
+  function showAuthPage() {
+    document.getElementById('authPage').style.display = 'flex';
+    document.querySelector('.app').style.display = 'none';
+  }
+
+  function hideAuthPage() {
+    document.getElementById('authPage').style.display = 'none';
+    document.querySelector('.app').style.display = 'flex';
+    updateUsernameDisplay();
+  }
+
+  function updateUsernameDisplay() {
+    const username = localStorage.getItem('username');
+    const label = document.getElementById('userLabel');
+    if (username && label) {
+      label.textContent = '> ' + username;
+    }
+  }
+
+  function switchAuthTab(tab) {
+    const tabs = document.querySelectorAll('.auth-tab');
+    tabs.forEach(t => t.classList.remove('active'));
+    if (tab === 'login') {
+      tabs[0].classList.add('active');
+      document.getElementById('loginForm').style.display = 'flex';
+      document.getElementById('registerForm').style.display = 'none';
+    } else {
+      tabs[1].classList.add('active');
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('registerForm').style.display = 'flex';
+    }
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('loginError').style.color = '';
+    document.getElementById('regError').textContent = '';
+  }
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errorEl = document.getElementById('loginError');
+    errorEl.textContent = '';
+    errorEl.style.color = '';
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (data.code === 1) {
+        setAuth(data.data.token, data.data.userId, data.data.username);
+        currentConvId = null;
+        conversations = [];
+        convTitleEl.textContent = 'Terminal';
+        showWelcome();
+        hideAuthPage();
+        loadConversations();
+      } else {
+        errorEl.textContent = data.msg || '登录失败';
+      }
+    } catch (err) {
+      errorEl.textContent = '网络错误';
+    }
+  }
+
+  async function handleRegister(e) {
+    e.preventDefault();
+    const username = document.getElementById('regUsername').value.trim();
+    const password = document.getElementById('regPassword').value;
+    const password2 = document.getElementById('regPassword2').value;
+    const errorEl = document.getElementById('regError');
+    errorEl.textContent = '';
+
+    if (password !== password2) {
+      errorEl.textContent = '两次密码不一致';
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (data.code === 1) {
+        switchAuthTab('login');
+        document.getElementById('loginUsername').value = username;
+        const loginError = document.getElementById('loginError');
+        loginError.style.color = 'var(--accent)';
+        loginError.textContent = '注册成功，请登录';
+      } else {
+        errorEl.textContent = data.msg || '注册失败';
+      }
+    } catch (err) {
+      errorEl.textContent = '网络错误';
+    }
+  }
+
+  async function logout() {
+    try {
+      await authFetch('/api/auth/logout', { method: 'POST' });
+    } catch (e) {
+      // ignore
+    }
+    clearAuth();
+    currentConvId = null;
+    conversations = [];
+    convTitleEl.textContent = 'Terminal';
+    showWelcome();
+    showAuthPage();
+  }
+
+  async function authFetch(url, options = {}) {
+    const token = getToken();
+    if (!token) {
+      showAuthPage();
+      throw new Error('未登录');
+    }
+    const headers = options.headers || {};
+    headers['Authorization'] = 'Bearer ' + token;
+    options.headers = headers;
+
+    const res = await fetch(url, options);
+    if (res.status === 401) {
+      clearAuth();
+      showAuthPage();
+      throw new Error('登录已过期');
+    }
+    return res;
+  }
+
   // ========== 会话管理 ==========
 
   async function loadConversations() {
     try {
-      const res = await fetch('/agent/conversation/list');
+      const res = await authFetch('/agent/conversation/list');
       const data = await res.json();
       if (data.code === 1) {
         conversations = data.data || [];
@@ -636,7 +927,7 @@
 
   async function createConversation() {
     try {
-      const res = await fetch('/agent/conversation?title=新对话', { method: 'POST' });
+      const res = await authFetch('/agent/conversation?title=新对话', { method: 'POST' });
       const data = await res.json();
       if (data.code === 1) {
         await loadConversations();
@@ -658,7 +949,7 @@
   async function loadHistory(convId) {
     messagesEl.innerHTML = '';
     try {
-      const res = await fetch(`/agent/conversation/${convId}/messages`);
+      const res = await authFetch(`/agent/conversation/${convId}/messages`);
       const data = await res.json();
       if (data.code === 1 && data.data && data.data.length > 0) {
         for (const msg of data.data) {
@@ -681,7 +972,7 @@
     const conv = conversations.find(c => c.id === convId);
     if (!conv || conv.title !== '新对话') return;
     try {
-      const res = await fetch(`/agent/conversation/${convId}/generate-title`, { method: 'POST' });
+      const res = await authFetch(`/agent/conversation/${convId}/generate-title`, { method: 'POST' });
       const data = await res.json();
       if (data.code === 1 && data.data) {
         convTitleEl.textContent = data.data;
@@ -721,7 +1012,6 @@
   }
 
   function addMessage(text, role) {
-    // 移除欢迎页
     const welcome = messagesEl.querySelector('.welcome');
     if (welcome) welcome.remove();
 
@@ -746,10 +1036,9 @@
     const text = inputEl.value.trim();
     if (!text) return;
 
-    // 没有当前会话时自动创建
     if (!currentConvId) {
       try {
-        const res = await fetch('/agent/conversation?title=新对话', { method: 'POST' });
+        const res = await authFetch('/agent/conversation?title=新对话', { method: 'POST' });
         const data = await res.json();
         if (data.code === 1) {
           currentConvId = data.data.id;
@@ -775,14 +1064,16 @@
 
     try {
       const url = `/agent/chat/stream?conversationId=${currentConvId}&message=${encodeURIComponent(text)}`;
-      const res = await fetch(url);
+      const res = await authFetch(url);
+      if (!res.ok) {
+        throw new Error('请求失败: ' + res.status);
+      }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
       let fullText = '';
       let lastRenderTime = 0;
 
-      // 流式渲染：markdown 解析 + 光标
       function renderStreaming(text) {
         bubble.innerHTML = '';
         const container = document.createElement('div');
@@ -794,7 +1085,6 @@
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
 
-      // 节流：30ms 内只渲染一次
       function throttledRender(text) {
         const now = Date.now();
         if (now - lastRenderTime < 30) return;
@@ -802,10 +1092,9 @@
         renderStreaming(text);
       }
 
-      // 解析 SSE 事件，保留数据内部换行
       function processEvents(raw) {
         const events = raw.split(/\n\n/);
-        const incomplete = events.pop(); // 保留未完成的部分
+        const incomplete = events.pop();
         let content = '';
         for (const event of events) {
           if (!event.trim()) continue;
@@ -833,7 +1122,6 @@
         }
       }
 
-      // 处理缓冲区剩余
       if (buffer.trim()) {
         const lines = buffer.split(/\n/);
         for (const line of lines) {
@@ -843,17 +1131,13 @@
         }
       }
 
-      // 流结束后最终渲染（完整 markdown）
       if (fullText) {
         bubble.innerHTML = renderMarkdown(fullText);
       } else {
         bubble.textContent = '(empty)';
       }
 
-      // 刷新会话列表（updatedAt 会变）
       loadConversations();
-
-      // 自动生成会话标题
       generateTitle(currentConvId);
 
     } catch (err) {
@@ -893,28 +1177,45 @@
     const isLight = html.classList.toggle('light');
     document.getElementById('themeBtn').textContent = isLight ? '☾' : '☀';
     localStorage.setItem('theme', isLight ? 'light' : 'dark');
-    // 切换 highlight.js 主题
     const link = document.getElementById('hljs-theme');
     link.href = isLight
       ? 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css'
       : 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css';
-    // 重新高亮已有的代码块
     document.querySelectorAll('.message.ai pre code').forEach(el => hljs.highlightElement(el));
   }
 
-  // 初始化主题
-  (function initTheme() {
+  // ========== 初始化 ==========
+
+  (function init() {
+    // 主题
     const saved = localStorage.getItem('theme');
     if (saved === 'light') {
       document.documentElement.classList.add('light');
       document.getElementById('hljs-theme').href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css';
       document.getElementById('themeBtn').textContent = '☾';
     }
+
+    // 认证
+    const token = getToken();
+    if (token) {
+      fetch('/api/auth/me', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      }).then(res => res.json()).then(data => {
+        if (data.code === 1) {
+          hideAuthPage();
+          loadConversations();
+        } else {
+          clearAuth();
+          showAuthPage();
+        }
+      }).catch(() => {
+        clearAuth();
+        showAuthPage();
+      });
+    } else {
+      showAuthPage();
+    }
   })();
-
-  // ========== 初始化 ==========
-
-  loadConversations();
 </script>
 
 </body>

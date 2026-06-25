@@ -7,15 +7,15 @@ import java.util.List;
 
 public interface AgentLoop {
 
-    Conversation createConversation(String title);
+    Conversation createConversation(Long userId, String title);
 
-    List<Conversation> listConversations();
+    List<Conversation> listConversations(Long userId);
 
-    List<ChatMessage> getHistory(Long conversationId);
+    List<ChatMessage> getHistory(Long userId, Long conversationId);
 
-    String chat(Long conversationId, String message);
+    String chat(Long userId, Long conversationId, String message);
 
-    Flux<String> chatStream(Long conversationId, String message);
+    Flux<String> chatStream(Long userId, Long conversationId, String message);
 
-    String generateTitle(Long conversationId);
+    String generateTitle(Long userId, Long conversationId);
 }

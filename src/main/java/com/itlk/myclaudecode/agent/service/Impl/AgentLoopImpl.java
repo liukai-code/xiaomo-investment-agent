@@ -57,31 +57,33 @@ public class AgentLoopImpl implements AgentLoop {
 
     @Override
     @Transactional
-    public Conversation createConversation(String title) {
+    public Conversation createConversation(Long userId, String title) {
         Conversation conversation = new Conversation();
+        conversation.setUserId(userId);
         conversation.setTitle(title);
         return conversationRepository.save(conversation);
     }
 
     @Override
-    public List<Conversation> listConversations() {
-        return conversationRepository.findAllByOrderByUpdatedAtDesc();
+    public List<Conversation> listConversations(Long userId) {
+        return conversationRepository.findByUserIdOrderByUpdatedAtDesc(userId);
     }
 
     @Override
-    public List<ChatMessage> getHistory(Long conversationId) {
+    public List<ChatMessage> getHistory(Long userId, Long conversationId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("会话不存在: " + conversationId));
+        checkOwnership(conversation, userId);
         return chatMessageRepository.findByConversationIdOrderByIdAsc(conversationId);
     }
 
     @Override
     @Transactional
-    public String chat(Long conversationId, String message) {
-        Conversation conversation = getOrCreateConversation(conversationId);
+    public String chat(Long userId, Long conversationId, String message) {
+        Conversation conversation = getOrCreateConversation(userId, conversationId);
 
-        // 保存用户消息
         saveMessage(conversation, MessageRole.USER, message, null, null);
 
-        // 构建上下文
         List<Message> context = buildContext(conversation.getId());
 
         AnthropicChatOptions options = AnthropicChatOptions.builder()
@@ -94,7 +96,6 @@ public class AgentLoopImpl implements AgentLoop {
                 .call()
                 .content();
 
-        // 保存助手回复
         saveMessage(conversation, MessageRole.ASSISTANT, response, null, null);
 
         return response;
@@ -102,13 +103,11 @@ public class AgentLoopImpl implements AgentLoop {
 
     @Override
     @Transactional
-    public Flux<String> chatStream(Long conversationId, String message) {
-        Conversation conversation = getOrCreateConversation(conversationId);
+    public Flux<String> chatStream(Long userId, Long conversationId, String message) {
+        Conversation conversation = getOrCreateConversation(userId, conversationId);
 
-        // 保存用户消息
         saveMessage(conversation, MessageRole.USER, message, null, null);
 
-        // 构建上下文
         List<Message> context = buildContext(conversation.getId());
         Long convId = conversation.getId();
 
@@ -126,37 +125,40 @@ public class AgentLoopImpl implements AgentLoop {
                 .doOnNext(accumulated::append)
                 .doOnComplete(() -> {
                     String fullResponse = accumulated.toString();
-                    // 需要在新事务中保存，因为 doOnComplete 可能在不同线程
                     saveAssistantMessage(convId, fullResponse);
                 });
     }
 
-    private Conversation getOrCreateConversation(Long conversationId) {
+    private Conversation getOrCreateConversation(Long userId, Long conversationId) {
         if (conversationId != null) {
-            return conversationRepository.findById(conversationId)
+            Conversation conversation = conversationRepository.findById(conversationId)
                     .orElseThrow(() -> new RuntimeException("会话不存在: " + conversationId));
+            checkOwnership(conversation, userId);
+            return conversation;
         }
-        return createConversation("新对话");
+        return createConversation(userId, "新对话");
+    }
+
+    private void checkOwnership(Conversation conversation, Long userId) {
+        if (conversation.getUserId() != null && !conversation.getUserId().equals(userId)) {
+            throw new RuntimeException("无权访问该会话");
+        }
     }
 
     private List<Message> buildContext(Long conversationId) {
         List<Message> context = new ArrayList<>();
 
-        // 注入 system prompt
         context.add(new SystemMessage(systemPrompt));
 
-        // 从 DB 加载最近的消息
         List<ChatMessage> recentMessages = chatMessageRepository
                 .findRecentByConversationId(conversationId, MAX_CONTEXT_MESSAGES);
 
-        // 查询返回的是倒序，需要反转
         Collections.reverse(recentMessages);
 
         for (ChatMessage msg : recentMessages) {
             switch (msg.getRole()) {
                 case USER -> context.add(new UserMessage(msg.getContent()));
                 case ASSISTANT -> context.add(new AssistantMessage(msg.getContent()));
-                // SYSTEM 和 TOOL 消息暂不回放给上下文
             }
         }
 
@@ -183,16 +185,15 @@ public class AgentLoopImpl implements AgentLoop {
 
     @Override
     @Transactional
-    public String generateTitle(Long conversationId) {
+    public String generateTitle(Long userId, Long conversationId) {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("会话不存在: " + conversationId));
+        checkOwnership(conversation, userId);
 
-        // 只有默认标题才需要生成
         if (!"新对话".equals(conversation.getTitle())) {
             return conversation.getTitle();
         }
 
-        // 取前几条消息作为上下文
         List<ChatMessage> messages = chatMessageRepository
                 .findRecentByConversationId(conversationId, 4);
         Collections.reverse(messages);
