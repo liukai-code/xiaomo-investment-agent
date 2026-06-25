@@ -35,11 +35,15 @@ public class FinancialDataTool {
     @Tool(description = "查询A股股票实时行情。当用户询问A股股价、涨跌幅、成交量时调用。股票代码格式：沪市6位数字如600519（贵州茅台），深市6位数字如000858（五粮液）。")
     public String getAShareQuote(
             @ToolParam(description = "A股股票代码，如600519、000858") String stockCode) {
+        log.info("[FinancialDataTool] getAShareQuote 入参: stockCode={}", stockCode);
         try {
             validateCode(stockCode, "股票代码");
             String symbol = buildAShareSymbol(stockCode);
-            return fetchTencentQuote(symbol, stockCode, "A股");
+            String result = fetchTencentQuote(symbol, stockCode, "A股");
+            log.info("[FinancialDataTool] getAShareQuote 出参: {}", result);
+            return result;
         } catch (Exception e) {
+            log.error("[FinancialDataTool] getAShareQuote 异常: {}", e.getMessage(), e);
             return "查询A股行情失败: " + e.getMessage();
         }
     }
@@ -47,11 +51,15 @@ public class FinancialDataTool {
     @Tool(description = "查询港股股票实时行情。当用户询问港股股价、涨跌幅时调用。股票代码格式：5位数字如00700（腾讯）、09988（阿里巴巴）。")
     public String getHKStockQuote(
             @ToolParam(description = "港股股票代码，如00700、09988") String stockCode) {
+        log.info("[FinancialDataTool] getHKStockQuote 入参: stockCode={}", stockCode);
         try {
             validateCode(stockCode, "港股代码");
             String symbol = "hk" + stockCode;
-            return fetchTencentQuote(symbol, stockCode, "港股");
+            String result = fetchTencentQuote(symbol, stockCode, "港股");
+            log.info("[FinancialDataTool] getHKStockQuote 出参: {}", result);
+            return result;
         } catch (Exception e) {
+            log.error("[FinancialDataTool] getHKStockQuote 异常: {}", e.getMessage(), e);
             return "查询港股行情失败: " + e.getMessage();
         }
     }
@@ -59,11 +67,15 @@ public class FinancialDataTool {
     @Tool(description = "查询美股股票实时行情。当用户询问美股股价、涨跌幅时调用。股票代码格式：公司简称如AAPL（苹果）、MSFT（微软）、TSLA（特斯拉）。")
     public String getUSStockQuote(
             @ToolParam(description = "美股股票代码，如AAPL、MSFT、TSLA") String stockCode) {
+        log.info("[FinancialDataTool] getUSStockQuote 入参: stockCode={}", stockCode);
         try {
             validateCode(stockCode, "美股代码");
             String symbol = "us" + stockCode.toUpperCase();
-            return fetchTencentQuote(symbol, stockCode, "美股");
+            String result = fetchTencentQuote(symbol, stockCode, "美股");
+            log.info("[FinancialDataTool] getUSStockQuote 出参: {}", result);
+            return result;
         } catch (Exception e) {
+            log.error("[FinancialDataTool] getUSStockQuote 异常: {}", e.getMessage(), e);
             return "查询美股行情失败: " + e.getMessage();
         }
     }
@@ -71,17 +83,21 @@ public class FinancialDataTool {
     @Tool(description = "查询基金净值信息。当用户询问基金净值、基金估值、基金涨跌时调用。基金代码为6位数字，如110011（易方达中小盘）、161725（招商中证白酒）。")
     public String getFundNav(
             @ToolParam(description = "基金代码，如110011、161725") String fundCode) {
+        log.info("[FinancialDataTool] getFundNav 入参: fundCode={}", fundCode);
         try {
             validateCode(fundCode, "基金代码");
-            return fetchFundNav(fundCode);
+            String result = fetchFundNav(fundCode);
+            log.info("[FinancialDataTool] getFundNav 出参: {}", result);
+            return result;
         } catch (Exception e) {
-            log.error("基金净值查询失败: {}", e.getMessage());
+            log.error("[FinancialDataTool] getFundNav 异常: {}", e.getMessage(), e);
             return "查询基金净值失败: " + e.getMessage();
         }
     }
 
     private String fetchTencentQuote(String symbol, String stockCode, String marketName) {
         String url = "https://qt.gtimg.cn/q=" + symbol;
+        log.info("[FinancialDataTool] fetchTencentQuote 请求URL: {}", url);
 
         Headers headers = new Headers.Builder()
                 .add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -89,6 +105,7 @@ public class FinancialDataTool {
 
         try {
             String body = httpGet(url, headers);
+            log.info("[FinancialDataTool] fetchTencentQuote 响应体: {}", body);
             if (body == null || body.isBlank()) {
                 return "接口返回为空，股票代码: " + stockCode;
             }
@@ -152,6 +169,7 @@ public class FinancialDataTool {
 
     private String fetchFundNav(String fundCode) {
         String url = "https://fundgz.1234567.com.cn/js/" + fundCode + ".js";
+        log.info("[FinancialDataTool] fetchFundNav 请求URL: {}", url);
 
         Headers headers = new Headers.Builder()
                 .add("Referer", "https://fund.eastmoney.com")
@@ -160,6 +178,7 @@ public class FinancialDataTool {
 
         try {
             String body = httpGet(url, headers);
+            log.info("[FinancialDataTool] fetchFundNav 响应体: {}", body);
 
             if (body == null || body.isBlank()) {
                 return "接口返回为空，基金代码: " + fundCode;
@@ -217,11 +236,21 @@ public class FinancialDataTool {
                 .get()
                 .build();
 
+        log.info("[FinancialDataTool] httpGet 发起请求: {} {}", request.method(), request.url());
+        log.debug("[FinancialDataTool] httpGet 请求头: {}", request.headers());
+
+        long startTime = System.currentTimeMillis();
         try (Response response = okHttpClient.newCall(request).execute()) {
+            long costTime = System.currentTimeMillis() - startTime;
+            log.info("[FinancialDataTool] httpGet 响应状态: {}, 耗时: {}ms", response.code(), costTime);
+
             if (!response.isSuccessful()) {
+                log.error("[FinancialDataTool] httpGet HTTP错误: {}", response.code());
                 throw new RuntimeException("HTTP 请求失败: " + response.code());
             }
-            return response.body() != null ? response.body().string() : null;
+            String body = response.body() != null ? response.body().string() : null;
+            log.debug("[FinancialDataTool] httpGet 响应体长度: {}", body != null ? body.length() : 0);
+            return body;
         }
     }
 
