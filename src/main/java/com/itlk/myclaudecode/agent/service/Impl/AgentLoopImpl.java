@@ -197,7 +197,11 @@ public class AgentLoopImpl implements AgentLoop {
                 .findRecentByConversationId(conversationId, 4);
         Collections.reverse(messages);
 
-        StringBuilder prompt = new StringBuilder("根据以下对话内容，生成一个简短的标题,聚焦于用户提出的问题（不超过15个字，不要加引号）：\n\n");
+        StringBuilder prompt = new StringBuilder(
+                "根据以下对话内容，用不超过15个汉字生成一个简短标题。" +
+                "规则：1）直接输出标题，不要解释；2）不要加引号；" +
+                "3）如果用户没有提出明确问题，用用户的原始消息作为标题（截取前15字）；" +
+                "4）严禁超过15个字。\n\n");
         for (ChatMessage msg : messages) {
             if (msg.getRole() == MessageRole.USER) {
                 prompt.append("用户：").append(msg.getContent()).append("\n");
