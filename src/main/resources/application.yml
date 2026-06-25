@@ -10,6 +10,12 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: false
+  data:
+    redis:
+      host: REDACTED_SERVER_IP
+      port: 6379
+      password: "123456"
+      timeout: 3000
   ai:
     anthropic:
       api-key: REDACTED_API_KEY
