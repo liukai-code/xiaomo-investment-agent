@@ -34,4 +34,7 @@ build/
 
 ### Logs ###
 app.log
+
+### Local config ###
+src/main/resources/application-local.yml
 /.claude/settings.local.json
