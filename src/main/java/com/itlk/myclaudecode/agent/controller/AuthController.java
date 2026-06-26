@@ -68,13 +68,29 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public Result<?> logout(@RequestAttribute Long userId, @RequestAttribute String token) {
+    public Result<?> logout(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return Result.error("未登录");
+        }
+        String token = authHeader.substring(7);
+        Long userId = tokenManager.getUserId(token);
+        if (userId == null) {
+            return Result.error("未登录");
+        }
         tokenManager.removeToken(token);
         return Result.success();
     }
 
     @GetMapping("/me")
-    public Result<?> me(@RequestAttribute Long userId) {
+    public Result<?> me(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return Result.error("未登录");
+        }
+        String token = authHeader.substring(7);
+        Long userId = tokenManager.getUserId(token);
+        if (userId == null) {
+            return Result.error("未登录");
+        }
         User user = userRepository.findById(userId).orElse(null);
         if (user == null) {
             return Result.error("用户不存在");

@@ -1,0 +1,93 @@
+.message.ai .bubble h1,
+.message.ai .bubble h2,
+.message.ai .bubble h3 {
+  margin-top: 8px;
+  margin-bottom: 4px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.message.ai .bubble h1 { font-size: 18px; }
+.message.ai .bubble h2 { font-size: 16px; }
+.message.ai .bubble h3 { font-size: 14px; }
+
+.message.ai .bubble p {
+  margin-bottom: 0;
+  line-height: 1.7;
+}
+
+.message.ai .bubble ul,
+.message.ai .bubble ol {
+  margin: 4px 0;
+  padding-left: 24px;
+  list-style-position: outside;
+}
+
+.message.ai .bubble ul { list-style-type: disc; }
+.message.ai .bubble ol { list-style-type: decimal; }
+
+.message.ai .bubble li {
+  margin-bottom: 3px;
+  line-height: 1.6;
+  display: list-item;
+}
+
+.message.ai .bubble li::marker { color: var(--accent); }
+.message.ai .bubble strong { color: var(--accent); font-weight: 600; }
+.message.ai .bubble em { color: #a0a0b0; font-style: italic; }
+
+.message.ai .bubble code {
+  background: var(--surface-2);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: #e0e0e0;
+}
+
+.message.ai .bubble pre {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  margin: 4px 0;
+  overflow-x: auto;
+}
+
+.message.ai .bubble pre code {
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.message.ai .bubble blockquote {
+  border-left: 3px solid var(--text-dim);
+  padding-left: 12px;
+  margin: 4px 0;
+  color: var(--text-dim);
+}
+
+.message.ai .bubble table {
+  border-collapse: collapse;
+  margin: 4px 0;
+  width: 100%;
+}
+
+.message.ai .bubble th,
+.message.ai .bubble td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.message.ai .bubble th {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+.message.ai .bubble hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 8px 0;
+}
