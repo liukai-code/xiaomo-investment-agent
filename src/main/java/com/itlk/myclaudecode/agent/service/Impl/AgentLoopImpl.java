@@ -26,7 +26,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -160,6 +162,15 @@ public class AgentLoopImpl implements AgentLoop {
                 .doOnComplete(() -> {
                     String fullResponse = accumulated.toString();
                     saveAssistantMessage(convId, fullResponse);
+                })
+                .timeout(Duration.ofSeconds(120))
+                .onErrorResume(e -> {
+                    log.error("流式请求异常: {}", e.getMessage());
+                    String partial = accumulated.toString();
+                    if (!partial.isEmpty()) {
+                        saveAssistantMessage(convId, partial);
+                    }
+                    return Flux.just("\n\n[服务端响应超时，请重试]");
                 });
     }
 
