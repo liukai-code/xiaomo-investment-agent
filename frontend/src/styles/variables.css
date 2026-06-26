@@ -462,14 +462,38 @@ html.light .chat-container::before { opacity: 0.2; }
   border-radius: 8px;
 }
 
+.auth-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 32px;
+  position: relative;
+}
+
 .auth-logo {
   font-family: 'JetBrains Mono', monospace;
   font-size: 24px;
   font-weight: 700;
   color: var(--accent);
-  text-align: center;
   letter-spacing: 4px;
-  margin-bottom: 32px;
+}
+
+.auth-theme {
+  position: absolute;
+  right: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 8px;
+  transition: all 0.2s;
+}
+
+.auth-theme:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .auth-tabs {
