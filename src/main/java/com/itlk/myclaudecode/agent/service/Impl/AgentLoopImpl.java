@@ -5,6 +5,7 @@ import com.itlk.myclaudecode.agent.repository.ChatMessageRepository;
 import com.itlk.myclaudecode.agent.repository.ConversationRepository;
 import com.itlk.myclaudecode.agent.repository.UserRepository;
 import com.itlk.myclaudecode.agent.service.AgentLoop;
+import com.itlk.myclaudecode.agent.service.ChatHistoryCacheService;
 import com.itlk.myclaudecode.tool.FileListTool;
 import com.itlk.myclaudecode.tool.FileReadTool;
 import com.itlk.myclaudecode.tool.FileWriteTool;
@@ -49,6 +50,9 @@ public class AgentLoopImpl implements AgentLoop {
     @Resource
     private UserRepository userRepository;
 
+    @Resource
+    private ChatHistoryCacheService cacheService;
+
     public AgentLoopImpl(ChatModel chatModel,
                          FileReadTool fileReadTool,
                          FileWriteTool fileWriteTool,
@@ -76,12 +80,20 @@ public class AgentLoopImpl implements AgentLoop {
         Conversation conversation = new Conversation();
         conversation.setUserId(userId);
         conversation.setTitle(title);
-        return conversationRepository.save(conversation);
+        Conversation saved = conversationRepository.save(conversation);
+        cacheService.evictConversationList(userId);
+        return saved;
     }
 
     @Override
     public List<Conversation> listConversations(Long userId) {
-        return conversationRepository.findByUserIdOrderByUpdatedAtDesc(userId);
+        List<Conversation> cached = cacheService.getCachedConversations(userId);
+        if (cached != null) {
+            return cached;
+        }
+        List<Conversation> conversations = conversationRepository.findByUserIdOrderByUpdatedAtDesc(userId);
+        cacheService.cacheConversations(userId, conversations);
+        return conversations;
     }
 
     @Override
@@ -89,7 +101,14 @@ public class AgentLoopImpl implements AgentLoop {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("会话不存在: " + conversationId));
         checkOwnership(conversation, userId);
-        return chatMessageRepository.findByConversationIdOrderByIdAsc(conversationId);
+
+        List<ChatMessage> cached = cacheService.getCachedMessages(conversationId);
+        if (cached != null) {
+            return cached;
+        }
+        List<ChatMessage> messages = chatMessageRepository.findByConversationIdOrderByIdAsc(conversationId);
+        cacheService.cacheMessages(conversationId, messages);
+        return messages;
     }
 
     @Override
@@ -172,10 +191,13 @@ public class AgentLoopImpl implements AgentLoop {
                 .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm:ss EEEE"));
         context.add(new SystemMessage(enrichedPrompt));
 
-        List<ChatMessage> recentMessages = chatMessageRepository
-                .findRecentByConversationId(conversationId, MAX_CONTEXT_MESSAGES);
-
-        Collections.reverse(recentMessages);
+        List<ChatMessage> recentMessages = cacheService.getCachedRecentMessages(conversationId, MAX_CONTEXT_MESSAGES);
+        if (recentMessages == null) {
+            recentMessages = chatMessageRepository
+                    .findRecentByConversationId(conversationId, MAX_CONTEXT_MESSAGES);
+            Collections.reverse(recentMessages);
+            cacheService.cacheRecentMessages(conversationId, MAX_CONTEXT_MESSAGES, recentMessages);
+        }
 
         for (ChatMessage msg : recentMessages) {
             switch (msg.getRole()) {
@@ -196,6 +218,7 @@ public class AgentLoopImpl implements AgentLoop {
         msg.setToolName(toolName);
         msg.setToolCallId(toolCallId);
         chatMessageRepository.save(msg);
+        cacheService.evictMessageCache(conversation.getId());
     }
 
     @Transactional
@@ -247,6 +270,7 @@ public class AgentLoopImpl implements AgentLoop {
 
         conversation.setTitle(title);
         conversationRepository.save(conversation);
+        cacheService.evictConversationList(userId);
 
         return title;
     }
