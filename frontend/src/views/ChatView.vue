@@ -5,11 +5,8 @@ import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { useThemeStore } from '@/stores/theme'
 import { streamChat } from '@/api/chat'
-import type { ChatMessage } from '@/api/conversation'
-import DOMPurify from 'dompurify'
-import { Marked } from 'marked'
-import { markedHighlight } from 'marked-highlight'
-import hljs from 'highlight.js'
+import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
+import { useRafThrottle } from '@/composables/useMarkdownBlocks'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -22,20 +19,6 @@ const inputText = ref('')
 const statusText = ref('READY')
 
 let abortController: AbortController | null = null
-
-const marked = new Marked(
-  markedHighlight({
-    langPrefix: 'hljs language-',
-    highlight(code: string, lang: string) {
-      if (lang && hljs.getLanguage(lang)) {
-        return hljs.highlight(code, { language: lang }).value
-      }
-      return hljs.highlightAuto(code).value
-    },
-  }),
-)
-
-marked.setOptions({ breaks: true, gfm: true })
 
 const currentTitle = computed(() => {
   const conv = chatStore.getCurrentConversation()
@@ -52,22 +35,12 @@ function formatTime(ts: string) {
   return d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
 }
 
-function escapeHtml(str: string) {
-  const div = document.createElement('div')
-  div.textContent = str
-  return div.innerHTML
-}
-
 function scrollToBottom() {
   nextTick(() => {
     if (messagesEl.value) {
       messagesEl.value.scrollTop = messagesEl.value.scrollHeight
     }
   })
-}
-
-function renderMarkdown(text: string): string {
-  return DOMPurify.sanitize(marked.parse(text) as string)
 }
 
 async function handleCreateConversation() {
@@ -113,20 +86,20 @@ async function handleSend() {
   chatStore.isGenerating = true
   statusText.value = 'GENERATING...'
 
-  const aiMsg = chatStore.addStreamingAiMessage()
+  chatStore.addStreamingAiMessage()
   scrollToBottom()
 
-  let lastRenderTime = 0
+  const { schedule, cancel: cancelRaf } = useRafThrottle()
 
   abortController = streamChat(chatStore.currentConvId!, text, authStore.token, {
     onChunk(fullText: string) {
-      const now = Date.now()
-      if (now - lastRenderTime < 30) return
-      lastRenderTime = now
-      chatStore.updateLastAiMessage(fullText)
-      scrollToBottom()
+      schedule(() => {
+        chatStore.updateLastAiMessage(fullText)
+        scrollToBottom()
+      })
     },
     onDone(fullText: string) {
+      cancelRaf()
       chatStore.updateLastAiMessage(fullText || '(empty)')
       chatStore.isGenerating = false
       statusText.value = 'READY'
@@ -136,6 +109,7 @@ async function handleSend() {
       chatStore.generateTitle(chatStore.currentConvId!)
     },
     onError(err: Error) {
+      cancelRaf()
       chatStore.updateLastAiMessage(`ERROR: ${err.message}`)
       chatStore.isGenerating = false
       statusText.value = 'READY'
@@ -213,12 +187,10 @@ onMounted(async () => {
           <div class="bubble">
             <template v-if="msg.role === 'USER'">{{ msg.content }}</template>
             <template v-else>
-              <span v-if="chatStore.isGenerating && msg === chatStore.messages[chatStore.messages.length - 1] && !msg.content">
-                <span class="cursor-blink"></span>
-              </span>
-              <span v-else-if="chatStore.isGenerating && msg === chatStore.messages[chatStore.messages.length - 1]" v-html="renderMarkdown(msg.content)"></span>
-              <span v-else v-html="renderMarkdown(msg.content)"></span>
-              <span v-if="chatStore.isGenerating && msg === chatStore.messages[chatStore.messages.length - 1] && msg.content" class="cursor-blink"></span>
+              <MarkdownRenderer
+                :text="msg.content"
+                :is-streaming="chatStore.isGenerating && msg === chatStore.messages[chatStore.messages.length - 1]"
+              />
             </template>
           </div>
         </div>
