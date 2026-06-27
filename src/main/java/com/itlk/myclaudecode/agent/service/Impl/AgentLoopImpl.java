@@ -120,7 +120,10 @@ public class AgentLoopImpl implements AgentLoop {
                 .options(options)
                 .stream()
                 .content()
-                .doOnNext(accumulated::append)
+                .map(delta -> {
+                    accumulated.append(delta);
+                    return accumulated.toString();
+                })
                 .doOnComplete(() -> {
                     String fullResponse = accumulated.toString();
                     chatMessageService.saveAssistantMessage(convId, fullResponse);

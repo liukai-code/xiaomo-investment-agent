@@ -25,7 +25,7 @@ export function streamChat(
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
-      let fullText = ''
+      let lastText = ''
 
       while (true) {
         const { done, value } = await reader.read()
@@ -35,18 +35,18 @@ export function streamChat(
         const result = processEvents(buffer)
         buffer = result.incomplete
         if (result.content) {
-          fullText += result.content
-          callbacks.onChunk(fullText)
+          lastText = result.content
+          callbacks.onChunk(lastText)
         }
       }
 
       // 处理剩余 buffer
       if (buffer.trim()) {
         const data = parseEventData(buffer)
-        if (data) fullText += (fullText ? '\n' : '') + data
+        if (data) lastText = data
       }
 
-      callbacks.onDone(fullText)
+      callbacks.onDone(lastText)
     })
     .catch((err) => {
       if (err.name !== 'AbortError') {
@@ -62,6 +62,9 @@ function parseEventData(event: string): string {
   for (const line of event.split(/\n/)) {
     if (line.startsWith('data:')) {
       dataLines.push(line.substring(5))
+    } else if (dataLines.length > 0) {
+      // chunk 边界切分导致的续行，拼接到上一个 data 行末尾
+      dataLines[dataLines.length - 1] += line
     }
   }
   return dataLines.join('\n')
@@ -74,10 +77,7 @@ function processEvents(raw: string): { content: string; incomplete: string } {
   for (const event of events) {
     if (!event.trim()) continue
     const data = parseEventData(event)
-    if (data) {
-      if (content) content += '\n'
-      content += data
-    }
+    if (data) content = data
   }
   return { content, incomplete }
 }
