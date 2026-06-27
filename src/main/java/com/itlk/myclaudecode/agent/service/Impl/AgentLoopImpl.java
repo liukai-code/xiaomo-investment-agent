@@ -8,6 +8,7 @@ import com.itlk.myclaudecode.tool.FileListTool;
 import com.itlk.myclaudecode.tool.FileReadTool;
 import com.itlk.myclaudecode.tool.FileWriteTool;
 import com.itlk.myclaudecode.tool.FinancialDataTool;
+import com.itlk.myclaudecode.tool.SqlTool;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
@@ -58,12 +59,13 @@ public class AgentLoopImpl implements AgentLoop {
                          FileWriteTool fileWriteTool,
                          FileListTool fileListTool,
                          FinancialDataTool financialDataTool,
+                         SqlTool sqlTool,
                          ToolCallbackProvider toolCallbackProvider,
                          @Value("${system-default-prompt}") String systemPrompt) {
         this.systemPrompt = systemPrompt;
 
         ChatClient.Builder builder = ChatClient.builder(chatModel)
-                .defaultTools(fileReadTool, fileWriteTool, fileListTool, financialDataTool);
+                .defaultTools(fileReadTool, fileWriteTool, fileListTool, financialDataTool, sqlTool);
 
         if (toolCallbackProvider != null) {
             builder.defaultToolCallbacks(toolCallbackProvider);

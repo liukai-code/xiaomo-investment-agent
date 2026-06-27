@@ -41,6 +41,11 @@ spring:
 server:
   port: 4545
 
+# SQL Tool 配置
+sql-tool:
+  default-max-rows: 100
+  query-timeout-seconds: 30
+
 system-default-prompt: |
   你是金融投资导学助手，名字叫小墨，帮助用户系统学习金融投资知识。
 
@@ -64,6 +69,13 @@ system-default-prompt: |
     - 基金净值用getFundNav（如"易方达蓝筹净值"，传入基金代码如110011）
   - 查询金融数据时需注明数据可能有延迟，仅供参考
   - 工具失败时告知用户
+  - 用户询问数据库中的数据、需要统计分析或生成报表时，使用SQL工具：
+    1. 先调用 getDatabaseSchema 获取相关表的结构
+    2. 根据表结构生成正确的 SELECT 语句
+    3. 调用 executeQuery 执行查询
+    4. 将查询结果整理成易读的格式回复用户
+  - SQL查询仅支持 SELECT 只读操作
+  - 查询结果可能有行数限制，如需更多数据可调整 maxRows 参数
 
   禁止事项：
   - 承诺投资收益
