@@ -4,6 +4,8 @@ import com.itlk.myclaudecode.agent.Entity.ChatMessage;
 import com.itlk.myclaudecode.agent.Entity.Conversation;
 import com.itlk.myclaudecode.agent.Entity.Result;
 import com.itlk.myclaudecode.agent.service.AgentLoop;
+import com.itlk.myclaudecode.agent.service.ChatMessageService;
+import com.itlk.myclaudecode.agent.service.ConversationService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +23,12 @@ public class agentLoopController {
     @Resource
     private AgentLoop agentLoop;
 
+    @Resource
+    private ConversationService conversationService;
+
+    @Resource
+    private ChatMessageService chatMessageService;
+
     private Long getUserId(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
         if (userId == null) {
@@ -36,7 +44,7 @@ public class agentLoopController {
             @RequestParam(required = false) String title,
             HttpServletRequest request) {
         Long userId = getUserId(request);
-        Conversation conversation = agentLoop.createConversation(
+        Conversation conversation = conversationService.createConversation(
                 userId, title != null ? title : "新对话");
         return Result.success(conversation);
     }
@@ -44,7 +52,7 @@ public class agentLoopController {
     @GetMapping("/conversation/list")
     public Result<List<Conversation>> listConversations(HttpServletRequest request) {
         Long userId = getUserId(request);
-        return Result.success(agentLoop.listConversations(userId));
+        return Result.success(conversationService.listConversations(userId));
     }
 
     @GetMapping("/conversation/{id}/messages")
@@ -52,7 +60,7 @@ public class agentLoopController {
             @PathVariable Long id,
             HttpServletRequest request) {
         Long userId = getUserId(request);
-        return Result.success(agentLoop.getHistory(userId, id));
+        return Result.success(chatMessageService.getHistory(userId, id));
     }
 
     @PostMapping("/conversation/{id}/generate-title")
