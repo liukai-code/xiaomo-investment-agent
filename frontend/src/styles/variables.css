@@ -65,6 +65,8 @@ body::before {
   display: flex;
   border: 1px solid var(--border);
   overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 /* ========== 侧边栏 ========== */
@@ -584,3 +586,29 @@ html.light .message.ai .bubble em { color: #57606a; }
 html.light .message.ai .bubble blockquote { color: #57606a; border-color: #d0d7de; }
 html.light .message.ai .bubble th { background: #f6f8fa; }
 html.light .message.ai .bubble th, html.light .message.ai .bubble td { border-color: var(--border); }
+
+/* ========== Galaxy Background ========== */
+.galaxy-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.galaxy-container canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.chat-bg {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}

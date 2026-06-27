@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
+import GalaxyBackground from '@/components/GalaxyBackground.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -52,6 +53,7 @@ async function handleRegister() {
 
 <template>
   <div class="auth-page">
+    <GalaxyBackground :dark="!themeStore.isLight" />
     <div class="auth-container">
       <div class="auth-header">
         <div class="auth-logo">&gt;_ TERMINAL</div>
