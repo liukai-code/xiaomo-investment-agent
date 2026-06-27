@@ -139,11 +139,9 @@ export function useGalaxyCanvas(
 
     const rect = el.getBoundingClientRect()
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    const maxW = 1920
-    const maxH = 1080
 
-    width = Math.min(rect.width, maxW)
-    height = Math.min(rect.height, maxH)
+    width = rect.width
+    height = rect.height
 
     canvas.width = width * dpr
     canvas.height = height * dpr
