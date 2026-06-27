@@ -42,12 +42,8 @@ export function streamChat(
 
       // 处理剩余 buffer
       if (buffer.trim()) {
-        const lines = buffer.split(/\n/)
-        for (const line of lines) {
-          if (line.startsWith('data:')) {
-            fullText += line.substring(5)
-          }
-        }
+        const data = parseEventData(buffer)
+        if (data) fullText += (fullText ? '\n' : '') + data
       }
 
       callbacks.onDone(fullText)
@@ -61,18 +57,26 @@ export function streamChat(
   return controller
 }
 
+function parseEventData(event: string): string {
+  const dataLines: string[] = []
+  for (const line of event.split(/\n/)) {
+    if (line.startsWith('data:')) {
+      dataLines.push(line.substring(5))
+    }
+  }
+  return dataLines.join('\n')
+}
+
 function processEvents(raw: string): { content: string; incomplete: string } {
   const events = raw.split(/\n\n/)
   const incomplete = events.pop() || ''
   let content = ''
   for (const event of events) {
     if (!event.trim()) continue
-    const lines = event.split(/\n/)
-    for (const line of lines) {
-      if (line.startsWith('data:')) {
-        if (content) content += '\n'
-        content += line.substring(5)
-      }
+    const data = parseEventData(event)
+    if (data) {
+      if (content) content += '\n'
+      content += data
     }
   }
   return { content, incomplete }

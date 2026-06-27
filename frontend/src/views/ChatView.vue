@@ -48,6 +48,12 @@ async function handleCreateConversation() {
 }
 
 async function handleSwitchConversation(id: number) {
+  if (abortController) {
+    abortController.abort()
+    abortController = null
+    chatStore.isGenerating = false
+    statusText.value = 'READY'
+  }
   await chatStore.switchConversation(id)
 }
 
