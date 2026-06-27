@@ -239,6 +239,11 @@ public class AgentLoopImpl implements AgentLoop {
         saveMessage(conversation, MessageRole.ASSISTANT, content, null, null);
     }
 
+    private String stripXmlTags(String text) {
+        if (text == null) return "";
+        return text.replaceAll("<[^>]+>", "").replaceAll("\\s+", " ").trim();
+    }
+
     @Override
     @Transactional
     public String generateTitle(Long userId, Long conversationId) {
@@ -258,12 +263,18 @@ public class AgentLoopImpl implements AgentLoop {
                 "根据以下对话内容，用不超过15个汉字生成一个简短标题。" +
                 "规则：1）直接输出标题，不要解释；2）不要加引号；" +
                 "3）如果用户没有提出明确问题，用用户的原始消息作为标题（截取前15字）；" +
-                "4）严禁超过15个字。\n\n");
+                "4）严禁超过15个字；" +
+                "5）禁止输出任何XML标签、尖括号<>、或工具调用格式；6）只输出纯文本标题。\n\n");
         for (ChatMessage msg : messages) {
             if (msg.getRole() == MessageRole.USER) {
                 prompt.append("用户：").append(msg.getContent()).append("\n");
             } else if (msg.getRole() == MessageRole.ASSISTANT) {
-                prompt.append("助手：").append(msg.getContent(), 0, Math.min(100, msg.getContent().length())).append("\n");
+                String cleanContent = stripXmlTags(msg.getContent());
+                if (!cleanContent.isEmpty()) {
+                    prompt.append("助手：")
+                          .append(cleanContent, 0, Math.min(100, cleanContent.length()))
+                          .append("\n");
+                }
             }
         }
 
@@ -272,17 +283,34 @@ public class AgentLoopImpl implements AgentLoop {
                 .maxTokens(50)
                 .build();
 
-        String title = chatClient.prompt()
+        String rawTitle = chatClient.prompt()
                 .user(prompt.toString())
                 .options(options)
                 .call()
-                .content()
-                .trim();
+                .content();
 
-        conversation.setTitle(title);
+        String title = stripXmlTags(rawTitle);
+        if (title.length() > 15) {
+            title = title.substring(0, 15);
+        }
+        if (title.isEmpty()) {
+            for (ChatMessage msg : messages) {
+                if (msg.getRole() == MessageRole.USER && msg.getContent() != null) {
+                    title = msg.getContent().length() > 15
+                            ? msg.getContent().substring(0, 15)
+                            : msg.getContent();
+                    break;
+                }
+            }
+        }
+        if (title.isEmpty()) {
+            title = "新对话";
+        }
+
+        conversation.setTitle(title.trim());
         conversationRepository.save(conversation);
         cacheService.evictConversationList(userId);
 
-        return title;
+        return title.trim();
     }
 }
