@@ -29,7 +29,7 @@ spring:
     mcp:
       client:
         enabled: true
-        request-timeout: 60s
+        request-timeout: 120s
         toolcallback:
           enabled: true
         sse:
