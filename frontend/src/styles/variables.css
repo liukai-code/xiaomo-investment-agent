@@ -601,6 +601,7 @@ html.light .message.ai .bubble th, html.light .message.ai .bubble td { border-co
   z-index: 0;
 }
 
+
 .galaxy-container canvas {
   position: absolute;
   inset: 0;

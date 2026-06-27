@@ -6,7 +6,6 @@ import { useChatStore } from '@/stores/chat'
 import { useThemeStore } from '@/stores/theme'
 import { streamChat } from '@/api/chat'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
-import GalaxyBackground from '@/components/GalaxyBackground.vue'
 import { useRafThrottle } from '@/composables/useMarkdownBlocks'
 
 const router = useRouter()
@@ -126,7 +125,6 @@ onMounted(async () => {
 
 <template>
   <div class="chat-bg">
-    <GalaxyBackground :dark="!themeStore.isLight" />
   <div class="app">
     <!-- 侧边栏 -->
     <div class="sidebar">

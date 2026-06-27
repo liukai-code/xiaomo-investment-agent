@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted, watch, type Ref } from 'vue'
+import { onMounted, onUnmounted, type Ref } from 'vue'
 
 interface Particle {
   x: number
@@ -19,6 +19,18 @@ interface Nebula {
   radius: number
   color: string
   opacity: number
+}
+
+interface Bokeh {
+  x: number
+  y: number
+  radius: number
+  color: string
+  baseOpacity: number
+  driftSpeed: number
+  angle: number
+  pulseSpeed: number
+  pulsePhase: number
 }
 
 interface GalaxyOptions {
@@ -60,6 +72,7 @@ export function useGalaxyCanvas(
   let ctx: CanvasRenderingContext2D | null = null
   let particles: Particle[] = []
   let nebulae: Nebula[] = []
+  let bokehArr: Bokeh[] = []
   let rafId = 0
   let width = 0
   let height = 0
@@ -67,13 +80,15 @@ export function useGalaxyCanvas(
   let resizeObserver: ResizeObserver | null = null
   let lastTime = 0
 
-  const opacityScale = ref(darkMode ? 1 : 0.15)
-
   function getAccentColor(): string {
     return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#00e676'
   }
 
   function initParticles(w: number, h: number) {
+    if (!darkMode) {
+      initBokeh(w, h)
+      return
+    }
     const accent = getAccentColor()
     const [ar, ag, ab] = hexToRgb(accent)
     const [br, bg, bb] = hueShift(ar, ag, ab, 200)
@@ -133,6 +148,61 @@ export function useGalaxyCanvas(
     }
   }
 
+  function initBokeh(w: number, h: number) {
+    const accent = getAccentColor()
+    const [ar, ag, ab] = hexToRgb(accent)
+    const count = 15
+
+    const palette = [
+      `${Math.round(ar * 0.5 + 255 * 0.5)},${Math.round(ag * 0.5 + 255 * 0.5)},${Math.round(ab * 0.5 + 255 * 0.5)}`,
+      '60,110,190',
+      '190,110,150',
+      `${Math.round(ar * 0.35 + 255 * 0.65)},${Math.round(ag * 0.35 + 255 * 0.65)},${Math.round(ab * 0.35 + 255 * 0.65)}`,
+      `${Math.round(ar * 0.6 + 255 * 0.4)},${Math.round(ag * 0.6 + 255 * 0.4)},${Math.round(ab * 0.6 + 255 * 0.4)}`,
+    ]
+
+    bokehArr = []
+    for (let i = 0; i < count; i++) {
+      bokehArr.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        radius: 80 + Math.random() * 160,
+        color: palette[i % palette.length],
+        baseOpacity: 0.15 + Math.random() * 0.2,
+        driftSpeed: 0.01 + Math.random() * 0.02,
+        angle: Math.random() * Math.PI * 2,
+        pulseSpeed: 0.0003 + Math.random() * 0.0005,
+        pulsePhase: Math.random() * Math.PI * 2,
+      })
+    }
+  }
+
+  function drawBokeh(time: number) {
+    if (!ctx) return
+    for (const b of bokehArr) {
+      b.x += Math.cos(b.angle) * b.driftSpeed
+      b.y += Math.sin(b.angle) * b.driftSpeed
+
+      const margin = b.radius
+      if (b.x < -margin) b.x = width + margin
+      if (b.x > width + margin) b.x = -margin
+      if (b.y < -margin) b.y = height + margin
+      if (b.y > height + margin) b.y = -margin
+
+      const pulse = Math.sin(time * b.pulseSpeed + b.pulsePhase) * 0.4 + 0.6
+      const opacity = b.baseOpacity * pulse
+
+      const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.radius)
+      grad.addColorStop(0, `rgba(${b.color},${opacity})`)
+      grad.addColorStop(0.5, `rgba(${b.color},${opacity * 0.4})`)
+      grad.addColorStop(1, `rgba(${b.color},0)`)
+      ctx.fillStyle = grad
+      ctx.beginPath()
+      ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+
   function resizeCanvas() {
     const el = container.value
     if (!el || !canvas || !ctx) return
@@ -154,11 +224,10 @@ export function useGalaxyCanvas(
 
   function drawNebulae() {
     if (!ctx) return
-    const scale = opacityScale.value
     for (const n of nebulae) {
       const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.radius)
-      grad.addColorStop(0, `rgba(${n.color},${n.opacity * scale})`)
-      grad.addColorStop(0.5, `rgba(${n.color},${n.opacity * scale * 0.4})`)
+      grad.addColorStop(0, `rgba(${n.color},${n.opacity})`)
+      grad.addColorStop(0.5, `rgba(${n.color},${n.opacity * 0.4})`)
       grad.addColorStop(1, `rgba(${n.color},0)`)
       ctx.fillStyle = grad
       ctx.fillRect(n.x - n.radius, n.y - n.radius, n.radius * 2, n.radius * 2)
@@ -167,7 +236,6 @@ export function useGalaxyCanvas(
 
   function drawParticles(time: number) {
     if (!ctx) return
-    const scale = opacityScale.value
 
     for (const p of particles) {
       if (p.isDrift) {
@@ -180,7 +248,7 @@ export function useGalaxyCanvas(
       }
 
       const twinkle = Math.sin(time * p.twinkleSpeed + p.twinklePhase) * 0.3 + 0.7
-      const opacity = p.baseOpacity * twinkle * scale
+      const opacity = p.baseOpacity * twinkle
 
       ctx.beginPath()
       ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
@@ -206,8 +274,12 @@ export function useGalaxyCanvas(
   function frame(time: number) {
     if (!ctx || !canvas) return
     ctx.clearRect(0, 0, width, height)
-    drawNebulae()
-    drawParticles(time)
+    if (darkMode) {
+      drawNebulae()
+      drawParticles(time)
+    } else {
+      drawBokeh(time)
+    }
     rafId = requestAnimationFrame(frame)
   }
 
@@ -226,7 +298,6 @@ export function useGalaxyCanvas(
 
   function setTheme(isDark: boolean) {
     darkMode = isDark
-    opacityScale.value = isDark ? 1 : 0.15
     if (width && height) {
       initParticles(width, height)
     }
