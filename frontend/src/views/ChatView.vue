@@ -22,7 +22,7 @@ let abortController: AbortController | null = null
 
 const currentTitle = computed(() => {
   const conv = chatStore.getCurrentConversation()
-  return conv ? conv.title : 'Terminal'
+  return conv ? conv.title : 'Financial Agent'
 })
 
 function formatTime(ts: string) {
@@ -79,7 +79,6 @@ async function handleSend() {
   const text = inputText.value.trim()
   if (!text || chatStore.isGenerating) return
 
-  // 自动创建会话
   if (!chatStore.currentConvId) {
     const conv = await chatStore.createConversation()
     if (!conv) return
@@ -90,7 +89,7 @@ async function handleSend() {
   if (inputEl.value) inputEl.value.style.height = 'auto'
 
   chatStore.isGenerating = true
-  statusText.value = 'GENERATING...'
+  statusText.value = '生成中...'
 
   chatStore.addStreamingAiMessage()
   scrollToBottom()
@@ -135,17 +134,17 @@ onMounted(async () => {
     <!-- 侧边栏 -->
     <div class="sidebar">
       <div class="sidebar-header">
-        <span class="logo">&gt; {{ authStore.username }}</span>
-        <div class="header-actions">
-          <button @click="themeStore.toggle()" :title="themeStore.isLight ? '深色模式' : '浅色模式'">
-            {{ themeStore.isLight ? '☾' : '☀' }}
-          </button>
-          <button @click="handleCreateConversation()" title="新建会话" style="font-size: 20px; line-height: 1">
-            +
-          </button>
-          <button id="logoutBtn" @click="handleLogout()" title="退出登录">⏻</button>
+        <div class="sidebar-brand">
+          <div class="logo">
+            <span class="logo-dot"></span>
+            Financial Agent
+          </div>
         </div>
+        <button class="new-chat-btn" @click="handleCreateConversation()">
+          + 新对话
+        </button>
       </div>
+
       <div class="conversation-list">
         <div v-if="chatStore.conversations.length === 0" class="empty-state">暂无会话</div>
         <div
@@ -157,6 +156,16 @@ onMounted(async () => {
         >
           <div class="conv-title">{{ conv.title }}</div>
           <div class="conv-time">{{ formatTime(conv.updatedAt) }}</div>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <span class="user-name">{{ authStore.username }}</span>
+        <div class="footer-actions">
+          <button @click="themeStore.toggle()" :title="themeStore.isLight ? '深色模式' : '浅色模式'">
+            {{ themeStore.isLight ? '☾' : '☀' }}
+          </button>
+          <button id="logoutBtn" @click="handleLogout()" title="退出登录">⏻</button>
         </div>
       </div>
     </div>
@@ -176,8 +185,8 @@ onMounted(async () => {
       <div ref="messagesEl" class="chat-messages">
         <!-- 欢迎页 -->
         <div v-if="chatStore.messages.length === 0" class="welcome">
-          <div class="logo">&gt; _</div>
-          <div class="sub">AI Terminal v1.0</div>
+          <div class="logo">Financial Agent</div>
+          <div class="sub">AI 金融投资助手</div>
           <div class="hint">
             <kbd>Enter</kbd> 发送 &nbsp; <kbd>Shift+Enter</kbd> 换行
           </div>
@@ -203,16 +212,18 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div class="chat-input">
-        <textarea
-          ref="inputEl"
-          v-model="inputText"
-          rows="1"
-          placeholder="输入消息..."
-          @input="handleInput"
-          @keydown="handleKeydown"
-        ></textarea>
-        <button :disabled="chatStore.isGenerating" @click="handleSend()">SEND</button>
+      <div class="chat-input-area">
+        <div class="chat-input">
+          <textarea
+            ref="inputEl"
+            v-model="inputText"
+            rows="1"
+            placeholder="输入你的问题..."
+            @input="handleInput"
+            @keydown="handleKeydown"
+          ></textarea>
+          <button :disabled="chatStore.isGenerating" @click="handleSend()">发送</button>
+        </div>
       </div>
     </div>
   </div>
