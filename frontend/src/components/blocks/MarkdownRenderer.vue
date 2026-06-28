@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { toRef } from 'vue'
 import { useMarkdownBlocks } from '@/composables/useMarkdownBlocks'
-import StreamingCursor from '@/components/StreamingCursor.vue'
+import StreamingCursor from '@/components/common/StreamingCursor.vue'
 import HeadingBlock from './HeadingBlock.vue'
 import ParagraphBlock from './ParagraphBlock.vue'
 import CodeBlock from './CodeBlock.vue'

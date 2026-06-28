@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
-import GalaxyBackground from '@/components/GalaxyBackground.vue'
+import GalaxyBackground from '@/components/common/GalaxyBackground.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
