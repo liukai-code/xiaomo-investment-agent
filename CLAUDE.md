@@ -90,7 +90,7 @@ Response: `{ code: 1|0, msg, data }`
 
 ## Conventions
 
-- Commit messages: 中文，带 prefix（feat/fix/refactor/docs）
+- Commit messages: 中文，带 prefix（feat/fix/refactor/docs），禁止自动附加 Co-Authored-By trailer
 - 包名全小写，类名大驼峰
 - 统一响应体: `Result<T>`
 - 前端密码传输: 客户端 SHA-256 → 服务端 BCrypt
