@@ -88,6 +88,10 @@ Auth: `POST /api/auth/{register,login,logout}`, `GET /api/auth/me`
 Agent: `GET/POST /agent/conversation/*`, `GET /agent/chat`, `GET /agent/chat/stream`
 Response: `{ code: 1|0, msg, data }`
 
+## Documentation
+
+项目文档统一放在 `docs/` 目录下，按子目录分类：`APIDocs/`、`DevelopmentProcess/`、`Guides/`、`Planning/`。
+
 ## Conventions
 
 - Commit messages: 中文，带 prefix（feat/fix/refactor/docs），禁止自动附加 Co-Authored-By trailer
