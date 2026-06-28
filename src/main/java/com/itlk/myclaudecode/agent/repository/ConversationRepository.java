@@ -1,6 +1,6 @@
 package com.itlk.myclaudecode.agent.repository;
 
-import com.itlk.myclaudecode.agent.Entity.Conversation;
+import com.itlk.myclaudecode.agent.entity.Conversation;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 

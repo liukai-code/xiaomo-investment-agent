@@ -1,6 +1,6 @@
 package com.itlk.myclaudecode.agent.repository;
 
-import com.itlk.myclaudecode.agent.Entity.ChatMessage;
+import com.itlk.myclaudecode.agent.entity.ChatMessage;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

@@ -1,6 +1,6 @@
-package com.itlk.myclaudecode.agent.service.Impl;
+package com.itlk.myclaudecode.agent.service.impl;
 
-import com.itlk.myclaudecode.agent.Entity.*;
+import com.itlk.myclaudecode.agent.entity.*;
 import com.itlk.myclaudecode.agent.repository.ChatMessageRepository;
 import com.itlk.myclaudecode.agent.repository.UserRepository;
 import com.itlk.myclaudecode.agent.service.*;

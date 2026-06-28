@@ -1,6 +1,6 @@
 package com.itlk.myclaudecode.config;
 
-import com.itlk.myclaudecode.agent.Entity.Result;
+import com.itlk.myclaudecode.agent.entity.Result;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;

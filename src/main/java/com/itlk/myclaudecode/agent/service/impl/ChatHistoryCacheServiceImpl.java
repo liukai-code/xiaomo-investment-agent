@@ -1,7 +1,7 @@
-package com.itlk.myclaudecode.agent.service.Impl;
+package com.itlk.myclaudecode.agent.service.impl;
 
-import com.itlk.myclaudecode.agent.Entity.ChatMessage;
-import com.itlk.myclaudecode.agent.Entity.Conversation;
+import com.itlk.myclaudecode.agent.entity.ChatMessage;
+import com.itlk.myclaudecode.agent.entity.Conversation;
 import com.itlk.myclaudecode.agent.service.ChatHistoryCacheService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;

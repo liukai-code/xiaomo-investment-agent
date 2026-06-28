@@ -1,8 +1,8 @@
 package com.itlk.myclaudecode.agent.controller;
 
-import com.itlk.myclaudecode.agent.Entity.ChatMessage;
-import com.itlk.myclaudecode.agent.Entity.Conversation;
-import com.itlk.myclaudecode.agent.Entity.Result;
+import com.itlk.myclaudecode.agent.entity.ChatMessage;
+import com.itlk.myclaudecode.agent.entity.Conversation;
+import com.itlk.myclaudecode.agent.entity.Result;
 import com.itlk.myclaudecode.agent.service.AgentLoop;
 import com.itlk.myclaudecode.agent.service.ChatMessageService;
 import com.itlk.myclaudecode.agent.service.ConversationService;
@@ -18,7 +18,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/agent")
 @Slf4j
-public class agentLoopController {
+public class AgentLoopController {
 
     @Resource
     private AgentLoop agentLoop;

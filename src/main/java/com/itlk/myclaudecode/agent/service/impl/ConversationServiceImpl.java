@@ -1,6 +1,6 @@
-package com.itlk.myclaudecode.agent.service.Impl;
+package com.itlk.myclaudecode.agent.service.impl;
 
-import com.itlk.myclaudecode.agent.Entity.Conversation;
+import com.itlk.myclaudecode.agent.entity.Conversation;
 import com.itlk.myclaudecode.agent.repository.ConversationRepository;
 import com.itlk.myclaudecode.agent.service.ChatHistoryCacheService;
 import com.itlk.myclaudecode.agent.service.ConversationService;

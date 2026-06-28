@@ -1,4 +1,4 @@
-package com.itlk.myclaudecode.agent.service.Impl;
+package com.itlk.myclaudecode.agent.service.impl;
 
 import com.itlk.myclaudecode.agent.service.TokenManager;
 import jakarta.annotation.Resource;

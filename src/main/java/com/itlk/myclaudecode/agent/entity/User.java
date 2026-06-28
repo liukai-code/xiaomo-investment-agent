@@ -1,4 +1,4 @@
-package com.itlk.myclaudecode.agent.Entity;
+package com.itlk.myclaudecode.agent.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;

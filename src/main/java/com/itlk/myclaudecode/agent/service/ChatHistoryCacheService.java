@@ -1,7 +1,7 @@
 package com.itlk.myclaudecode.agent.service;
 
-import com.itlk.myclaudecode.agent.Entity.ChatMessage;
-import com.itlk.myclaudecode.agent.Entity.Conversation;
+import com.itlk.myclaudecode.agent.entity.ChatMessage;
+import com.itlk.myclaudecode.agent.entity.Conversation;
 import java.util.List;
 
 public interface ChatHistoryCacheService {

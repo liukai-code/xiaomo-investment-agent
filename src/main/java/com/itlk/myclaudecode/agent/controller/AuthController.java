@@ -1,7 +1,7 @@
 package com.itlk.myclaudecode.agent.controller;
 
-import com.itlk.myclaudecode.agent.Entity.Result;
-import com.itlk.myclaudecode.agent.Entity.User;
+import com.itlk.myclaudecode.agent.entity.Result;
+import com.itlk.myclaudecode.agent.entity.User;
 import com.itlk.myclaudecode.agent.repository.UserRepository;
 import com.itlk.myclaudecode.agent.service.TokenManager;
 import jakarta.annotation.Resource;
