@@ -12,6 +12,7 @@ import com.itlk.myclaudecode.tool.FileWriteTool;
 import com.itlk.myclaudecode.tool.FinancialCalcTool;
 import com.itlk.myclaudecode.tool.FinancialDataTool;
 import com.itlk.myclaudecode.tool.SqlTool;
+import com.itlk.myclaudecode.common.exception.ToolCallLimitExceededException;
 import com.itlk.myclaudecode.tool.WebFetchTool;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +59,9 @@ public class AgentLoopImpl implements AgentLoop {
     @Resource
     private ChatMessageRepository chatMessageRepository;
 
+    @Resource
+    private MaxToolCallManager maxToolCallManager;
+
     public AgentLoopImpl(ChatModel chatModel,
                          FileReadTool fileReadTool,
                          FileWriteTool fileWriteTool,
@@ -85,6 +89,7 @@ public class AgentLoopImpl implements AgentLoop {
     @Transactional
     public String chat(Long userId, Long conversationId, String message) {
         Conversation conversation = getOrCreateConversation(userId, conversationId);
+        maxToolCallManager.reset();
 
         chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
 
@@ -95,21 +100,27 @@ public class AgentLoopImpl implements AgentLoop {
                 .temperature(0.7)
                 .build();
 
-        String response = chatClient.prompt()
-                .messages(context.toArray(new Message[0]))
-                .options(options)
-                .call()
-                .content();
+        try {
+            String response = chatClient.prompt()
+                    .messages(context.toArray(new Message[0]))
+                    .options(options)
+                    .call()
+                    .content();
 
-        chatMessageService.saveMessage(conversation, MessageRole.ASSISTANT, response, null, null);
-
-        return response;
+            chatMessageService.saveMessage(conversation, MessageRole.ASSISTANT, response, null, null);
+            return response;
+        } catch (ToolCallLimitExceededException e) {
+            log.warn("同步请求工具调用超限: {}", e.getMessage());
+            chatMessageService.saveMessage(conversation, MessageRole.ASSISTANT, e.getMessage(), null, null);
+            return e.getMessage();
+        }
     }
 
     @Override
     @Transactional
     public Flux<String> chatStream(Long userId, Long conversationId, String message) {
         Conversation conversation = getOrCreateConversation(userId, conversationId);
+        maxToolCallManager.reset();
 
         chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
 
@@ -136,14 +147,21 @@ public class AgentLoopImpl implements AgentLoop {
                     String fullResponse = accumulated.toString();
                     chatMessageService.saveAssistantMessage(convId, fullResponse);
                 })
-                .timeout(Duration.ofSeconds(120))
+                .timeout(Duration.ofSeconds(300))
                 .onErrorResume(e -> {
-                    log.error("流式请求异常: {}", e.getMessage());
+                    String errorMsg;
+                    if (e instanceof ToolCallLimitExceededException) {
+                        errorMsg = e.getMessage();
+                        log.warn("流式请求工具调用超限: {}", errorMsg);
+                    } else {
+                        errorMsg = "服务端响应超时，请重试";
+                        log.error("流式请求异常: {}", e.getMessage());
+                    }
                     String partial = accumulated.toString();
                     if (!partial.isEmpty()) {
                         chatMessageService.saveAssistantMessage(convId, partial);
                     }
-                    return Flux.just("\n\n[服务端响应超时，请重试]");
+                    return Flux.just("\n\n[" + errorMsg + "]");
                 });
     }
 
