@@ -7,6 +7,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.Headers;
+import com.itlk.myclaudecode.tool.annotation.ToolBehavior;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 
@@ -32,6 +33,7 @@ public class FinancialDataTool {
         this.objectMapper = new ObjectMapper();
     }
 
+    @ToolBehavior(deterministic = false, cacheable = false)
     @Tool(description = "查询A股股票实时行情。当用户询问A股股价、涨跌幅、成交量时调用。股票代码格式：沪市6位数字如600519（贵州茅台），深市6位数字如000858（五粮液）。")
     public String getAShareQuote(
             @ToolParam(description = "A股股票代码，如600519、000858") String stockCode) {
@@ -48,6 +50,7 @@ public class FinancialDataTool {
         }
     }
 
+    @ToolBehavior(deterministic = false, cacheable = false)
     @Tool(description = "查询港股股票实时行情。当用户询问港股股价、涨跌幅时调用。股票代码格式：5位数字如00700（腾讯）、09988（阿里巴巴）。")
     public String getHKStockQuote(
             @ToolParam(description = "港股股票代码，如00700、09988") String stockCode) {
@@ -64,6 +67,7 @@ public class FinancialDataTool {
         }
     }
 
+    @ToolBehavior(deterministic = false, cacheable = false)
     @Tool(description = "查询美股股票实时行情。当用户询问美股股价、涨跌幅时调用。股票代码格式：公司简称如AAPL（苹果）、MSFT（微软）、TSLA（特斯拉）。")
     public String getUSStockQuote(
             @ToolParam(description = "美股股票代码，如AAPL、MSFT、TSLA") String stockCode) {
@@ -80,6 +84,7 @@ public class FinancialDataTool {
         }
     }
 
+    @ToolBehavior(deterministic = false, cacheable = false)
     @Tool(description = "查询基金净值信息。当用户询问基金净值、基金估值、基金涨跌时调用。基金代码为6位数字，如110011（易方达中小盘）、161725（招商中证白酒）。")
     public String getFundNav(
             @ToolParam(description = "基金代码，如110011、161725") String fundCode) {

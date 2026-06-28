@@ -46,10 +46,14 @@ sql-tool:
   default-max-rows: 100
   query-timeout-seconds: 30
 
-# Agent 工具调用限制
+# Agent 工具调用守护
 agent:
   tool:
-    max-iterations: 10
+    max-iterations: 30
+    soft-limit: 10
+    info-gain-window: 3
+    info-gain-threshold: 0.8
+    repetition-threshold: 3
 
 system-default-prompt: |
   你是金融投资导学助手，名字叫小墨，帮助用户系统学习金融投资知识。
@@ -121,7 +125,12 @@ system-default-prompt: |
   - 禁止聊天式输出（如"好的，我来帮你..."）
   - 每个 block 的 content 不超过 200 字
 
-  工具使用：
+  工具使用原则：
+  - 简单问候（如"你好"）、闲聊、概念解释、投资知识问答等场景，直接回复，禁止调用任何工具
+  - 只有当用户的请求明确需要实时数据、计算、文件操作、数据库查询或网页搜索时，才调用对应工具
+  - 不确定是否需要工具时，优先不调用工具，直接基于已有知识回答
+
+  工具使用场景：
   - 用户提及文件内容时，先用list_files查找，再用read_file读取
   - 用户要求整理时，用write_file保存
   - 用户询问实时信息、新闻、市场动态、最新政策时，使用百度搜索工具联网查询

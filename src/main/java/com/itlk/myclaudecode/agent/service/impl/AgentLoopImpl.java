@@ -1,5 +1,6 @@
 package com.itlk.myclaudecode.agent.service.impl;
 
+import com.itlk.myclaudecode.agent.config.ToolGuardProperties;
 import com.itlk.myclaudecode.agent.service.AgentLoop;
 import com.itlk.myclaudecode.conversation.entity.*;
 import com.itlk.myclaudecode.conversation.repository.ChatMessageRepository;
@@ -7,6 +8,8 @@ import com.itlk.myclaudecode.conversation.service.*;
 import com.itlk.myclaudecode.user.entity.User;
 import com.itlk.myclaudecode.user.repository.UserRepository;
 import com.itlk.myclaudecode.tool.FileListTool;
+import com.itlk.myclaudecode.tool.guard.InfoGainTracker;
+import com.itlk.myclaudecode.tool.guard.RepetitionDetector;
 import com.itlk.myclaudecode.tool.FileReadTool;
 import com.itlk.myclaudecode.tool.FileWriteTool;
 import com.itlk.myclaudecode.tool.FinancialCalcTool;
@@ -44,6 +47,7 @@ public class AgentLoopImpl implements AgentLoop {
 
     private final String systemPrompt;
     private final ChatClient chatClient;
+    private final ToolGuardProperties toolGuardProperties;
 
     @Resource
     private UserRepository userRepository;
@@ -72,8 +76,10 @@ public class AgentLoopImpl implements AgentLoop {
                          SqlTool sqlTool,
                          WebFetchTool webFetchTool,
                          ToolCallbackProvider toolCallbackProvider,
+                         ToolGuardProperties toolGuardProperties,
                          @Value("${system-default-prompt}") String systemPrompt) {
         this.systemPrompt = systemPrompt;
+        this.toolGuardProperties = toolGuardProperties;
 
         ChatClient.Builder builder = ChatClient.builder(chatModel)
                 .defaultTools(fileReadTool, fileWriteTool, fileListTool, financialCalcTool, financialDataTool, sqlTool, webFetchTool);
@@ -99,7 +105,10 @@ public class AgentLoopImpl implements AgentLoop {
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
                 .temperature(0.7)
-                .toolContext(Map.of(MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0)))
+                .toolContext(Map.of(
+                        MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0),
+                        MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(toolGuardProperties.infoGainWindow(), toolGuardProperties.infoGainThreshold()),
+                        MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold())))
                 .build();
 
         String response = chatClient.prompt()
@@ -128,7 +137,10 @@ public class AgentLoopImpl implements AgentLoop {
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
                 .temperature(0.7)
-                .toolContext(Map.of(MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0)))
+                .toolContext(Map.of(
+                        MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0),
+                        MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(toolGuardProperties.infoGainWindow(), toolGuardProperties.infoGainThreshold()),
+                        MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold())))
                 .build();
 
         return chatClient.prompt()

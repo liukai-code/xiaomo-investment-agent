@@ -1,6 +1,7 @@
 package com.itlk.myclaudecode.tool;
 
 import lombok.extern.slf4j.Slf4j;
+import com.itlk.myclaudecode.tool.annotation.ToolBehavior;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 
@@ -89,6 +90,7 @@ public class SqlTool {
         }
     }
 
+    @ToolBehavior(deterministic = false, cacheable = false)
     @Tool(description = "执行SQL查询语句。仅支持SELECT只读查询，不支持INSERT/UPDATE/DELETE等写操作。执行前请先调用getDatabaseSchema了解表结构。")
     public String executeQuery(
             @ToolParam(description = "要执行的SQL SELECT语句，如 SELECT COUNT(*) FROM users") String sql,

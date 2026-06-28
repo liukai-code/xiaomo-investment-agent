@@ -7,6 +7,7 @@ import okhttp3.Response;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import com.itlk.myclaudecode.tool.annotation.ToolBehavior;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 
@@ -33,6 +34,7 @@ public class WebFetchTool {
                 .build();
     }
 
+    @ToolBehavior(deterministic = false, cacheable = false)
     @Tool(description = "抓取指定URL的网页内容并提取可读文本。当百度搜索返回结果后需要阅读全文、用户要求查看某篇文章或网页内容时调用。仅支持http和https协议的URL。")
     public String fetchWebpage(
             @ToolParam(description = "要抓取的网页URL，必须以http://或https://开头") String url,
@@ -60,6 +62,7 @@ public class WebFetchTool {
         }
     }
 
+    @ToolBehavior(deterministic = false, cacheable = false)
     @Tool(description = "抓取指定URL的网页并仅提取文章正文内容（去除导航、广告、页脚等杂质）。适合新闻文章、博客帖子、教程等内容型页面。对于纯导航页或首页，请改用fetchWebpage。")
     public String fetchArticleContent(
             @ToolParam(description = "要抓取的文章URL") String url,
