@@ -53,14 +53,12 @@ AI 不再输出自由文本，而是输出 **JSON blocks 数组**。每个 block
 
 ## 三、Block 类型规范
 
-| type | 用途 | 渲染效果 | content | data |
-|------|------|----------|---------|------|
-| `title` | 标题 | 大号加粗文字 | 标题文字 | 无 |
-| `text` | 文本段落 | 普通文字（支持内联 Markdown） | 正文 | 无 |
-| `kpi` | 数据指标 | 3 列网格卡片，涨绿跌红 | 描述文字 | `[{label, value, trend}]` |
-| `table` | 数据表格 | 带表头的表格 | 描述文字 | `{headers: [], rows: [[]]}` |
-| `card` | 信息卡片 | 圆角背景卡片 | 正文（支持 `\n` 换行） | 无 |
-| `warning` | 风险提示 | 红色边框警告条 | 提示文字 | 无 |
+- **title** — 标题，大号加粗文字，content 为标题文字
+- **text** — 文本段落，普通文字（支持内联 Markdown），content 为正文
+- **kpi** — 数据指标，3 列网格卡片涨绿跌红，content 为描述，data 为 `[{label, value, trend}]`
+- **table** — 数据表格，带表头的表格，content 为描述，data 为 `{headers, rows}`
+- **card** — 信息卡片，圆角背景卡片，content 为正文（支持换行）
+- **warning** — 风险提示，红色边框警告条，content 为提示文字
 
 ### trend 取值
 
@@ -74,14 +72,12 @@ AI 不再输出自由文本，而是输出 **JSON blocks 数组**。每个 block
 
 `validateJsonBlocks.ts` 处理 AI 输出的各种异常情况：
 
-| 异常场景 | 处理方式 |
-|----------|----------|
-| 输出被 ``` 包裹 | 自动剥离代码块 |
-| JSON 前有自然语言 | 截取第一个 `{` 到最后一个 `}` |
-| 尾部多余逗号 | 正则修复 `,\s*}` → `}` |
-| JSON 解析失败 | 尝试正则提取部分完整 blocks |
-| 完全无法解析 | fallback 为 `[{type:"text", content:原文}]` |
-| 旧消息（无 JSON 结构） | 检测为 legacy，走 Markdown 块渲染 |
+- **输出被代码块包裹** — 自动剥离代码块
+- **JSON 前有自然语言** — 截取第一个 `{` 到最后一个 `}`
+- **尾部多余逗号** — 正则修复
+- **JSON 解析失败** — 尝试正则提取部分完整 blocks
+- **完全无法解析** — fallback 为 text block
+- **旧消息（无 JSON 结构）** — 检测为 legacy，走 Markdown 块渲染
 
 ---
 
@@ -89,30 +85,22 @@ AI 不再输出自由文本，而是输出 **JSON blocks 数组**。每个 block
 
 ### 后端
 
-| 文件 | 变更 |
-|------|------|
-| `src/main/resources/application.yml` | System Prompt 替换为 JSON blocks 协议 |
+- `src/main/resources/application.yml` — System Prompt 替换为 JSON blocks 协议
 
 ### 前端 — 新增
 
-| 文件 | 职责 |
-|------|------|
-| `frontend/src/utils/validateJsonBlocks.ts` | JSON 校验+清理+fallback |
-| `frontend/src/components/blocks/MessageBlock.vue` | 单个 block 渲染组件（6 种类型） |
+- `frontend/src/utils/validateJsonBlocks.ts` — JSON 校验、清理、fallback
+- `frontend/src/components/blocks/MessageBlock.vue` — 单个 block 渲染组件（6 种类型）
 
 ### 前端 — 修改
 
-| 文件 | 变更 |
-|------|------|
-| `frontend/src/composables/useMessageProtocol.ts` | 重写：调用 validateJsonBlocks 解析 |
-| `frontend/src/components/blocks/MarkdownRenderer.vue` | 分发：JSON → MessageBlock，legacy → Markdown 块 |
+- `frontend/src/composables/useMessageProtocol.ts` — 重写：调用 validateJsonBlocks 解析
+- `frontend/src/components/blocks/MarkdownRenderer.vue` — 分发：JSON 走 MessageBlock，legacy 走 Markdown
 
 ### 前端 — 删除
 
-| 文件 | 原因 |
-|------|------|
-| `frontend/src/components/blocks/KpiBlock.vue` | 被 MessageBlock 替代 |
-| `frontend/src/components/blocks/CardBlock.vue` | 被 MessageBlock 替代 |
+- `frontend/src/components/blocks/KpiBlock.vue` — 被 MessageBlock 替代
+- `frontend/src/components/blocks/CardBlock.vue` — 被 MessageBlock 替代
 
 ---
 
@@ -152,13 +140,11 @@ SSE 流式到达 → MarkdownRenderer
 
 蓝色金融系（从赛博朋克绿切换）：
 
-| 变量 | 暗色 | 亮色 | 说明 |
-|------|------|------|------|
-| `--accent` | `#3b82f6` | `#2563eb` | 蓝色主调 |
-| `--green` | `#22c55e` | `#16a34a` | 涨/正面 |
-| `--red` | `#ef4444` | `#dc2626` | 跌/负面 |
-| `--bg` | `#1a1a2e` | `#f8fafc` | 背景 |
-| `--surface` | `#16213e` | `#ffffff` | 卡片表面 |
+- `--accent` — 暗色 `#3b82f6`，亮色 `#2563eb`，蓝色主调
+- `--green` — 暗色 `#22c55e`，亮色 `#16a34a`，涨或正面
+- `--red` — 暗色 `#ef4444`，亮色 `#dc2626`，跌或负面
+- `--bg` — 暗色 `#1a1a2e`，亮色 `#f8fafc`，背景
+- `--surface` — 暗色 `#16213e`，亮色 `#ffffff`，卡片表面
 
 ### 布局
 
@@ -175,13 +161,9 @@ SSE 流式到达 → MarkdownRenderer
 1. 后端重启：`mvn spring-boot:run`（加载新 System Prompt）
 2. 前端启动：`cd frontend && npm run dev`
 3. 测试场景：
-
-| 测试输入 | 预期 blocks | 预期渲染 |
-|----------|------------|----------|
-| "茅台今天多少钱" | title + kpi + text + warning | 标题 + KPI 网格 + 说明 + 风险提示 |
-| "什么是复利" | title + card + text | 标题 + 卡片 + 文字 |
-| "查询数据库用户" | title + table + text | 标题 + 表格 + 说明 |
-| 旧消息（纯 Markdown） | legacy fallback | Markdown 块渲染 |
-
+   - "茅台今天多少钱" → title + kpi + text + warning → 标题 + KPI 网格 + 说明 + 风险提示
+   - "什么是复利" → title + card + text → 标题 + 卡片 + 文字
+   - "查询数据库用户" → title + table + text → 标题 + 表格 + 说明
+   - 旧消息（纯 Markdown）→ legacy fallback → Markdown 块渲染
 4. 容错测试：AI 输出被代码块包裹、JSON 前有文字等异常情况
-5. 主题切换：暗色/亮色模式下所有组件样式正常
+5. 主题切换：暗色或亮色模式下所有组件样式正常
