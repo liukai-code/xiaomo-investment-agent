@@ -92,6 +92,7 @@ public class AgentLoopImpl implements AgentLoop {
 
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
+                .temperature(0.7)
                 .build();
 
         String response = chatClient.prompt()
@@ -119,6 +120,7 @@ public class AgentLoopImpl implements AgentLoop {
 
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
+                .temperature(0.7)
                 .build();
 
         return chatClient.prompt()
