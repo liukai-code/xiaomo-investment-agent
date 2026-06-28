@@ -5,6 +5,7 @@ import com.itlk.myclaudecode.tool.FileReadTool;
 import com.itlk.myclaudecode.tool.FileWriteTool;
 import com.itlk.myclaudecode.tool.FinancialDataTool;
 import com.itlk.myclaudecode.tool.SqlTool;
+import com.itlk.myclaudecode.tool.WebFetchTool;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -43,5 +44,10 @@ public class ToolConfig {
     @Bean
     public SqlTool sqlTool(DataSource dataSource) {
         return new SqlTool(dataSource, sqlDefaultMaxRows, sqlQueryTimeoutSeconds);
+    }
+
+    @Bean
+    public WebFetchTool webFetchTool() {
+        return new WebFetchTool();
     }
 }

@@ -96,6 +96,13 @@
             <version>4.12.0</version>
         </dependency>
 
+        <!-- Jsoup - HTML parsing for WebFetchTool -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.17.2</version>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
