@@ -12,7 +12,6 @@ import com.itlk.myclaudecode.tool.FileWriteTool;
 import com.itlk.myclaudecode.tool.FinancialCalcTool;
 import com.itlk.myclaudecode.tool.FinancialDataTool;
 import com.itlk.myclaudecode.tool.SqlTool;
-import com.itlk.myclaudecode.common.exception.ToolCallLimitExceededException;
 import com.itlk.myclaudecode.tool.WebFetchTool;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +33,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @Slf4j
@@ -98,22 +99,17 @@ public class AgentLoopImpl implements AgentLoop {
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
                 .temperature(0.7)
+                .toolContext(Map.of(MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0)))
                 .build();
 
-        try {
-            String response = chatClient.prompt()
-                    .messages(context.toArray(new Message[0]))
-                    .options(options)
-                    .call()
-                    .content();
+        String response = chatClient.prompt()
+                .messages(context.toArray(new Message[0]))
+                .options(options)
+                .call()
+                .content();
 
-            chatMessageService.saveMessage(conversation, MessageRole.ASSISTANT, response, null, null);
-            return response;
-        } catch (ToolCallLimitExceededException e) {
-            log.warn("同步请求工具调用超限: {}", e.getMessage());
-            chatMessageService.saveMessage(conversation, MessageRole.ASSISTANT, e.getMessage(), null, null);
-            return e.getMessage();
-        }
+        chatMessageService.saveMessage(conversation, MessageRole.ASSISTANT, response, null, null);
+        return response;
     }
 
     @Override
@@ -132,6 +128,7 @@ public class AgentLoopImpl implements AgentLoop {
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
                 .temperature(0.7)
+                .toolContext(Map.of(MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0)))
                 .build();
 
         return chatClient.prompt()
@@ -149,14 +146,8 @@ public class AgentLoopImpl implements AgentLoop {
                 })
                 .timeout(Duration.ofSeconds(300))
                 .onErrorResume(e -> {
-                    String errorMsg;
-                    if (e instanceof ToolCallLimitExceededException) {
-                        errorMsg = e.getMessage();
-                        log.warn("流式请求工具调用超限: {}", errorMsg);
-                    } else {
-                        errorMsg = "服务端响应超时，请重试";
-                        log.error("流式请求异常: {}", e.getMessage());
-                    }
+                    String errorMsg = "服务端响应超时，请重试";
+                    log.error("流式请求异常: {}", e.getMessage());
                     String partial = accumulated.toString();
                     if (!partial.isEmpty()) {
                         chatMessageService.saveAssistantMessage(convId, partial);
