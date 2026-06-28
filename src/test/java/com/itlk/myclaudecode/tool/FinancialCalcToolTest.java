@@ -65,6 +65,29 @@ class FinancialCalcToolTest {
             String result = tool.calculate("");
             assertTrue(result.contains("不能为空"));
         }
+
+        @Test
+        @DisplayName("嵌套括号 (1+(2*3))")
+        void nestedParentheses() {
+            String result = tool.calculate("(1+(2*3))");
+            assertTrue(result.contains("7"), "(1+(2*3))=7，实际: " + result);
+        }
+
+        @Test
+        @DisplayName("小数运算 1.5*2.4")
+        void decimalOps() {
+            String result = tool.calculate("1.5*2.4");
+            assertTrue(result.contains("3.6") || result.contains("3.5999"),
+                    "1.5*2.4≈3.6，实际: " + result);
+        }
+
+        @Test
+        @DisplayName("除零不崩溃")
+        void divideByZero() {
+            String result = tool.calculate("1/0");
+            // 不抛异常即可，结果为Infinity
+            assertNotNull(result);
+        }
     }
 
     // ==================== A. 基础利息 ====================
@@ -103,6 +126,14 @@ class FinancialCalcToolTest {
             String result = tool.compoundInterest(10000, 0.2, 10);
             // 10000 * (1.2)^10 = 61917.36
             assertTrue(result.contains("61917.36"), "高利率复利，实际: " + result);
+        }
+
+        @Test
+        @DisplayName("负利率 - 资金贬值")
+        void negativeRate() {
+            String result = tool.compoundInterest(10000, -0.05, 5);
+            // 10000 * (0.95)^5 = 7737.81
+            assertTrue(result.contains("7737.81"), "负利率贬值，实际: " + result);
         }
     }
 
@@ -177,6 +208,14 @@ class FinancialCalcToolTest {
         void zeroRateDca() {
             String result = tool.dcaReturn(2000, 0, 12);
             assertTrue(result.contains("24000.00"), "零利率终值=总投入");
+        }
+
+        @Test
+        @DisplayName("1个月定投 - 终值≈投入金额")
+        void oneMonthDca() {
+            String result = tool.dcaReturn(2000, 0.08, 1);
+            // 1个月，终值≈2000
+            assertTrue(result.contains("2000"), "1个月定投终值≈2000，实际: " + result);
         }
     }
 
@@ -290,6 +329,14 @@ class FinancialCalcToolTest {
             String result = tool.peRatio(50, 0);
             assertTrue(result.contains("每股收益为0"));
         }
+
+        @Test
+        @DisplayName("负EPS（亏损公司） → 返回提示")
+        void negativeEps() {
+            String result = tool.peRatio(50, -2);
+            assertTrue(result.contains("亏损") || result.contains("无参考意义"),
+                    "负EPS应提示亏损，实际: " + result);
+        }
     }
 
     @Nested
@@ -318,6 +365,14 @@ class FinancialCalcToolTest {
             String result = tool.pbRatio(15, 0);
             assertTrue(result.contains("每股净资产为0"));
         }
+
+        @Test
+        @DisplayName("负BVPS（资不抵债） → 返回提示")
+        void negativeBvps() {
+            String result = tool.pbRatio(5, -3);
+            assertTrue(result.contains("资不抵债") || result.contains("无参考意义"),
+                    "负BVPS应提示资不抵债，实际: " + result);
+        }
     }
 
     @Nested
@@ -336,6 +391,20 @@ class FinancialCalcToolTest {
         void zeroPrice() {
             String result = tool.dividendYield(2, 0);
             assertTrue(result.contains("股价不能为0"));
+        }
+
+        @Test
+        @DisplayName("零分红 → 股息率0%")
+        void zeroDividend() {
+            String result = tool.dividendYield(0, 40);
+            assertTrue(result.contains("0.00"), "零分红股息率应为0%");
+        }
+
+        @Test
+        @DisplayName("负分红 → 负股息率")
+        void negativeDividend() {
+            String result = tool.dividendYield(-1, 40);
+            assertTrue(result.contains("-2.50"), "负分红股息率应为-2.5%，实际: " + result);
         }
     }
 
@@ -370,6 +439,14 @@ class FinancialCalcToolTest {
             assertTrue(result.contains("1032.") || result.contains("1033."),
                     "短期贷款月供，实际: " + result);
         }
+
+        @Test
+        @DisplayName("负利率 → 不崩溃")
+        void negativeRate() {
+            String result = tool.loanPayment(100000, -0.01, 12);
+            assertNotNull(result, "负利率不应崩溃");
+            assertFalse(result.contains("失败"), "负利率不应报错");
+        }
     }
 
     // ==================== D. 投资决策 ====================
@@ -394,6 +471,14 @@ class FinancialCalcToolTest {
             String result = tool.npv(0.2, "-10000,2000,2000,2000");
             assertTrue(result.contains("NPV < 0") || result.contains("不值得投资"),
                     "高折现率NPV应<0，实际: " + result);
+        }
+
+        @Test
+        @DisplayName("NPV=0 → 盈亏平衡")
+        void zeroNpv() {
+            // -1000 + 1100/1.1 = -1000 + 1000 = 0
+            String result = tool.npv(0.1, "-1000,1100");
+            assertTrue(result.contains("盈亏平衡"), "NPV=0应为盈亏平衡，实际: " + result);
         }
     }
 
@@ -475,6 +560,15 @@ class FinancialCalcToolTest {
             assertTrue(result.contains("6.") || result.contains("7."),
                     "折价YTM应>票面利率，实际: " + result);
         }
+
+        @Test
+        @DisplayName("溢价买入YTM < 票面利率")
+        void premiumBondYtm() {
+            String result = tool.bondYtm(1000, 1100, 0.05, 10);
+            // YTM应 < 5%
+            assertTrue(result.contains("3.") || result.contains("4."),
+                    "溢价YTM应<票面利率，实际: " + result);
+        }
     }
 
     // ==================== F. 退休规划 ====================
@@ -531,6 +625,15 @@ class FinancialCalcToolTest {
         void zeroWithdrawal() {
             String result = tool.withdrawalPlan(1000000, 0, 0.06);
             assertTrue(result.contains("必须大于0"));
+        }
+
+        @Test
+        @DisplayName("负收益率 → 加速耗尽")
+        void negativeReturnRate() {
+            String result = tool.withdrawalPlan(1000000, 80000, -0.02);
+            // 负收益+提取，应比正收益更快耗尽
+            assertFalse(result.contains("永续"), "负收益率不应永续");
+            assertTrue(result.contains("本金可持续"), "应返回可持续年数");
         }
     }
 

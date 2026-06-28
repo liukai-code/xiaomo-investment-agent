@@ -142,7 +142,6 @@ public class FinancialCalcTool {
         try {
             if (days <= 0) return "持有天数必须大于0";
             BigDecimal totalReturn = BigDecimal.valueOf(totalReturnPercent).divide(HUNDRED, MC);
-            BigDecimal dayFactor = BigDecimal.valueOf(365.0 / days);
             // annualized = (1 + totalReturn)^(365/days) - 1
             double exponent = 365.0 / days;
             BigDecimal factor = BigDecimal.ONE.add(totalReturn, MC);
@@ -308,6 +307,7 @@ public class FinancialCalcTool {
         log.info("[FinancialCalcTool] peRatio 入参: stockPrice={}, eps={}", stockPrice, earningsPerShare);
         try {
             if (earningsPerShare == 0) return "每股收益为0，无法计算市盈率";
+            if (earningsPerShare < 0) return "每股收益为负（公司亏损），PE无参考意义";
             BigDecimal price = BigDecimal.valueOf(stockPrice);
             BigDecimal eps = BigDecimal.valueOf(earningsPerShare);
             BigDecimal pe = price.divide(eps, MC);
@@ -336,6 +336,7 @@ public class FinancialCalcTool {
         log.info("[FinancialCalcTool] pbRatio 入参: stockPrice={}, bvps={}", stockPrice, bookValuePerShare);
         try {
             if (bookValuePerShare == 0) return "每股净资产为0，无法计算市净率";
+            if (bookValuePerShare < 0) return "每股净资产为负（资不抵债），PB无参考意义";
             BigDecimal price = BigDecimal.valueOf(stockPrice);
             BigDecimal bvps = BigDecimal.valueOf(bookValuePerShare);
             BigDecimal pb = price.divide(bvps, MC);
@@ -445,7 +446,10 @@ public class FinancialCalcTool {
                 breakdown.append(String.format("  第%d期：%.2f元（现值%.2f元）\n", i, cf.setScale(2, RoundingMode.HALF_UP), pv.setScale(2, RoundingMode.HALF_UP)));
             }
 
-            String recommendation = npvValue.compareTo(BigDecimal.ZERO) > 0 ? "NPV > 0，项目值得投资" : "NPV < 0，项目不值得投资";
+            String recommendation;
+            if (npvValue.compareTo(BigDecimal.ZERO) > 0) recommendation = "NPV > 0，项目值得投资";
+            else if (npvValue.compareTo(BigDecimal.ZERO) < 0) recommendation = "NPV < 0，项目不值得投资";
+            else recommendation = "NPV = 0，盈亏平衡";
 
             String output = String.format(
                     "净现值（NPV）计算：\n折现率：%.2f%%\n\n现金流明细：\n%s\nNPV = %.2f元\n结论：%s",
@@ -639,7 +643,6 @@ public class FinancialCalcTool {
             BigDecimal p = BigDecimal.valueOf(principal);
             BigDecimal w = BigDecimal.valueOf(annualWithdrawal);
             BigDecimal r = BigDecimal.valueOf(annualRate);
-            BigDecimal onePlusR = BigDecimal.ONE.add(r, MC);
 
             int years = 0;
             BigDecimal balance = p;
@@ -727,7 +730,6 @@ public class FinancialCalcTool {
             double peak = nav[0];
             double maxDrawdownVal = 0;
             int peakIdx = 0;
-            int troughIdx = 0;
             int drawdownPeakIdx = 0;
             int drawdownTroughIdx = 0;
 
@@ -770,8 +772,6 @@ public class FinancialCalcTool {
             if (years <= 0) return "投资年数必须大于0";
             if (endValue < 0) return "期末价值不能为负";
 
-            BigDecimal bv = BigDecimal.valueOf(beginValue);
-            BigDecimal ev = BigDecimal.valueOf(endValue);
             double ratio = endValue / beginValue;
             double cagrVal = Math.pow(ratio, 1.0 / years) - 1;
 
