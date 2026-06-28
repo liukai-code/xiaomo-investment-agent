@@ -1,0 +1,56 @@
+# ============================================================
+# 环境变量配置模板
+# 复制为 src/main/resources/application-local.yml 后填入实际值
+# ============================================================
+
+spring:
+  profiles:
+    active: local
+  application:
+    name: my-claude-code
+  datasource:
+    url: jdbc:postgresql://localhost:5432/myclaudecode
+    username: your_db_username
+    password: your_db_password
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:
+      timeout: 3000
+  ai:
+    anthropic:
+      api-key: your_anthropic_api_key
+      base-url: https://api.anthropic.com
+      chat:
+        options:
+          model: mimo-v2.5-pro
+          max-tokens: 4096
+    mcp:
+      client:
+        enabled: true
+        request-timeout: 120s
+        toolcallback:
+          enabled: true
+        sse:
+          connections:
+            baidu-ai-search:
+              url: your_baidu_mcp_url
+              sse-endpoint: your_baidu_mcp_sse_endpoint
+
+server:
+  port: 4545
+
+# SQL Tool 配置
+sql-tool:
+  default-max-rows: 100
+  query-timeout-seconds: 30
+
+system-default-prompt: |
+  你是金融投资导学助手，名字叫小墨，帮助用户系统学习金融投资知识。
+  （完整提示词见 application.yml）

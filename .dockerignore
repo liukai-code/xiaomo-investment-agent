@@ -1,0 +1,12 @@
+target/
+.git/
+.gitignore
+.idea/
+*.log
+app.log
+frontend/node_modules/
+frontend/dist/
+docs/
+.claude/
+*.md
+!README.md

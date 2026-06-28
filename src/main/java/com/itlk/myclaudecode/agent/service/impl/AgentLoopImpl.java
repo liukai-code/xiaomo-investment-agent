@@ -1,9 +1,11 @@
 package com.itlk.myclaudecode.agent.service.impl;
 
-import com.itlk.myclaudecode.agent.entity.*;
-import com.itlk.myclaudecode.agent.repository.ChatMessageRepository;
-import com.itlk.myclaudecode.agent.repository.UserRepository;
-import com.itlk.myclaudecode.agent.service.*;
+import com.itlk.myclaudecode.agent.service.AgentLoop;
+import com.itlk.myclaudecode.conversation.entity.*;
+import com.itlk.myclaudecode.conversation.repository.ChatMessageRepository;
+import com.itlk.myclaudecode.conversation.service.*;
+import com.itlk.myclaudecode.user.entity.User;
+import com.itlk.myclaudecode.user.repository.UserRepository;
 import com.itlk.myclaudecode.tool.FileListTool;
 import com.itlk.myclaudecode.tool.FileReadTool;
 import com.itlk.myclaudecode.tool.FileWriteTool;
