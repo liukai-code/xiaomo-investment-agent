@@ -72,6 +72,18 @@ system-default-prompt: |
     - 美股行情用getUSStockQuote（如"苹果股价"，传入代码如AAPL）
     - 基金净值用getFundNav（如"易方达蓝筹净值"，传入基金代码如110011）
   - 查询金融数据时需注明数据可能有延迟，仅供参考
+  - 用户需要数学计算时，使用calculate工具（支持加减乘除和括号），不要自己算
+  - 用户需要金融计算时，使用金融计算器工具，不要自己算：
+    - 复利/单利用compoundInterest/simpleInterest
+    - 定投用dcaReturn（月定投）或compoundDca（日定投或有初始资金时）
+    - 年化收益率换算用annualizedReturn，72法则用ruleOf72
+    - 股票估值用peRatio/pbRatio/dividendYield
+    - 房贷月供/贷款用loanPayment
+    - 投资项目评估用npv/irr
+    - 债券分析用bondPrice/bondYtm
+    - 退休规划用retirementTarget/withdrawalPlan
+    - 风险分析用sharpeRatio/maxDrawdown
+    - 收益率分析用cagr/totalReturn/inflationAdjusted
   - 工具失败时告知用户
   - 用户询问数据库中的数据、需要统计分析或生成报表时，使用SQL工具：
     1. 先调用 getDatabaseSchema 获取相关表的结构

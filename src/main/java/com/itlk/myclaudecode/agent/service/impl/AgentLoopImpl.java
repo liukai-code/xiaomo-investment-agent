@@ -9,6 +9,7 @@ import com.itlk.myclaudecode.user.repository.UserRepository;
 import com.itlk.myclaudecode.tool.FileListTool;
 import com.itlk.myclaudecode.tool.FileReadTool;
 import com.itlk.myclaudecode.tool.FileWriteTool;
+import com.itlk.myclaudecode.tool.FinancialCalcTool;
 import com.itlk.myclaudecode.tool.FinancialDataTool;
 import com.itlk.myclaudecode.tool.SqlTool;
 import com.itlk.myclaudecode.tool.WebFetchTool;
@@ -61,6 +62,7 @@ public class AgentLoopImpl implements AgentLoop {
                          FileReadTool fileReadTool,
                          FileWriteTool fileWriteTool,
                          FileListTool fileListTool,
+                         FinancialCalcTool financialCalcTool,
                          FinancialDataTool financialDataTool,
                          SqlTool sqlTool,
                          WebFetchTool webFetchTool,
@@ -69,7 +71,7 @@ public class AgentLoopImpl implements AgentLoop {
         this.systemPrompt = systemPrompt;
 
         ChatClient.Builder builder = ChatClient.builder(chatModel)
-                .defaultTools(fileReadTool, fileWriteTool, fileListTool, financialDataTool, sqlTool, webFetchTool);
+                .defaultTools(fileReadTool, fileWriteTool, fileListTool, financialCalcTool, financialDataTool, sqlTool, webFetchTool);
 
         if (toolCallbackProvider != null) {
             builder.defaultToolCallbacks(toolCallbackProvider);
