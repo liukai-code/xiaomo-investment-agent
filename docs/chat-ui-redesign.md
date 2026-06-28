@@ -6,180 +6,182 @@
 
 ### 原有问题
 
-1. **视觉风格过时**：赛博朋克/CRT 终端美学（扫描线、绿色 accent、JetBrains Mono 等宽字体、固定 1080px 容器）
+1. **视觉风格过时**：赛博朋克/CRT 终端美学（扫描线、绿色 accent、等宽字体、固定宽度容器）
 2. **布局不可控**：LLM 输出自由格式 Markdown → 前端纯文本渲染 → AI 消息结构不一致
-3. **缺乏消息协议**：没有"消息类型"概念，所有内容一视同仁渲染为 Markdown 块
+3. **缺乏消息协议**：没有"消息类型"概念，所有内容一视同仁渲染为 Markdown 气泡
 
 ### 改动目标
 
 - 视觉：升级为 ChatGPT 结构 + Bloomberg 金融感 + Notion 干净层级
-- 架构：引入消息协议层，AI 输出结构化类型标记 → 前端按类型分发渲染组件
+- 架构：AI 输出 JSON blocks 数组 → 前端按 block 类型渲染为 UI 组件树
 
 ---
 
-## 二、整体架构变更
+## 二、整体架构
 
-### Before
-
-```
-LLM → 自由 Markdown → 前端 parseBlocks → 统一渲染
-```
-
-### After
+### 架构图
 
 ```
-LLM → 类型标记 + Markdown → useMessageProtocol 解析 → 按类型分发渲染
-                                            ↓
-                              ┌─────────────┼─────────────┐
-                              ↓             ↓             ↓
-                           KpiBlock     CardBlock    MarkdownRenderer
-                          (KPI 网格)   (卡片+标题)    (默认块渲染)
+AI 输出 JSON → validateJsonBlocks 校验+清理 → useMessageProtocol 解析
+                                                      ↓
+                                          MarkdownRenderer 分发
+                                                      ↓
+                              ┌─────────────────────────────────────────┐
+                              │  isJson = true  │  isJson = false       │
+                              │  → MessageBlock │  → Markdown 块渲染     │
+                              │  × N 个 blocks  │  (legacy fallback)    │
+                              └─────────────────────────────────────────┘
+```
+
+### 核心设计
+
+AI 不再输出自由文本，而是输出 **JSON blocks 数组**。每个 block 是一个独立的 UI 组件：
+
+```json
+{"blocks":[
+  {"type":"title","content":"贵州茅台实时行情"},
+  {"type":"kpi","content":"600519.SH","data":[
+    {"label":"当前价格","value":"1856.00","trend":"neutral"},
+    {"label":"涨跌","value":"+12.50","trend":"up"}
+  ]},
+  {"type":"text","content":"数据来源：腾讯行情，仅供参考。"},
+  {"type":"warning","content":"投资有风险，入市需谨慎"}
+]}
 ```
 
 ---
 
-## 三、消息协议设计
+## 三、Block 类型规范
 
-### 协议格式
+| type | 用途 | 渲染效果 | content | data |
+|------|------|----------|---------|------|
+| `title` | 标题 | 大号加粗文字 | 标题文字 | 无 |
+| `text` | 文本段落 | 普通文字（支持内联 Markdown） | 正文 | 无 |
+| `kpi` | 数据指标 | 3 列网格卡片，涨绿跌红 | 描述文字 | `[{label, value, trend}]` |
+| `table` | 数据表格 | 带表头的表格 | 描述文字 | `{headers: [], rows: [[]]}` |
+| `card` | 信息卡片 | 圆角背景卡片 | 正文（支持 `\n` 换行） | 无 |
+| `warning` | 风险提示 | 红色边框警告条 | 提示文字 | 无 |
 
-AI 在回复最开头输出 HTML 注释格式的类型标记，后跟标准 Markdown：
+### trend 取值
 
-```
-<!--type:kpi-->
-
-## 📊 海力士实时股价
-
-| 指标 | 数值 | 趋势 |
-|------|------|------|
-| 当前价格 | 169.10 | neutral |
-| 涨跌 | -25.40 | down |
-| 跌幅 | -13.93% | down |
-```
-
-### 类型定义
-
-| 类型标记 | 用途 | 渲染组件 | 适用场景 |
-|----------|------|----------|----------|
-| `<!--type:text-->` | 纯文本回答 | MarkdownRenderer | 概念解释、一般对话、学习建议 |
-| `<!--type:card-->` | 带标题卡片 | CardBlock | 投资分析、策略总结、案例解读 |
-| `<!--type:kpi-->` | KPI 数据网格 | KpiBlock | 股票行情、基金净值、金融计算结果 |
-| `<!--type:table-->` | 数据表格 | MarkdownRenderer | 数据库查询结果、多条目对比 |
-
-### KPI 表格规范
-
-当使用 `<!--type:kpi-->` 时，AI 必须输出三列 Markdown 表格：
-
-```markdown
-| 指标 | 数值 | 趋势 |
-|------|------|------|
-| 名称 | 值 | up/down/neutral |
-```
-
-- `up`: 涨/正面（绿色）
-- `down`: 跌/负面（红色）
-- `neutral`: 中性/无变化（灰色）
-
-### 兼容性
-
-无类型标记的消息默认按 `text` 类型渲染，确保旧消息不受影响。
+- `up` — 涨/正面（绿色 `#22c55e`）
+- `down` — 跌/负面（红色 `#ef4444`）
+- `neutral` — 中性/无变化（默认文字色）
 
 ---
 
-## 四、文件变更清单
+## 四、JSON 校验与容错
+
+`validateJsonBlocks.ts` 处理 AI 输出的各种异常情况：
+
+| 异常场景 | 处理方式 |
+|----------|----------|
+| 输出被 ``` 包裹 | 自动剥离代码块 |
+| JSON 前有自然语言 | 截取第一个 `{` 到最后一个 `}` |
+| 尾部多余逗号 | 正则修复 `,\s*}` → `}` |
+| JSON 解析失败 | 尝试正则提取部分完整 blocks |
+| 完全无法解析 | fallback 为 `[{type:"text", content:原文}]` |
+| 旧消息（无 JSON 结构） | 检测为 legacy，走 Markdown 块渲染 |
+
+---
+
+## 五、文件清单
 
 ### 后端
 
 | 文件 | 变更 |
 |------|------|
-| `src/main/resources/application.yml` | System Prompt 追加输出协议规则 |
+| `src/main/resources/application.yml` | System Prompt 替换为 JSON blocks 协议 |
 
-### 前端 — 新增文件
+### 前端 — 新增
 
 | 文件 | 职责 |
 |------|------|
-| `frontend/src/composables/useMessageProtocol.ts` | 消息协议解析器：检测 `<!--type:xxx-->` 标记，提取类型、标题、内容 |
-| `frontend/src/components/blocks/KpiBlock.vue` | KPI 网格组件：解析 3 列表格 → 网格布局，涨绿跌红 |
-| `frontend/src/components/blocks/CardBlock.vue` | 卡片容器组件：标题 + MarkdownRenderer 内容区 |
+| `frontend/src/utils/validateJsonBlocks.ts` | JSON 校验+清理+fallback |
+| `frontend/src/components/blocks/MessageBlock.vue` | 单个 block 渲染组件（6 种类型） |
 
-### 前端 — 修改文件
+### 前端 — 修改
 
 | 文件 | 变更 |
 |------|------|
-| `frontend/src/components/blocks/MarkdownRenderer.vue` | 集成协议分发：根据消息类型路由到 KpiBlock/CardBlock/默认渲染 |
-| `frontend/src/views/ChatView.vue` | UI 重构：侧边栏、消息布局、输入框、欢迎页 |
-| `frontend/src/styles/variables.css` | 全面重写：蓝色系配色、全屏布局、卡片式消息、ChatGPT 风格输入框 |
-| `frontend/src/styles/markdown.css` | 适配新配色变量 |
+| `frontend/src/composables/useMessageProtocol.ts` | 重写：调用 validateJsonBlocks 解析 |
+| `frontend/src/components/blocks/MarkdownRenderer.vue` | 分发：JSON → MessageBlock，legacy → Markdown 块 |
+
+### 前端 — 删除
+
+| 文件 | 原因 |
+|------|------|
+| `frontend/src/components/blocks/KpiBlock.vue` | 被 MessageBlock 替代 |
+| `frontend/src/components/blocks/CardBlock.vue` | 被 MessageBlock 替代 |
 
 ---
 
-## 五、UI 设计变更
+## 六、渲染流程
 
-### 配色方案
+### JSON 消息（新协议）
 
-从赛博朋克绿色切换到蓝色金融系：
+```
+SSE 流式到达 → onChunk(累积全文) → chatStore.updateLastAiMessage
+  → MarkdownRenderer 重新渲染
+  → useMessageProtocol 调用 parseAndValidate
+    → 检测到 "blocks" 字段 → isJson = true
+    → JSON.parse + validateBlocks
+  → 遍历 blocks 数组，每个 block 渲染一个 MessageBlock
+    → title → 大号标题
+    → kpi → 3 列网格 + 涨跌颜色
+    → table → 带表头的表格
+    → card → 圆角卡片
+    → warning → 红色警告条
+    → text → 普通文字
+```
 
-| 变量 | 暗色值 | 亮色值 | 说明 |
-|------|--------|--------|------|
+### Legacy 消息（旧 Markdown）
+
+```
+SSE 流式到达 → MarkdownRenderer
+  → useMessageProtocol 检测无 "blocks" 字段 → isJson = false
+  → 走原有 Markdown 块渲染流水线
+    → HeadingBlock / ParagraphBlock / CodeBlock / ...
+```
+
+---
+
+## 七、UI 设计
+
+### 配色
+
+蓝色金融系（从赛博朋克绿切换）：
+
+| 变量 | 暗色 | 亮色 | 说明 |
+|------|------|------|------|
 | `--accent` | `#3b82f6` | `#2563eb` | 蓝色主调 |
 | `--green` | `#22c55e` | `#16a34a` | 涨/正面 |
 | `--red` | `#ef4444` | `#dc2626` | 跌/负面 |
 | `--bg` | `#1a1a2e` | `#f8fafc` | 背景 |
 | `--surface` | `#16213e` | `#ffffff` | 卡片表面 |
 
-### 布局变更
+### 布局
 
-- **容器**：固定 1080px → 全屏响应式
-- **侧边栏**：260px，圆角卡片式会话项，底部用户栏
-- **消息**：用户右对齐蓝色气泡，AI 左侧卡片式输出
-- **输入框**：ChatGPT 风格圆角容器，focus 蓝色光晕
-- **字体**：`Inter` + `Noto Sans SC`（替代 JetBrains Mono 作为主字体）
-
-### 删除
-
-- CRT 扫描线效果 (`body::before`)
-- 绿色 accent 配色
-- 固定宽度容器限制
+- 全屏响应式（删除固定 1080px 容器）
+- 侧边栏 260px（圆角卡片式会话项）
+- 用户消息右对齐蓝色气泡
+- AI 消息左侧，每个 block 独立渲染
+- 输入框 ChatGPT 风格圆角容器
 
 ---
 
-## 六、渲染流程
+## 八、验证方式
 
-### 流式输出时的渲染流程
-
-```
-SSE chunk 到达
-  → onChunk(累积全文)
-  → RAF 节流
-  → chatStore.updateLastAiMessage(fullText)
-  → Vue 响应式触发 MarkdownRenderer 重新渲染
-  → useMessageProtocol 解析类型标记
-    → 标记未完整时（如只有 "<!--"），降级为 text 类型
-    → 标记完整后，切换到对应组件
-  → 对应组件渲染内容
-```
-
-### 类型检测时机
-
-- `<!--type:kpi-->` 共 16 个字符
-- 流式输出时，前 16 个字符内可能检测不到完整标记
-- 检测到前使用默认 `text` 渲染（Markdown 块），检测到后无缝切换
-- 用户体验：开头几帧可能以普通文本渲染，随后切换为结构化组件
-
----
-
-## 七、验证方式
-
-1. 启动后端：`mvn spring-boot:run`（加载新 System Prompt）
-2. 启动前端：`cd frontend && npm run dev`
+1. 后端重启：`mvn spring-boot:run`（加载新 System Prompt）
+2. 前端启动：`cd frontend && npm run dev`
 3. 测试场景：
 
-| 测试输入 | 预期类型 | 预期渲染 |
-|----------|----------|----------|
-| "茅台今天多少钱" | `kpi` | KPI 网格卡片 |
-| "什么是复利" | `text` | 默认 Markdown 卡片 |
-| "帮我分析一下定投策略" | `card` | 带标题卡片 |
-| "查询数据库中的用户" | `table` | 表格卡片 |
-| 旧消息（无标记） | `text`（默认） | 正常渲染 |
+| 测试输入 | 预期 blocks | 预期渲染 |
+|----------|------------|----------|
+| "茅台今天多少钱" | title + kpi + text + warning | 标题 + KPI 网格 + 说明 + 风险提示 |
+| "什么是复利" | title + card + text | 标题 + 卡片 + 文字 |
+| "查询数据库用户" | title + table + text | 标题 + 表格 + 说明 |
+| 旧消息（纯 Markdown） | legacy fallback | Markdown 块渲染 |
 
-4. 主题切换：暗色/亮色模式下所有组件样式正常
-5. 流式体验：输入发送后实时输出，无卡顿
+4. 容错测试：AI 输出被代码块包裹、JSON 前有文字等异常情况
+5. 主题切换：暗色/亮色模式下所有组件样式正常

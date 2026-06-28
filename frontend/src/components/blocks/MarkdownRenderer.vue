@@ -3,8 +3,7 @@ import { computed, toRef } from 'vue'
 import { useMarkdownBlocks } from '@/composables/useMarkdownBlocks'
 import { useMessageProtocol } from '@/composables/useMessageProtocol'
 import StreamingCursor from '@/components/common/StreamingCursor.vue'
-import KpiBlock from './KpiBlock.vue'
-import CardBlock from './CardBlock.vue'
+import MessageBlock from './MessageBlock.vue'
 import HeadingBlock from './HeadingBlock.vue'
 import ParagraphBlock from './ParagraphBlock.vue'
 import CodeBlock from './CodeBlock.vue'
@@ -21,25 +20,21 @@ const props = defineProps<{
 const textRef = toRef(props, 'text')
 const { parsed } = useMessageProtocol(textRef)
 
-const contentRef = computed(() => parsed.value.content)
-const { blocks } = useMarkdownBlocks(contentRef)
+// For legacy markdown fallback
+const { blocks } = useMarkdownBlocks(textRef)
 </script>
 
 <template>
-  <!-- Protocol-aware rendering -->
-  <KpiBlock
-    v-if="parsed.type === 'kpi'"
-    :content="parsed.content"
-  />
+  <!-- JSON blocks rendering -->
+  <template v-if="parsed.isJson">
+    <MessageBlock
+      v-for="(block, i) in parsed.blocks"
+      :key="i"
+      :block="block"
+    />
+  </template>
 
-  <CardBlock
-    v-else-if="parsed.type === 'card'"
-    :title="parsed.title"
-    :content="parsed.content"
-    :is-streaming="isStreaming"
-  />
-
-  <!-- Default markdown rendering (text, table, or no marker) -->
+  <!-- Legacy markdown fallback -->
   <template v-else>
     <template v-for="block in blocks" :key="block.key">
       <HeadingBlock v-if="block.type === 'heading'" :block="block" />
