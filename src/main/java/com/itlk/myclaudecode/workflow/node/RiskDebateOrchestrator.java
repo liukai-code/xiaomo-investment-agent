@@ -10,6 +10,9 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -19,7 +22,8 @@ import java.util.regex.Pattern;
 @Slf4j
 public class RiskDebateOrchestrator implements WorkflowNode {
 
-    private static final Pattern JSON_PATTERN = Pattern.compile("\\{[^}]+}");
+    private static final Pattern JSON_PATTERN = Pattern.compile("```json\\s*(\\{[\\s\\S]*?})\\s*```|\\{[\\s\\S]*?}");
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private final DebateNode aggressive;
     private final DebateNode conservative;
@@ -81,23 +85,20 @@ public class RiskDebateOrchestrator implements WorkflowNode {
         try {
             Matcher matcher = JSON_PATTERN.matcher(content);
             if (matcher.find()) {
-                String json = matcher.group();
-                // 简单解析 JSON 字段
-                String action = extractJsonValue(json, "action");
-                String confidenceStr = extractJsonValue(json, "confidence");
-                String targetPriceStr = extractJsonValue(json, "target_price");
-                String summary = extractJsonValue(json, "summary");
+                // group(1) = code block 内的 JSON，group(0) = 整个匹配（可能含 ```）
+                String json = matcher.group(1) != null ? matcher.group(1) : matcher.group(0);
+                JsonNode node = objectMapper.readTree(json);
 
-                double confidence = confidenceStr != null ? Double.parseDouble(confidenceStr) : 0.5;
-                double targetPrice = targetPriceStr != null ? Double.parseDouble(targetPriceStr) : 0.0;
+                String action = node.has("action") ? node.get("action").asText("HOLD") : "HOLD";
+                double confidence = node.has("confidence") ? node.get("confidence").asDouble(0.5) : 0.5;
+                double targetPrice = node.has("target_price") ? node.get("target_price").asDouble(0.0) : 0.0;
+                String summary = node.has("summary") ? node.get("summary").asText("") : "";
 
-                return new FinalDecision(
-                        action != null ? action : "HOLD",
-                        confidence,
-                        targetPrice,
-                        summary != null ? summary : content.substring(0, Math.min(content.length(), 200)),
-                        Instant.now()
-                );
+                if (summary.isEmpty()) {
+                    summary = content.substring(0, Math.min(content.length(), 200));
+                }
+
+                return new FinalDecision(action, confidence, targetPrice, summary, Instant.now());
             }
         } catch (Exception e) {
             log.warn("解析最终裁决 JSON 失败，使用默认值: {}", e.getMessage());
@@ -106,19 +107,13 @@ public class RiskDebateOrchestrator implements WorkflowNode {
         // fallback: 从文本中推断
         String upper = content.toUpperCase();
         String action = "HOLD";
-        if (upper.contains("BUY") || upper.contains("买入") || upper.contains("买入")) {
+        if (upper.contains("BUY") || upper.contains("买入")) {
             action = "BUY";
-        } else if (upper.contains("SELL") || upper.contains("卖出") || upper.contains("卖出")) {
+        } else if (upper.contains("SELL") || upper.contains("卖出")) {
             action = "SELL";
         }
 
         return new FinalDecision(action, 0.5, 0.0,
                 content.substring(0, Math.min(content.length(), 200)), Instant.now());
-    }
-
-    private String extractJsonValue(String json, String key) {
-        Pattern p = Pattern.compile("\"" + key + "\"\\s*:\\s*\"?([^\",}]+)\"?");
-        Matcher m = p.matcher(json);
-        return m.find() ? m.group(1).trim() : null;
     }
 }

@@ -138,8 +138,10 @@ public enum AgentRole {
     RISK_JUDGE(
             "RiskJudge",
             "你是风险裁决官，综合激进、保守、中立三方的风险评估，做出最终裁决。\n"
-                    + "你的输出必须是严格的JSON格式：\n"
-                    + "{\"action\":\"BUY或SELL或HOLD\",\"confidence\":0.0到1.0的数字,\"target_price\":数字,\"summary\":\"综合摘要，200字以内\"}\n"
+                    + "输出格式要求：\n"
+                    + "1. 先用2-3句话总结你的裁决理由（中文，自然语言）\n"
+                    + "2. 然后输出一个严格的JSON对象，用```json```代码块包裹：\n"
+                    + "```json\n{\"action\":\"BUY或SELL或HOLD\",\"confidence\":0.0到1.0的数字,\"target_price\":数字,\"summary\":\"综合摘要，100字以内\"}\n```\n"
                     + "注意：\n"
                     + "1. action只能是BUY、SELL或HOLD之一\n"
                     + "2. confidence是0.0到1.0之间的小数\n"

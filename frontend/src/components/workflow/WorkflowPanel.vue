@@ -119,6 +119,25 @@ const finalDecision = computed(() => {
   return null
 })
 
+// 解析 RiskJudge 的 JSON 输出为结构化数据
+function parseJudgeJson(content: string): { action: string; confidence: number; targetPrice: number; summary: string } | null {
+  try {
+    // 匹配 ```json``` 代码块内的 JSON 或裸 JSON
+    const codeBlockMatch = content.match(/```json\s*([\s\S]*?)\s*```/)
+    const jsonStr = codeBlockMatch ? codeBlockMatch[1] : content.match(/\{[\s\S]*?}/)?.[0]
+    if (jsonStr) {
+      const obj = JSON.parse(jsonStr)
+      return {
+        action: obj.action || 'HOLD',
+        confidence: typeof obj.confidence === 'number' ? obj.confidence : 0.5,
+        targetPrice: typeof obj.target_price === 'number' ? obj.target_price : 0,
+        summary: obj.summary || '',
+      }
+    }
+  } catch {}
+  return null
+}
+
 // 按阶段分组的 Agent
 const phaseAgents: Record<string, string[]> = {
   Layer1_DataCollection: ['MarketAnalyst', 'FundamentalsAnalyst', 'NewsAnalyst', 'SocialAnalyst'],
@@ -145,6 +164,14 @@ function getPhaseIconClass(phase: string): string {
   if (phaseStatus.value.has(phase)) return 'icon-done'
   if (currentPhase.value === phase) return 'icon-running'
   return 'icon-pending'
+}
+
+// 将 RiskJudge 的 JSON 输出格式化为可读文本
+function formatAgentContent(agentName: string, content: string): string {
+  if (agentName !== 'RiskJudge') return content
+  const parsed = parseJudgeJson(content)
+  if (!parsed) return content
+  return `**裁决：${parsed.action}** | 置信度：${(parsed.confidence * 100).toFixed(0)}%${parsed.targetPrice > 0 ? ' | 目标价：' + parsed.targetPrice : ''}\n\n${parsed.summary}`
 }
 </script>
 
@@ -205,7 +232,7 @@ function getPhaseIconClass(phase: string): string {
             class="agent-content"
           >
             <MarkdownRenderer
-              :text="agentStates.get(agentName)?.content || ''"
+              :text="formatAgentContent(agentName, agentStates.get(agentName)?.content || '')"
               :is-streaming="agentStates.get(agentName)?.status === 'running'"
             />
           </div>
@@ -217,7 +244,25 @@ function getPhaseIconClass(phase: string): string {
     <div v-if="finalDecision" class="final-decision">
       <div class="decision-header">最终裁决</div>
       <div class="decision-content">
-        <MarkdownRenderer :text="finalDecision.content || ''" :is-streaming="false" />
+        <template v-if="parseJudgeJson(finalDecision.content || '')">
+          <div class="decision-card">
+            <div class="decision-action" :class="(parseJudgeJson(finalDecision.content || '')?.action || 'HOLD').toLowerCase()">
+              {{ parseJudgeJson(finalDecision.content || '')?.action }}
+            </div>
+            <div class="decision-meta">
+              <span class="decision-label">置信度</span>
+              <span class="decision-value">{{ ((parseJudgeJson(finalDecision.content || '')?.confidence || 0) * 100).toFixed(0) }}%</span>
+              <template v-if="(parseJudgeJson(finalDecision.content || '')?.targetPrice || 0) > 0">
+                <span class="decision-label" style="margin-left:16px">目标价</span>
+                <span class="decision-value">{{ parseJudgeJson(finalDecision.content || '')?.targetPrice }}</span>
+              </template>
+            </div>
+            <div class="decision-summary">{{ parseJudgeJson(finalDecision.content || '')?.summary }}</div>
+          </div>
+        </template>
+        <template v-else>
+          <MarkdownRenderer :text="finalDecision.content || ''" :is-streaming="false" />
+        </template>
       </div>
     </div>
   </div>
@@ -384,6 +429,8 @@ function getPhaseIconClass(phase: string): string {
   font-size: 13px;
   max-height: 400px;
   overflow-y: auto;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .final-decision {
@@ -402,6 +449,44 @@ function getPhaseIconClass(phase: string): string {
 }
 
 .decision-content {
-  padding: 8px 12px;
+  padding: 12px 16px;
+}
+
+.decision-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.decision-action {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.decision-action.buy { color: #ef4444; }
+.decision-action.sell { color: #22c55e; }
+.decision-action.hold { color: #f59e0b; }
+
+.decision-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.decision-label {
+  color: var(--text-dim, #999);
+}
+
+.decision-value {
+  font-weight: 600;
+}
+
+.decision-summary {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary, #666);
+  word-break: break-word;
 }
 </style>
