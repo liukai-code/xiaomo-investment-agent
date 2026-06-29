@@ -104,6 +104,44 @@ public class DeepAnalysisWorkflow {
         return graph;
     }
 
+    /**
+     * 从已持久化的 WorkflowAnalysis 构建聊天摘要（用于保存到 chat_messages）
+     */
+    public String buildSummaryForConversation(Long conversationId) {
+        List<WorkflowAnalysis> analyses = analysisRepository.findByConversationIdOrderByCreatedAtDesc(conversationId);
+        if (analyses.isEmpty()) {
+            return "## 深度分析完成\n\n分析结果已生成，请查看工作流详情。";
+        }
+        WorkflowAnalysis latest = analyses.get(0);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("## 深度分析完成\n\n");
+
+        if (latest.getAction() != null) {
+            sb.append("### 投资决策\n\n");
+            sb.append("| 项目 | 结论 |\n|------|------|\n");
+            sb.append("| 操作建议 | **").append(latest.getAction()).append("** |\n");
+            if (latest.getConfidence() != null) {
+                sb.append("| 置信度 | ").append(String.format("%.0f%%", latest.getConfidence() * 100)).append(" |\n");
+            }
+            if (latest.getTargetPrice() != null) {
+                sb.append("| 目标价 | ").append(latest.getTargetPrice()).append(" |\n");
+            }
+            sb.append("\n");
+        }
+
+        if (latest.getSummary() != null && !latest.getSummary().isBlank()) {
+            sb.append("### 综合摘要\n\n").append(latest.getSummary()).append("\n\n");
+        }
+
+        if (latest.getTradingProposal() != null && !latest.getTradingProposal().isBlank()) {
+            sb.append("### 交易方案\n\n").append(latest.getTradingProposal()).append("\n\n");
+        }
+
+        sb.append("---\n*以上由多智能体工作流自动生成，仅供参考*");
+        return sb.toString();
+    }
+
     private void persistResults(WorkflowState state) {
         try {
             WorkflowAnalysis analysis = new WorkflowAnalysis();

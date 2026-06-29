@@ -6,6 +6,7 @@ import com.itlk.myclaudecode.agent.service.AgentLoop;
 import com.itlk.myclaudecode.common.entity.Result;
 import com.itlk.myclaudecode.conversation.entity.ChatMessage;
 import com.itlk.myclaudecode.conversation.entity.Conversation;
+import com.itlk.myclaudecode.conversation.entity.MessageRole;
 import com.itlk.myclaudecode.conversation.service.ChatMessageService;
 import com.itlk.myclaudecode.conversation.service.ConversationService;
 import com.itlk.myclaudecode.workflow.service.DeepAnalysisWorkflow;
@@ -125,6 +126,10 @@ public class AgentLoopController {
         Long userId = getUserId(request);
         log.info("收到深度分析请求：userId={}, conversationId={}, message={}", userId, conversationId, message);
 
+        // 保存用户消息
+        Conversation conversation = conversationService.getConversation(conversationId);
+        chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
+
         return deepAnalysisWorkflow.execute(userId, conversationId, message)
                 .map(event -> {
                     try {
@@ -144,6 +149,12 @@ public class AgentLoopController {
                                 .event("done")
                                 .data("{\"conversationId\":" + conversationId + "}")
                                 .build()
-                ));
+                ))
+                .doOnComplete(() -> {
+                    // 保存 AI 最终结果到 chat_messages
+                    String summary = deepAnalysisWorkflow.buildSummaryForConversation(conversationId);
+                    chatMessageService.saveMessage(conversation, MessageRole.ASSISTANT, summary, null, null);
+                    log.info("深度分析结果已保存到会话 {}", conversationId);
+                });
     }
 }

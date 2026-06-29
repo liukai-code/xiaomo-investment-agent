@@ -72,7 +72,9 @@ public class WorkflowAgentFactory {
         }
 
         this.allToolCallbacks = callbacks.toArray(new ToolCallback[0]);
-        log.info("WorkflowAgentFactory 初始化完成，共 {} 个工具", allToolCallbacks.length);
+        log.info("WorkflowAgentFactory 初始化完成，共 {} 个工具: {}",
+                allToolCallbacks.length,
+                Arrays.stream(allToolCallbacks).map(cb -> cb.getToolDefinition().name()).toList());
     }
 
     /**
@@ -83,8 +85,19 @@ public class WorkflowAgentFactory {
         List<ToolCallback> scoped = Arrays.stream(allToolCallbacks)
                 .filter(cb -> allowedTools.contains(cb.getToolDefinition().name()))
                 .collect(Collectors.toList());
-        log.info("创建分析师 {}，绑定 {} 个工具: {}", role.roleName(), scoped.size(),
+        log.info("创建分析师 {}，请求 {} 个工具，实际绑定 {} 个: {}",
+                role.roleName(), allowedTools.size(), scoped.size(),
                 scoped.stream().map(cb -> cb.getToolDefinition().name()).toList());
+
+        // 检查是否有请求的工具未找到
+        Set<String> registeredNames = scoped.stream()
+                .map(cb -> cb.getToolDefinition().name()).collect(Collectors.toSet());
+        Set<String> missing = allowedTools.stream()
+                .filter(name -> !registeredNames.contains(name))
+                .collect(Collectors.toSet());
+        if (!missing.isEmpty()) {
+            log.warn("[{}] 以下工具未找到，可能名称不匹配: {}", role.roleName(), missing);
+        }
         return new AnalystNode(chatModel, role.roleName(), role.systemPrompt(), scoped, guardProperties, role.guardConfig());
     }
 
