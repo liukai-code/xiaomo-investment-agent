@@ -35,7 +35,7 @@ public class WebFetchTool {
     }
 
     @ToolBehavior(deterministic = false, cacheable = false)
-    @Tool(description = "抓取指定URL的网页内容并提取可读文本。当百度搜索返回结果后需要阅读全文、用户要求查看某篇文章或网页内容时调用。仅支持http和https协议的URL。")
+    @Tool(description = "抓取指定URL的网页内容并提取可读文本。当联网搜索返回结果后需要阅读全文、用户要求查看某篇文章或网页内容时调用。仅支持http和https协议的URL。")
     public String fetchWebpage(
             @ToolParam(description = "要抓取的网页URL，必须以http://或https://开头") String url,
             @ToolParam(description = "最大返回字符数，默认8000，最大20000", required = false) Integer maxLength) {

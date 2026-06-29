@@ -1,8 +1,11 @@
 package com.itlk.myclaudecode.tool.guard;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreType;
+
 import java.io.Serializable;
 import java.util.LinkedList;
 
+@JsonIgnoreType
 public class InfoGainTracker implements Serializable {
 
     private static final int MAX_SUMMARY_LENGTH = 500;

@@ -1,10 +1,13 @@
 package com.itlk.myclaudecode.tool.guard;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreType;
+
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 
+@JsonIgnoreType
 public class RepetitionDetector implements Serializable {
 
     private final Map<String, LinkedList<String>> callHistory = new HashMap<>();
