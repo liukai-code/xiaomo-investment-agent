@@ -41,6 +41,8 @@ import reactor.core.publisher.Flux;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -142,15 +144,23 @@ public class AgentLoopImpl implements AgentLoop {
 
         List<Message> context = buildContext(conversation.getId(), userId);
 
+        Map<String, Object> toolCtx = new HashMap<>();
+        toolCtx.put(MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0));
+        toolCtx.put(MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(toolGuardProperties.infoGainWindow(), toolGuardProperties.infoGainThreshold()));
+        toolCtx.put(MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold()));
+        toolCtx.put(MaxToolCallManager.FETCH_SESSION_TRACKER_KEY, new FetchSessionTracker(toolGuardProperties.maxFetches(), toolGuardProperties.maxConsecutiveNoNewInfo()));
+        toolCtx.put(MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY, new SearchSessionTracker(toolGuardProperties.maxSearchRounds()));
+        toolCtx.put(MaxToolCallManager.DUPLICATE_CACHE_KEY, new LinkedHashMap<String, java.util.List<Message>>(16, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, java.util.List<Message>> eldest) {
+                return size() > 50;
+            }
+        });
+
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
                 .temperature(0.3)
-                .toolContext(Map.of(
-                        MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0),
-                        MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(toolGuardProperties.infoGainWindow(), toolGuardProperties.infoGainThreshold()),
-                        MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold()),
-                        MaxToolCallManager.FETCH_SESSION_TRACKER_KEY, new FetchSessionTracker(toolGuardProperties.maxFetches(), toolGuardProperties.maxConsecutiveNoNewInfo()),
-                        MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY, new SearchSessionTracker(toolGuardProperties.maxSearchRounds())))
+                .toolContext(toolCtx)
                 .build();
 
         String response = chatClient.prompt()
@@ -177,15 +187,23 @@ public class AgentLoopImpl implements AgentLoop {
 
         StringBuilder accumulated = new StringBuilder();
 
+        Map<String, Object> streamToolCtx = new HashMap<>();
+        streamToolCtx.put(MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0));
+        streamToolCtx.put(MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(toolGuardProperties.infoGainWindow(), toolGuardProperties.infoGainThreshold()));
+        streamToolCtx.put(MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold()));
+        streamToolCtx.put(MaxToolCallManager.FETCH_SESSION_TRACKER_KEY, new FetchSessionTracker(toolGuardProperties.maxFetches(), toolGuardProperties.maxConsecutiveNoNewInfo()));
+        streamToolCtx.put(MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY, new SearchSessionTracker(toolGuardProperties.maxSearchRounds()));
+        streamToolCtx.put(MaxToolCallManager.DUPLICATE_CACHE_KEY, new LinkedHashMap<String, java.util.List<Message>>(16, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, java.util.List<Message>> eldest) {
+                return size() > 50;
+            }
+        });
+
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
                 .temperature(0.3)
-                .toolContext(Map.of(
-                        MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0),
-                        MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(toolGuardProperties.infoGainWindow(), toolGuardProperties.infoGainThreshold()),
-                        MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold()),
-                        MaxToolCallManager.FETCH_SESSION_TRACKER_KEY, new FetchSessionTracker(toolGuardProperties.maxFetches(), toolGuardProperties.maxConsecutiveNoNewInfo()),
-                        MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY, new SearchSessionTracker(toolGuardProperties.maxSearchRounds())))
+                .toolContext(streamToolCtx)
                 .build();
 
         return chatClient.prompt()
@@ -327,6 +345,9 @@ public class AgentLoopImpl implements AgentLoop {
 
     private static String sanitizeOutput(String text) {
         if (text == null) return "";
-        return text.replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "").trim();
+        return text
+                .replaceAll("\\n*\\[GUARD:[\\s\\S]*?\\[/GUARD]\\n*", "")
+                .replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "")
+                .trim();
     }
 }

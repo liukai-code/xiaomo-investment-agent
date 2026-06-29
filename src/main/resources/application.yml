@@ -56,9 +56,14 @@ agent:
   tool:
     max-iterations: 30
     soft-limit: 10
+    escalation-warning: 15
+    escalation-final: 20
     info-gain-window: 3
     info-gain-threshold: 0.8
     repetition-threshold: 3
+    tool-timeout-seconds: 60
+    report-min-length: 500
+    report-min-sections: 2
 
 # 多智能体深度分析工作流
 workflow:

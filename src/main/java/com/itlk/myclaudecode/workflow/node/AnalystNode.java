@@ -5,7 +5,9 @@ import com.itlk.myclaudecode.agent.service.impl.MaxToolCallManager;
 import com.itlk.myclaudecode.tool.guard.FetchSessionTracker;
 import com.itlk.myclaudecode.tool.guard.InfoGainTracker;
 import com.itlk.myclaudecode.tool.guard.RepetitionDetector;
+import com.itlk.myclaudecode.tool.guard.ReportCompletenessChecker;
 import com.itlk.myclaudecode.tool.guard.SearchSessionTracker;
+import com.itlk.myclaudecode.workflow.agent.AgentRole;
 import com.itlk.myclaudecode.workflow.engine.WorkflowNode;
 import com.itlk.myclaudecode.workflow.event.WorkflowEvent;
 import com.itlk.myclaudecode.workflow.state.AgentReport;
@@ -14,12 +16,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -32,15 +37,18 @@ public class AnalystNode implements WorkflowNode {
     private final String systemPrompt;
     private final List<ToolCallback> toolCallbacks;
     private final ToolGuardProperties guardProperties;
+    private final AgentRole.RoleGuardConfig roleGuardConfig;
 
     public AnalystNode(ChatModel chatModel, String roleName,
                        String systemPrompt, List<ToolCallback> toolCallbacks,
-                       ToolGuardProperties guardProperties) {
+                       ToolGuardProperties guardProperties,
+                       AgentRole.RoleGuardConfig roleGuardConfig) {
         this.chatModel = chatModel;
         this.roleName = roleName;
         this.systemPrompt = systemPrompt;
         this.toolCallbacks = toolCallbacks;
         this.guardProperties = guardProperties;
+        this.roleGuardConfig = roleGuardConfig;
     }
 
     @Override
@@ -63,22 +71,36 @@ public class AnalystNode implements WorkflowNode {
         sink.tryEmitNext(WorkflowEvent.agentStart(roleName));
 
         StringBuilder report = new StringBuilder();
+        ReportCompletenessChecker completenessChecker = new ReportCompletenessChecker(
+                guardProperties.reportMinLength(), guardProperties.reportMinSections());
+
+        // Use role-specific config when available, fall back to global
+        AgentRole.RoleGuardConfig rc = roleGuardConfig;
+        double infoGainThreshold = rc != null ? rc.infoGainThreshold() : guardProperties.infoGainThreshold();
+        int repetitionThreshold = rc != null ? rc.repetitionThreshold() : guardProperties.repetitionThreshold();
+        int maxFetches = rc != null ? rc.maxFetches() : guardProperties.maxFetches();
+        int maxConsecutiveNoNewInfo = rc != null ? rc.maxConsecutiveNoNewInfo() : guardProperties.maxConsecutiveNoNewInfo();
+        int maxSearchRounds = rc != null ? rc.maxSearchRounds() : guardProperties.maxSearchRounds();
+
+        Map<String, Object> toolCtx = new HashMap<>();
+        toolCtx.put(MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0));
+        toolCtx.put(MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(3, infoGainThreshold));
+        toolCtx.put(MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(repetitionThreshold));
+        toolCtx.put(MaxToolCallManager.FETCH_SESSION_TRACKER_KEY, new FetchSessionTracker(maxFetches, maxConsecutiveNoNewInfo));
+        toolCtx.put(MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY, new SearchSessionTracker(maxSearchRounds));
+        toolCtx.put(MaxToolCallManager.DUPLICATE_CACHE_KEY, new LinkedHashMap<String, List<Message>>(16, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, List<Message>> eldest) {
+                return size() > 50;
+            }
+        });
+        toolCtx.put(MaxToolCallManager.REPORT_COMPLETENESS_KEY, completenessChecker);
 
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
-                .temperature(guardProperties != null ? 0.4 : 0.4)
-                .maxTokens(guardProperties != null ? 8192 : 8192)
-                .toolContext(Map.of(
-                        MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0),
-                        MaxToolCallManager.INFO_GAIN_TRACKER_KEY,
-                                new InfoGainTracker(3, 0.8),
-                        MaxToolCallManager.REPETITION_DETECTOR_KEY,
-                                new RepetitionDetector(3),
-                        MaxToolCallManager.FETCH_SESSION_TRACKER_KEY,
-                                new FetchSessionTracker(3, 2),
-                        MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY,
-                                new SearchSessionTracker(1)
-                ))
+                .temperature(0.4)
+                .maxTokens(8192)
+                .toolContext(toolCtx)
                 .build();
 
         return agentClient.prompt()
@@ -88,6 +110,7 @@ public class AnalystNode implements WorkflowNode {
                 .content()
                 .map(chunk -> {
                     report.append(chunk);
+                    completenessChecker.appendChunk(chunk);
                     return WorkflowEvent.agentChunk(roleName, chunk);
                 })
                 .doOnComplete(() -> {

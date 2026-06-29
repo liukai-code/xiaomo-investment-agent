@@ -7,6 +7,8 @@ public record GuardSignal(
         int currentStep,
         int softLimit,
         int hardLimit,
+        int escalationWarning,
+        int escalationFinal,
         InfoGainLevel infoGain,
         double infoGainSimilarity,
         RepetitionResult repetition,
@@ -18,69 +20,81 @@ public record GuardSignal(
         boolean overMaxFetches,
         boolean stuckNoNewInfo
 ) {
-    public boolean shouldInject() {
-        return currentStep >= softLimit
+
+    public enum SignalLevel {
+        NONE,       // no signal needed
+        ADVISORY,   // soft limit or minor issues - suggest stopping
+        WARNING,    // escalation - strongly suggest stopping
+        CRITICAL,   // final warning - must stop, returnDirect=true
+        FORCE       // hard limit - force stop, returnDirect=true
+    }
+
+    public SignalLevel getLevel() {
+        if (currentStep >= hardLimit || overMaxFetches) return SignalLevel.FORCE;
+        if (currentStep >= escalationFinal) return SignalLevel.CRITICAL;
+        if (currentStep >= escalationWarning
                 || infoGain == InfoGainLevel.LOW
-                || repetition != RepetitionResult.NONE
-                || overMaxFetches
-                || stuckNoNewInfo
-                || isDuplicateUrl;
+                || repetition == RepetitionResult.STUCK_IDENTICAL) return SignalLevel.WARNING;
+        if (currentStep >= softLimit
+                || repetition == RepetitionResult.STUCK_SIMILAR
+                || isDuplicateUrl || stuckNoNewInfo) return SignalLevel.ADVISORY;
+        return SignalLevel.NONE;
+    }
+
+    public boolean shouldInject() {
+        return getLevel() != SignalLevel.NONE;
     }
 
     public boolean isHardLimit() {
-        return currentStep >= hardLimit
-                || overMaxFetches;
+        SignalLevel level = getLevel();
+        return level == SignalLevel.FORCE || level == SignalLevel.CRITICAL;
     }
 
     public String format() {
+        SignalLevel level = getLevel();
+        if (level == SignalLevel.NONE) return "";
+
         StringBuilder sb = new StringBuilder();
-        sb.append("\n\n[GUARD_SIGNAL]\n");
-        sb.append("step: ").append(currentStep).append("/").append(hardLimit).append("\n");
-        sb.append("soft_limit: ").append(softLimit).append("\n");
-        sb.append("info_gain: ").append(infoGain.name().toLowerCase());
+        sb.append("\n\n[GUARD: ").append(level.name()).append("]\n");
+        sb.append("Action: ").append(suggestAction(level)).append("\n");
+        sb.append("Context: step=").append(currentStep).append("/").append(hardLimit);
         if (infoGain == InfoGainLevel.LOW) {
-            sb.append(" (similarity=").append(String.format("%.2f", infoGainSimilarity)).append(")");
+            sb.append(", info=low(").append(String.format("%.2f", infoGainSimilarity)).append(")");
         }
-        sb.append("\n");
-        sb.append("repetition: ").append(repetition.name().toLowerCase());
         if (repetition != RepetitionResult.NONE) {
-            sb.append(" (tool: ").append(toolName).append(")");
+            sb.append(", repeat=").append(repetition.name().toLowerCase());
         }
-        sb.append("\n");
         if (isFetchTool) {
-            sb.append("fetch_count: ").append(fetchCount).append("/3\n");
-            sb.append("consecutive_no_new_info: ").append(consecutiveNoNewInfo).append("/2\n");
-            if (isDuplicateUrl) {
-                sb.append("duplicate_url: true\n");
-            }
+            sb.append(", fetch=").append(fetchCount).append("/3");
         }
-        sb.append("suggestion: ").append(suggest()).append("\n");
-        sb.append("[/GUARD_SIGNAL]");
+        sb.append("\n[/GUARD]");
         return sb.toString();
     }
 
-    private String suggest() {
-        if (isHardLimit()) {
-            if (overMaxFetches) {
-                return "已达到单次会话最大抓取次数(3次)，必须基于已有内容直接回答用户。不要再调用任何fetch工具。";
-            }
-            return "已达到硬上限，必须基于已有结果直接回答用户。";
+    private String suggestAction(SignalLevel level) {
+        switch (level) {
+            case FORCE:
+                if (overMaxFetches) {
+                    return "已达到最大抓取次数(3次)，必须基于已有内容直接回答用户。不要再调用任何fetch工具。";
+                }
+                return "已达到硬上限，必须基于已有结果直接回答用户。";
+            case CRITICAL:
+                return "即将达到硬上限，请立即停止工具调用，基于已有数据完成分析。";
+            case WARNING:
+                if (repetition == RepetitionResult.STUCK_IDENTICAL) {
+                    return "检测到重复调用相同工具和参数，请换一种方式或基于已有结果回答。";
+                }
+                if (infoGain == InfoGainLevel.LOW) {
+                    return "最近几轮工具调用未产生新信息，建议基于已有数据回答，或调用不同工具获取新维度信息。";
+                }
+                return "请评估是否已获得足够信息来回答用户。";
+            case ADVISORY:
+                if (isDuplicateUrl) return "该URL已经被抓取过，请勿重复抓取。";
+                if (stuckNoNewInfo) return "连续多轮抓取未获得新信息，建议基于已有内容回答。";
+                if (repetition == RepetitionResult.STUCK_SIMILAR) return "检测到连续相似调用，请评估是否需要调整策略。";
+                return "请评估是否已获得足够信息。";
+            default:
+                return "";
         }
-        if (stuckNoNewInfo) {
-            return "连续多轮抓取未获得新信息，建议立即基于已有内容回答用户，或换用不同工具获取新维度信息。";
-        }
-        if (isDuplicateUrl) {
-            return "该URL已经被抓取过，请勿重复抓取。请基于已有内容回答或尝试其他URL。";
-        }
-        if (repetition == RepetitionResult.STUCK_IDENTICAL) {
-            return "检测到重复调用相同工具和参数，请换一种方式或基于已有结果回答。";
-        }
-        if (repetition == RepetitionResult.STUCK_SIMILAR) {
-            return "检测到连续相似调用，请评估是否需要调整策略。";
-        }
-        if (infoGain == InfoGainLevel.LOW) {
-            return "最近几轮工具调用未产生新信息，建议基于已有数据尝试回答，或调用不同工具获取新维度信息。";
-        }
-        return "请评估是否已获得足够信息来回答用户。";
     }
 }

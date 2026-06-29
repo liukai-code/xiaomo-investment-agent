@@ -3,6 +3,7 @@ package com.itlk.myclaudecode.agent.service.impl;
 import com.itlk.myclaudecode.agent.config.ToolGuardProperties;
 import com.itlk.myclaudecode.tool.guard.FetchSessionTracker;
 import com.itlk.myclaudecode.tool.guard.GuardSignal;
+import com.itlk.myclaudecode.tool.guard.ReportCompletenessChecker;
 import com.itlk.myclaudecode.tool.guard.SearchSessionTracker;
 import com.itlk.myclaudecode.tool.guard.InfoGainTracker;
 import com.itlk.myclaudecode.tool.guard.InfoGainTracker.InfoGainLevel;
@@ -30,6 +31,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
@@ -41,6 +46,8 @@ public class MaxToolCallManager implements ToolCallingManager {
     public static final String REPETITION_DETECTOR_KEY = "repetitionDetector";
     public static final String FETCH_SESSION_TRACKER_KEY = "fetchSessionTracker";
     public static final String SEARCH_SESSION_TRACKER_KEY = "searchSessionTracker";
+    public static final String DUPLICATE_CACHE_KEY = "duplicateCache";
+    public static final String REPORT_COMPLETENESS_KEY = "reportCompleteness";
 
     private static final Set<String> FETCH_TOOL_NAMES = Set.of(
             "fetchArticleContent", "fetchWebpage"
@@ -53,14 +60,7 @@ public class MaxToolCallManager implements ToolCallingManager {
     private final ToolCallingManager delegate;
     private final ToolGuardProperties properties;
     private final ToolBehaviorRegistry behaviorRegistry;
-
-    private final ThreadLocal<Map<String, List<Message>>> duplicateCache =
-            ThreadLocal.withInitial(() -> new LinkedHashMap<>(16, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<String, List<Message>> eldest) {
-                    return size() > 50;
-                }
-            });
+    private final long toolTimeoutMs;
 
     public MaxToolCallManager(
             ToolCallbackResolver toolCallbackResolver,
@@ -69,11 +69,13 @@ public class MaxToolCallManager implements ToolCallingManager {
             ToolBehaviorRegistry behaviorRegistry) {
         this.properties = properties;
         this.behaviorRegistry = behaviorRegistry;
+        this.toolTimeoutMs = properties.toolTimeoutSeconds() * 1000L;
         this.delegate = DefaultToolCallingManager.builder()
                 .toolCallbackResolver(toolCallbackResolver)
                 .toolExecutionExceptionProcessor(exceptionProcessor)
                 .build();
-        log.info("MaxToolCallManager V2 初始化, softLimit={}, hardLimit={}", properties.softLimit(), properties.maxIterations());
+        log.info("MaxToolCallManager 初始化, softLimit={}, escalationWarning={}, escalationFinal={}, hardLimit={}",
+                properties.softLimit(), properties.escalationWarning(), properties.escalationFinal(), properties.maxIterations());
     }
 
     @Override
@@ -82,12 +84,15 @@ public class MaxToolCallManager implements ToolCallingManager {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public ToolExecutionResult executeToolCalls(Prompt prompt, ChatResponse chatResponse) {
         AtomicInteger counter = extractFromContext(prompt, TOOL_CALL_COUNTER_KEY, AtomicInteger.class);
         InfoGainTracker infoGainTracker = extractFromContext(prompt, INFO_GAIN_TRACKER_KEY, InfoGainTracker.class);
         RepetitionDetector repetitionDetector = extractFromContext(prompt, REPETITION_DETECTOR_KEY, RepetitionDetector.class);
         FetchSessionTracker fetchTracker = extractFromContext(prompt, FETCH_SESSION_TRACKER_KEY, FetchSessionTracker.class);
         SearchSessionTracker searchTracker = extractFromContext(prompt, SEARCH_SESSION_TRACKER_KEY, SearchSessionTracker.class);
+        Map<String, List<Message>> duplicateCache = extractFromContext(prompt, DUPLICATE_CACHE_KEY, Map.class);
+        ReportCompletenessChecker completenessChecker = extractFromContext(prompt, REPORT_COMPLETENESS_KEY, ReportCompletenessChecker.class);
 
         int step = counter.incrementAndGet();
         AssistantMessage assistantWithTools = findAssistantWithToolCalls(chatResponse);
@@ -101,7 +106,22 @@ public class MaxToolCallManager implements ToolCallingManager {
             boolean cacheable = behaviorRegistry.getBehavior(tc.name()).cacheable();
             boolean isFetchTool = isFetchTool(tc.name());
 
-            // URL 去重检查（执行前拦截）
+            // Report completeness check (workflow mode)
+            if (completenessChecker != null && completenessChecker.isReportSubstantial()) {
+                log.info("[MaxToolCallManager] 报告已完整(length={}), 跳过工具调用",
+                        completenessChecker.getAccumulatedLength());
+                String msg = "报告已基本完整(length=" + completenessChecker.getAccumulatedLength()
+                        + "字符)，请基于已有数据完成报告，无需继续调用工具。";
+                List<Message> skipHistory = buildSkipResult(tc, msg);
+                GuardSignal signal = new GuardSignal(
+                        step, properties.softLimit(), properties.maxIterations(),
+                        properties.escalationWarning(), properties.escalationFinal(),
+                        InfoGainLevel.UNKNOWN, 0.0, RepetitionResult.NONE, tc.name(),
+                        false, 0, false, 0, false, false);
+                return new GuardedToolExecutionResult(new CachedToolExecutionResult(skipHistory), signal);
+            }
+
+            // URL dedup check (pre-execution intercept)
             if (isFetchTool && fetchTracker != null) {
                 String url = extractUrlFromArgs(tc.arguments());
                 if (url != null && fetchTracker.isUrlVisited(url)) {
@@ -113,6 +133,7 @@ public class MaxToolCallManager implements ToolCallingManager {
 
                     GuardSignal signal = new GuardSignal(
                             step, properties.softLimit(), properties.maxIterations(),
+                            properties.escalationWarning(), properties.escalationFinal(),
                             infoGain, infoGainTracker.getLastSimilarity(),
                             repetition, tc.name(),
                             true, fetchTracker.getFetchCount(), true,
@@ -121,26 +142,26 @@ public class MaxToolCallManager implements ToolCallingManager {
                 }
             }
 
-            // 正常执行
-            if (cacheable) {
+            // Normal execution with cache check
+            if (cacheable && duplicateCache != null) {
                 String cacheKey = tc.name() + ":" + tc.arguments().hashCode();
-                List<Message> cachedResult = duplicateCache.get().get(cacheKey);
+                List<Message> cachedResult = duplicateCache.get(cacheKey);
                 if (cachedResult != null) {
                     log.info("[MaxToolCallManager] 检测到重复工具调用，返回缓存结果: {}", tc.name());
                     return new CachedToolExecutionResult(cachedResult);
                 }
                 result = executeSafely(prompt, chatResponse);
-                duplicateCache.get().put(cacheKey, result.conversationHistory());
+                duplicateCache.put(cacheKey, result.conversationHistory());
             } else {
                 result = executeSafely(prompt, chatResponse);
             }
 
-            // 信息增益和重复检测
+            // Info gain and repetition detection
             String resultText = extractResultText(result);
             InfoGainLevel infoGain = infoGainTracker.recordAndGetLevel(resultText);
             RepetitionResult repetition = repetitionDetector.recordAndDetect(tc.name(), tc.arguments());
 
-            // 搜索工具检测：限制搜索轮次 + 注入规划指令
+            // Search tool: limit search rounds
             if (isSearchTool(tc.name()) && searchTracker != null) {
                 SearchSessionTracker.SearchResult sr = searchTracker.recordSearch();
                 if (sr.isOverLimit()) {
@@ -149,6 +170,7 @@ public class MaxToolCallManager implements ToolCallingManager {
                     List<Message> limitHistory = buildSkipResult(tc, limitMsg);
                     GuardSignal signal = new GuardSignal(
                             step, properties.softLimit(), properties.maxIterations(),
+                            properties.escalationWarning(), properties.escalationFinal(),
                             infoGain, infoGainTracker.getLastSimilarity(),
                             repetition, tc.name(),
                             false, 0, false, 0, false, false);
@@ -156,7 +178,7 @@ public class MaxToolCallManager implements ToolCallingManager {
                 }
             }
 
-            // Fetch 专项追踪
+            // Fetch session tracking
             boolean overMaxFetches = false;
             boolean stuckNoNewInfo = false;
             boolean isDuplicateUrl = false;
@@ -178,13 +200,14 @@ public class MaxToolCallManager implements ToolCallingManager {
 
             GuardSignal signal = new GuardSignal(
                     step, properties.softLimit(), properties.maxIterations(),
+                    properties.escalationWarning(), properties.escalationFinal(),
                     infoGain, infoGainTracker.getLastSimilarity(),
                     repetition, tc.name(),
                     isFetchTool, fetchCount, isDuplicateUrl,
                     consecutiveNoNewInfo, overMaxFetches, stuckNoNewInfo);
 
-            log.info("[MaxToolCallManager] 信号: infoGain={}, repetition={}, shouldInject={}, fetch={}",
-                    infoGain, repetition, signal.shouldInject(), isFetchTool);
+            log.info("[MaxToolCallManager] 信号: level={}, infoGain={}, repetition={}, shouldInject={}, fetch={}",
+                    signal.getLevel(), infoGain, repetition, signal.shouldInject(), isFetchTool);
 
             if (signal.isHardLimit()) {
                 if (overMaxFetches) {
@@ -196,7 +219,7 @@ public class MaxToolCallManager implements ToolCallingManager {
             }
 
             if (signal.shouldInject()) {
-                counter.set(0);
+                // No more counter reset — graduated escalation handles the progression
                 return new GuardedToolExecutionResult(result, signal);
             }
         } else {
@@ -207,7 +230,7 @@ public class MaxToolCallManager implements ToolCallingManager {
     }
 
     public void reset() {
-        duplicateCache.get().clear();
+        // No-op: cache is now in toolContext, managed per-session
     }
 
     @SuppressWarnings("unchecked")
@@ -227,29 +250,43 @@ public class MaxToolCallManager implements ToolCallingManager {
 
     private ToolExecutionResult executeSafely(Prompt prompt, ChatResponse chatResponse) {
         try {
-            return delegate.executeToolCalls(prompt, chatResponse);
-        } catch (Exception e) {
-            log.warn("[MaxToolCallManager] 工具执行异常，返回错误信息给模型: {}", e.getMessage());
-            String errorMsg = "工具调用失败: " + e.getMessage();
-            AssistantMessage originalAssistant = findAssistantWithToolCalls(chatResponse);
-            List<AssistantMessage.ToolCall> toolCalls = originalAssistant.getToolCalls();
-
-            // 显式重建 AssistantMessage，确保 toolCalls 不会因序列化丢失
-            AssistantMessage safeAssistant = new AssistantMessage(
-                    originalAssistant.getText() != null ? originalAssistant.getText() : "",
-                    originalAssistant.getMetadata() != null ? originalAssistant.getMetadata() : Map.of(),
-                    toolCalls
-            );
-
-            List<Message> errorHistory = new ArrayList<>();
-            errorHistory.add(safeAssistant);
-            List<ToolResponseMessage.ToolResponse> responses = new ArrayList<>();
-            for (AssistantMessage.ToolCall tc : toolCalls) {
-                responses.add(new ToolResponseMessage.ToolResponse(tc.id(), tc.name(), errorMsg));
+            return CompletableFuture.supplyAsync(() -> delegate.executeToolCalls(prompt, chatResponse))
+                    .orTimeout(toolTimeoutMs, TimeUnit.MILLISECONDS)
+                    .join();
+        } catch (CompletionException e) {
+            if (e.getCause() instanceof TimeoutException) {
+                log.warn("[MaxToolCallManager] 工具执行超时 ({}ms)", toolTimeoutMs);
+                String timeoutMsg = "工具调用超时(" + (toolTimeoutMs / 1000) + "秒)，请基于已有信息回答用户。";
+                return buildErrorResponse(chatResponse, timeoutMsg);
             }
-            errorHistory.add(new ToolResponseMessage(responses));
-            return new CachedToolExecutionResult(errorHistory);
+            log.warn("[MaxToolCallManager] 工具执行异常: {}", e.getMessage());
+            String errorMsg = "工具调用失败: " + e.getMessage();
+            return buildErrorResponse(chatResponse, errorMsg);
+        } catch (Exception e) {
+            log.warn("[MaxToolCallManager] 工具执行异常: {}", e.getMessage());
+            String errorMsg = "工具调用失败: " + e.getMessage();
+            return buildErrorResponse(chatResponse, errorMsg);
         }
+    }
+
+    private ToolExecutionResult buildErrorResponse(ChatResponse chatResponse, String errorMsg) {
+        AssistantMessage originalAssistant = findAssistantWithToolCalls(chatResponse);
+        List<AssistantMessage.ToolCall> toolCalls = originalAssistant.getToolCalls();
+
+        AssistantMessage safeAssistant = new AssistantMessage(
+                originalAssistant.getText() != null ? originalAssistant.getText() : "",
+                originalAssistant.getMetadata() != null ? originalAssistant.getMetadata() : Map.of(),
+                toolCalls
+        );
+
+        List<Message> errorHistory = new ArrayList<>();
+        errorHistory.add(safeAssistant);
+        List<ToolResponseMessage.ToolResponse> responses = new ArrayList<>();
+        for (AssistantMessage.ToolCall tc : toolCalls) {
+            responses.add(new ToolResponseMessage.ToolResponse(tc.id(), tc.name(), errorMsg));
+        }
+        errorHistory.add(new ToolResponseMessage(responses));
+        return new CachedToolExecutionResult(errorHistory);
     }
 
     private AssistantMessage findAssistantWithToolCalls(ChatResponse chatResponse) {
@@ -320,23 +357,17 @@ public class MaxToolCallManager implements ToolCallingManager {
         GuardedToolExecutionResult(ToolExecutionResult delegate, GuardSignal signal) {
             this.hardLimit = signal.isHardLimit();
             List<Message> original = delegate.conversationHistory();
-            this.guardedHistory = appendSignal(original, signal.format());
+            this.guardedHistory = injectAsSeparateMessage(original, signal);
         }
 
-        private static List<Message> appendSignal(List<Message> messages, String signal) {
-            List<Message> result = new ArrayList<>(messages.size());
-            for (int i = 0; i < messages.size(); i++) {
-                Message msg = messages.get(i);
-                if (i == messages.size() - 1 && msg instanceof ToolResponseMessage toolMsg) {
-                    List<ToolResponseMessage.ToolResponse> signaled = toolMsg.getResponses()
-                            .stream()
-                            .map(r -> new ToolResponseMessage.ToolResponse(r.id(), r.name(), r.responseData() + signal))
-                            .toList();
-                    result.add(new ToolResponseMessage(signaled, msg.getMetadata()));
-                } else {
-                    result.add(msg);
-                }
-            }
+        private static List<Message> injectAsSeparateMessage(List<Message> messages, GuardSignal signal) {
+            List<Message> result = new ArrayList<>(messages.size() + 1);
+            result.addAll(messages);
+            // Inject as a separate synthetic tool response, not appended to the real tool's output
+            List<ToolResponseMessage.ToolResponse> signalResponses = new ArrayList<>();
+            signalResponses.add(new ToolResponseMessage.ToolResponse(
+                    "__guard_signal__", "__guard_signal__", signal.format()));
+            result.add(new ToolResponseMessage(signalResponses));
             return result;
         }
 

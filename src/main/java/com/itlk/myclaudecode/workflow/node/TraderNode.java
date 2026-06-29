@@ -12,11 +12,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -56,19 +59,26 @@ public class TraderNode implements WorkflowNode {
 
         StringBuilder proposal = new StringBuilder();
 
+        Map<String, Object> toolCtx = new HashMap<>();
+        toolCtx.put(MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0));
+        toolCtx.put(MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(3, 0.8));
+        toolCtx.put(MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(3));
+        toolCtx.put(MaxToolCallManager.FETCH_SESSION_TRACKER_KEY, new FetchSessionTracker(3, 2));
+        toolCtx.put(MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY, new SearchSessionTracker(1));
+        toolCtx.put(MaxToolCallManager.DUPLICATE_CACHE_KEY, new LinkedHashMap<String, List<Message>>(16, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, List<Message>> eldest) {
+                return size() > 50;
+            }
+        });
+
         return client.prompt()
                 .user(prompt)
                 .options(AnthropicChatOptions.builder()
                         .thinking(AnthropicApi.ThinkingType.DISABLED, null)
                         .temperature(0.4)
                         .maxTokens(4096)
-                        .toolContext(Map.of(
-                                MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0),
-                                MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(3, 0.8),
-                                MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(3),
-                                MaxToolCallManager.FETCH_SESSION_TRACKER_KEY, new FetchSessionTracker(3, 2),
-                                MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY, new SearchSessionTracker(1)
-                        ))
+                        .toolContext(toolCtx)
                         .build())
                 .stream()
                 .content()

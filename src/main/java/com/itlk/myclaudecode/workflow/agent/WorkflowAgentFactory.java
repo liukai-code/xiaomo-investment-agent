@@ -85,7 +85,7 @@ public class WorkflowAgentFactory {
                 .collect(Collectors.toList());
         log.info("创建分析师 {}，绑定 {} 个工具: {}", role.roleName(), scoped.size(),
                 scoped.stream().map(cb -> cb.getToolDefinition().name()).toList());
-        return new AnalystNode(chatModel, role.roleName(), role.systemPrompt(), scoped, guardProperties);
+        return new AnalystNode(chatModel, role.roleName(), role.systemPrompt(), scoped, guardProperties, role.guardConfig());
     }
 
     /**
