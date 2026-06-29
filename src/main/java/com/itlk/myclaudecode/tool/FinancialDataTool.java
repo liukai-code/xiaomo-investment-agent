@@ -35,21 +35,69 @@ public class FinancialDataTool {
         this.objectMapper = new ObjectMapper();
     }
 
+    private static final Pattern PURE_DIGITS = Pattern.compile("^\\d{6}$");
+
     @ToolBehavior(deterministic = false, cacheable = false)
-    @Tool(description = "查询A股股票实时行情。需要6位数字股票代码(沪市以6开头如600519,深市以0/3开头如000858)。如果只知道股票名称,必须先调用 searchStockByName 获取代码,严禁猜测代码。")
+    @Tool(description = "查询A股股票实时行情。支持两种输入：6位数字代码（如600519）或股票名称/关键词（如茅台、亨通光电）。传入名称时会自动搜索代码再查询行情。")
     public String getAShareQuote(
-            @ToolParam(description = "A股6位数字代码,如600519、000858。注意:此代码必须来自 searchStockByName 的返回结果,不要从搜索结果或网页内容中提取代码,那些代码经常是错误的") String stockCode) {
-        log.info("[FinancialDataTool] getAShareQuote 入参: stockCode={}", stockCode);
+            @ToolParam(description = "A股股票代码（6位数字）或股票名称/关键词，如600519、茅台、亨通光电") String stockCodeOrName) {
+        log.info("[FinancialDataTool] getAShareQuote 入参: stockCodeOrName={}", stockCodeOrName);
         try {
-            validateCode(stockCode, "股票代码");
-            String symbol = buildAShareSymbol(stockCode);
-            String result = fetchTencentQuote(symbol, stockCode, "A股");
-            log.info("[FinancialDataTool] getAShareQuote 出参: {}", result);
-            return result;
+            if (stockCodeOrName == null || stockCodeOrName.isBlank()) {
+                return "股票代码或名称不能为空";
+            }
+            String input = stockCodeOrName.trim();
+
+            // 判断是代码还是名称
+            if (PURE_DIGITS.matcher(input).matches()) {
+                // 6位数字，直接查行情
+                String symbol = buildAShareSymbol(input);
+                String result = fetchTencentQuote(symbol, input, "A股");
+                log.info("[FinancialDataTool] getAShareQuote 出参: {}", result);
+                return result;
+            } else {
+                // 非纯数字，当作名称搜索
+                log.info("[FinancialDataTool] 输入非代码格式，自动搜索: {}", input);
+                String searchResult = searchEastMoney(input);
+                if (searchResult == null || searchResult.isBlank()) {
+                    searchResult = searchSinaFallback(input);
+                }
+                if (searchResult == null || searchResult.isBlank()) {
+                    return "未找到与「" + input + "」相关的A股股票，请确认名称是否正确。";
+                }
+
+                // 从搜索结果中提取第一个代码
+                String firstCode = extractFirstCode(searchResult);
+                if (firstCode == null) {
+                    return "搜索到结果但无法提取代码，请尝试输入更精确的名称。\n搜索结果：\n" + searchResult;
+                }
+
+                // 用提取到的代码查行情
+                log.info("[FinancialDataTool] 搜索到代码: {}，查询行情", firstCode);
+                String symbol = buildAShareSymbol(firstCode);
+                String quoteResult = fetchTencentQuote(symbol, firstCode, "A股");
+                log.info("[FinancialDataTool] getAShareQuote 出参: {}", quoteResult);
+                return quoteResult;
+            }
         } catch (Exception e) {
             log.error("[FinancialDataTool] getAShareQuote 异常: {}", e.getMessage(), e);
             return "查询A股行情失败: " + e.getMessage();
         }
+    }
+
+    private String extractFirstCode(String searchResult) {
+        // searchResult 格式: "600519 贵州茅台（沪市）\n000858 五粮液（深市）"
+        String[] lines = searchResult.split("\n");
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.length() >= 6) {
+                String candidate = trimmed.substring(0, 6);
+                if (PURE_DIGITS.matcher(candidate).matches()) {
+                    return candidate;
+                }
+            }
+        }
+        return null;
     }
 
     @ToolBehavior(deterministic = false, cacheable = false)
@@ -103,7 +151,7 @@ public class FinancialDataTool {
     }
 
     @ToolBehavior(deterministic = false, cacheable = true)
-    @Tool(description = "通过中文名称模糊搜索股票代码。当用户提到股票名称但未提供代码时(如亨通光电、贵州茅台),先调用此工具获取代码,再用 getAShareQuote 查询行情。支持A股沪市和深市。")
+    @Tool(description = "通过中文名称模糊搜索股票代码。返回匹配的股票列表。如果只需要查一只股票的行情，直接用 getAShareQuote 传名称即可，它会自动搜索。此工具适用于需要查看多个搜索结果的场景。")
     public String searchStockByName(
             @ToolParam(description = "股票中文名称或关键词,如亨通光电、茅台") String name) {
         log.info("[FinancialDataTool] searchStockByName 入参: name={}", name);
