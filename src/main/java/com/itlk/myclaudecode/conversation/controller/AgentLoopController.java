@@ -1,15 +1,19 @@
 package com.itlk.myclaudecode.conversation.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itlk.myclaudecode.agent.service.AgentLoop;
 import com.itlk.myclaudecode.common.entity.Result;
 import com.itlk.myclaudecode.conversation.entity.ChatMessage;
 import com.itlk.myclaudecode.conversation.entity.Conversation;
 import com.itlk.myclaudecode.conversation.service.ChatMessageService;
 import com.itlk.myclaudecode.conversation.service.ConversationService;
+import com.itlk.myclaudecode.workflow.service.DeepAnalysisWorkflow;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
@@ -28,6 +32,12 @@ public class AgentLoopController {
 
     @Resource
     private ChatMessageService chatMessageService;
+
+    @Resource
+    private DeepAnalysisWorkflow deepAnalysisWorkflow;
+
+    @Resource
+    private ObjectMapper objectMapper;
 
     private Long getUserId(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
@@ -103,5 +113,37 @@ public class AgentLoopController {
         Long userId = getUserId(request);
         log.info("收到流式消息：userId={}, conversationId={}, message={}", userId, conversationId, message);
         return agentLoop.chatStream(userId, conversationId, message);
+    }
+
+    // ========== 深度分析工作流 ==========
+
+    @GetMapping(value = "/chat/deep-analysis", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<String>> deepAnalysis(
+            @RequestParam Long conversationId,
+            @RequestParam String message,
+            HttpServletRequest request) {
+        Long userId = getUserId(request);
+        log.info("收到深度分析请求：userId={}, conversationId={}, message={}", userId, conversationId, message);
+
+        return deepAnalysisWorkflow.execute(userId, conversationId, message)
+                .map(event -> {
+                    try {
+                        return ServerSentEvent.<String>builder()
+                                .event("workflow")
+                                .data(objectMapper.writeValueAsString(event))
+                                .build();
+                    } catch (JsonProcessingException e) {
+                        return ServerSentEvent.<String>builder()
+                                .event("error")
+                                .data("{\"error\":\"序列化失败\"}")
+                                .build();
+                    }
+                })
+                .concatWith(Flux.just(
+                        ServerSentEvent.<String>builder()
+                                .event("done")
+                                .data("{\"conversationId\":" + conversationId + "}")
+                                .build()
+                ));
     }
 }

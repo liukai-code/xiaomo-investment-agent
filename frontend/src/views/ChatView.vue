@@ -4,8 +4,9 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { useThemeStore } from '@/stores/theme'
-import { streamChat } from '@/api/chat'
+import { streamChat, streamDeepAnalysis, type WorkflowEvent } from '@/api/chat'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
+import WorkflowPanel from '@/components/workflow/WorkflowPanel.vue'
 import { useRafThrottle } from '@/composables/useMarkdownBlocks'
 
 const router = useRouter()
@@ -21,6 +22,16 @@ const activeMenuConvId = ref<number | null>(null)
 const deleteConfirmConvId = ref<number | null>(null)
 
 let abortController: AbortController | null = null
+
+// 深度分析工作流状态
+const workflowEvents = ref<WorkflowEvent[]>([])
+const isWorkflowRunning = ref(false)
+const isWorkflowMode = ref(false)
+
+function isDeepAnalysisRequest(text: string): boolean {
+  const keywords = ['深度分析', '全面分析', '深度研究', '深度调研', '多维度分析']
+  return keywords.some((kw) => text.includes(kw))
+}
 
 const currentTitle = computed(() => {
   const conv = chatStore.getCurrentConversation()
@@ -122,6 +133,12 @@ async function handleSend() {
   chatStore.isGenerating = true
   statusText.value = '生成中...'
 
+  // 判断是否走深度分析工作流
+  if (isDeepAnalysisRequest(text)) {
+    handleDeepAnalysis(text)
+    return
+  }
+
   chatStore.addStreamingAiMessage()
   scrollToBottom()
 
@@ -152,6 +169,61 @@ async function handleSend() {
       abortController = null
     },
   })
+}
+
+function handleDeepAnalysis(text: string) {
+  // 切换到工作流模式
+  isWorkflowMode.value = true
+  isWorkflowRunning.value = true
+  workflowEvents.value = []
+  statusText.value = '深度分析中...'
+
+  // 添加一个占位消息，用于显示工作流面板
+  chatStore.addStreamingAiMessage()
+  chatStore.updateLastAiMessage('深度分析工作流已启动，请稍候...')
+  scrollToBottom()
+
+  abortController = streamDeepAnalysis(chatStore.currentConvId!, text, authStore.token, {
+    onEvent(event: WorkflowEvent) {
+      workflowEvents.value.push(event)
+      scrollToBottom()
+    },
+    onDone() {
+      isWorkflowRunning.value = false
+      chatStore.isGenerating = false
+      statusText.value = 'READY'
+      abortController = null
+
+      // 将最终结果写入消息
+      const summary = buildWorkflowSummary()
+      chatStore.updateLastAiMessage(summary)
+      scrollToBottom()
+      chatStore.loadConversations()
+      chatStore.generateTitle(chatStore.currentConvId!)
+    },
+    onError(err: Error) {
+      isWorkflowRunning.value = false
+      chatStore.updateLastAiMessage(`深度分析失败: ${err.message}`)
+      chatStore.isGenerating = false
+      statusText.value = 'READY'
+      abortController = null
+    },
+  })
+}
+
+function buildWorkflowSummary(): string {
+  // 从工作流事件中提取最终决策
+  const finalEvent = workflowEvents.value.find((e) => e.type === 'FINAL_DECISION')
+  if (finalEvent?.content) {
+    return `## 深度分析完成\n\n${finalEvent.content}\n\n---\n*以上由多智能体工作流自动生成，仅供参考*`
+  }
+
+  // 如果没有最终决策，显示各阶段完成状态
+  const completedPhases = workflowEvents.value
+    .filter((e) => e.type === 'PHASE_COMPLETE')
+    .map((e) => e.phase)
+
+  return `## 深度分析完成\n\n已完成阶段：${completedPhases.join(' → ')}\n\n详细分析结果请查看上方工作流面板。\n\n---\n*以上由多智能体工作流自动生成，仅供参考*`
 }
 
 onMounted(async () => {
@@ -247,10 +319,16 @@ onUnmounted(() => {
           <div class="bubble">
             <template v-if="msg.role === 'USER'">{{ msg.content }}</template>
             <template v-else>
-              <MarkdownRenderer
-                :text="msg.content"
-                :is-streaming="chatStore.isGenerating && msg === chatStore.messages[chatStore.messages.length - 1]"
-              />
+              <!-- 工作流面板：仅最后一条 AI 消息且处于工作流模式时显示 -->
+              <template v-if="isWorkflowMode && msg === chatStore.messages[chatStore.messages.length - 1] && workflowEvents.length > 0">
+                <WorkflowPanel :events="workflowEvents" :is-running="isWorkflowRunning" />
+              </template>
+              <template v-else>
+                <MarkdownRenderer
+                  :text="msg.content"
+                  :is-streaming="chatStore.isGenerating && msg === chatStore.messages[chatStore.messages.length - 1]"
+                />
+              </template>
             </template>
           </div>
         </div>

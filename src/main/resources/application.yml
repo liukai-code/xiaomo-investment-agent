@@ -60,6 +60,18 @@ agent:
     info-gain-threshold: 0.8
     repetition-threshold: 3
 
+# 多智能体深度分析工作流
+workflow:
+  deep-analysis:
+    enabled: true
+    bull-bear-rounds: 2
+    risk-rounds: 2
+    analyst-max-tokens: 8192
+    analyst-temperature: 0.4
+    debate-max-tokens: 4096
+    debate-temperature: 0.5
+    timeout-seconds: 600
+
 system-default-prompt: |
   你是金融投资导学助手，名字叫小墨，帮助用户系统学习金融投资知识。
 
