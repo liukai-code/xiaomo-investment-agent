@@ -75,9 +75,10 @@ public class MaxToolCallManager implements ToolCallingManager {
         RepetitionDetector repetitionDetector = extractFromContext(prompt, REPETITION_DETECTOR_KEY, RepetitionDetector.class);
 
         int step = counter.incrementAndGet();
-        log.info("[MaxToolCallManager] 工具调用轮次: {}/{}", step, properties.maxIterations());
-
-        List<AssistantMessage.ToolCall> toolCalls = chatResponse.getResult().getOutput().getToolCalls();
+        AssistantMessage assistantWithTools = findAssistantWithToolCalls(chatResponse);
+        List<AssistantMessage.ToolCall> toolCalls = assistantWithTools.getToolCalls();
+        String toolNames = toolCalls.stream().map(AssistantMessage.ToolCall::name).collect(java.util.stream.Collectors.joining(", "));
+        log.info("[MaxToolCallManager] 工具调用轮次: {}/{}, 工具: [{}]", step, properties.maxIterations(), toolNames);
         ToolExecutionResult result;
 
         if (toolCalls.size() == 1) {
@@ -151,11 +152,18 @@ public class MaxToolCallManager implements ToolCallingManager {
         } catch (Exception e) {
             log.warn("[MaxToolCallManager] 工具执行异常，返回错误信息给模型: {}", e.getMessage());
             String errorMsg = "工具调用失败: " + e.getMessage();
-            AssistantMessage assistantOutput = chatResponse.getResult().getOutput();
-            List<AssistantMessage.ToolCall> toolCalls = assistantOutput.getToolCalls();
+            AssistantMessage originalAssistant = findAssistantWithToolCalls(chatResponse);
+            List<AssistantMessage.ToolCall> toolCalls = originalAssistant.getToolCalls();
+
+            // 显式重建 AssistantMessage，确保 toolCalls 不会因序列化丢失
+            AssistantMessage safeAssistant = new AssistantMessage(
+                    originalAssistant.getText() != null ? originalAssistant.getText() : "",
+                    originalAssistant.getMetadata() != null ? originalAssistant.getMetadata() : Map.of(),
+                    toolCalls
+            );
 
             List<Message> errorHistory = new ArrayList<>();
-            errorHistory.add(assistantOutput);
+            errorHistory.add(safeAssistant);
             List<ToolResponseMessage.ToolResponse> responses = new ArrayList<>();
             for (AssistantMessage.ToolCall tc : toolCalls) {
                 responses.add(new ToolResponseMessage.ToolResponse(tc.id(), tc.name(), errorMsg));
@@ -163,6 +171,14 @@ public class MaxToolCallManager implements ToolCallingManager {
             errorHistory.add(new ToolResponseMessage(responses));
             return new CachedToolExecutionResult(errorHistory);
         }
+    }
+
+    private AssistantMessage findAssistantWithToolCalls(ChatResponse chatResponse) {
+        return chatResponse.getResults().stream()
+                .map(generation -> (AssistantMessage) generation.getOutput())
+                .filter(assistant -> assistant != null && !assistant.getToolCalls().isEmpty())
+                .findFirst()
+                .orElseGet(() -> chatResponse.getResult().getOutput());
     }
 
     private String extractResultText(ToolExecutionResult result) {
