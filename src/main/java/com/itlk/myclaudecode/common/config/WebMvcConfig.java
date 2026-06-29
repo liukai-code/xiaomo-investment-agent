@@ -20,8 +20,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addPathPatterns("/**")
                 .excludePathPatterns(
                         "/api/auth/**",
+                        "/api/admin/**",
                         "/",
                         "/index.html",
+                        "/admin.html",
                         "/favicon.ico",
                         "/error",
                         "/assets/**"

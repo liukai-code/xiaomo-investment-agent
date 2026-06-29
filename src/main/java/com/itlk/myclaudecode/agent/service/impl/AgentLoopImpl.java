@@ -28,9 +28,13 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
+import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import com.itlk.myclaudecode.tool.config.ToolConfigService;
+import com.itlk.myclaudecode.tool.config.ToolEnabledCheckWrapper;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
@@ -48,8 +52,9 @@ public class AgentLoopImpl implements AgentLoop {
     private static final int MAX_CONTEXT_MESSAGES = 50;
 
     private final String systemPrompt;
-    private final ChatClient chatClient;
+    private ChatClient chatClient;
     private final ToolGuardProperties toolGuardProperties;
+    private final ToolConfigService toolConfigService;
 
     @Resource
     private UserRepository userRepository;
@@ -79,19 +84,52 @@ public class AgentLoopImpl implements AgentLoop {
                          WebFetchTool webFetchTool,
                          ToolCallbackProvider toolCallbackProvider,
                          ToolGuardProperties toolGuardProperties,
+                         ToolConfigService toolConfigService,
                          @Value("${system-default-prompt}") String systemPrompt) {
         this.systemPrompt = systemPrompt;
         this.toolGuardProperties = toolGuardProperties;
+        this.toolConfigService = toolConfigService;
 
-        ChatClient.Builder builder = ChatClient.builder(chatModel)
-                .defaultTools(fileReadTool, fileWriteTool, fileListTool, financialCalcTool, financialDataTool, sqlTool, webFetchTool);
+        // 将工具对象转为 ToolCallback，再用拦截器包装
+        try {
+            ToolCallbackProvider provider = MethodToolCallbackProvider.builder()
+                    .toolObjects(fileReadTool, fileWriteTool, fileListTool,
+                            financialCalcTool, financialDataTool, sqlTool, webFetchTool)
+                    .build();
+            ToolCallback[] originalCallbacks = provider.getToolCallbacks();
+            List<ToolCallback> wrappedCallbacks = new ArrayList<>();
+            List<String> toolNames = new ArrayList<>();
 
-        if (toolCallbackProvider != null) {
-            builder.defaultToolCallbacks(toolCallbackProvider);
-            log.info("已注册 MCP 工具: {}", (Object) toolCallbackProvider.getToolCallbacks());
+            for (ToolCallback cb : originalCallbacks) {
+                wrappedCallbacks.add(new ToolEnabledCheckWrapper(cb, toolConfigService));
+                toolNames.add(cb.getToolDefinition().name());
+            }
+
+            // 注册 MCP 工具（同样包装）
+            if (toolCallbackProvider != null) {
+                for (ToolCallback mcp : toolCallbackProvider.getToolCallbacks()) {
+                    wrappedCallbacks.add(new ToolEnabledCheckWrapper(mcp, toolConfigService));
+                    toolNames.add(mcp.getToolDefinition().name());
+                }
+                log.info("已注册 MCP 工具: {}", (Object) toolCallbackProvider.getToolCallbacks());
+            }
+
+            this.chatClient = ChatClient.builder(chatModel)
+                    .defaultToolCallbacks(wrappedCallbacks.toArray(new ToolCallback[0]))
+                    .build();
+
+            toolConfigService.initDefaults(toolNames);
+            log.info("工具拦截器已包装，共 {} 个工具: {}", toolNames.size(), toolNames);
+        } catch (Exception e) {
+            log.error("工具初始化失败，回退到直接注册", e);
+            ChatClient.Builder builder = ChatClient.builder(chatModel)
+                    .defaultTools(fileReadTool, fileWriteTool, fileListTool,
+                            financialCalcTool, financialDataTool, sqlTool, webFetchTool);
+            if (toolCallbackProvider != null) {
+                builder.defaultToolCallbacks(toolCallbackProvider);
+            }
+            this.chatClient = builder.build();
         }
-
-        this.chatClient = builder.build();
     }
 
     @Override
