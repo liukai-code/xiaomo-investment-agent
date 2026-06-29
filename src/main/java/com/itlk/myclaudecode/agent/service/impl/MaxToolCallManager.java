@@ -1,7 +1,9 @@
 package com.itlk.myclaudecode.agent.service.impl;
 
 import com.itlk.myclaudecode.agent.config.ToolGuardProperties;
+import com.itlk.myclaudecode.tool.guard.FetchSessionTracker;
 import com.itlk.myclaudecode.tool.guard.GuardSignal;
+import com.itlk.myclaudecode.tool.guard.SearchSessionTracker;
 import com.itlk.myclaudecode.tool.guard.InfoGainTracker;
 import com.itlk.myclaudecode.tool.guard.InfoGainTracker.InfoGainLevel;
 import com.itlk.myclaudecode.tool.guard.RepetitionDetector;
@@ -27,6 +29,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
@@ -36,6 +39,27 @@ public class MaxToolCallManager implements ToolCallingManager {
     public static final String TOOL_CALL_COUNTER_KEY = "toolCallCounter";
     public static final String INFO_GAIN_TRACKER_KEY = "infoGainTracker";
     public static final String REPETITION_DETECTOR_KEY = "repetitionDetector";
+    public static final String FETCH_SESSION_TRACKER_KEY = "fetchSessionTracker";
+    public static final String SEARCH_SESSION_TRACKER_KEY = "searchSessionTracker";
+
+    private static final Set<String> FETCH_TOOL_NAMES = Set.of(
+            "fetchArticleContent", "fetchWebpage"
+    );
+
+    private static final Set<String> SEARCH_TOOL_NAMES = Set.of(
+            "bailian_web_search", "webSearch", "web_search"
+    );
+
+    private static final String PLANNING_INJECTION = """
+
+            [检索规划指令]
+            搜索结果已返回。请立即停止搜索，按以下流程操作：
+            1. 从上述结果中选择最多 3 个最相关的 URL
+            2. 用 fetchArticleContent 逐一提取正文
+            3. 基于提取的内容直接回答用户
+            注意：不要再调用搜索工具，不要再抓取超出上述列表的 URL。
+            [/检索规划指令]
+            """;
 
     private final ToolCallingManager delegate;
     private final ToolGuardProperties properties;
@@ -73,6 +97,8 @@ public class MaxToolCallManager implements ToolCallingManager {
         AtomicInteger counter = extractFromContext(prompt, TOOL_CALL_COUNTER_KEY, AtomicInteger.class);
         InfoGainTracker infoGainTracker = extractFromContext(prompt, INFO_GAIN_TRACKER_KEY, InfoGainTracker.class);
         RepetitionDetector repetitionDetector = extractFromContext(prompt, REPETITION_DETECTOR_KEY, RepetitionDetector.class);
+        FetchSessionTracker fetchTracker = extractFromContext(prompt, FETCH_SESSION_TRACKER_KEY, FetchSessionTracker.class);
+        SearchSessionTracker searchTracker = extractFromContext(prompt, SEARCH_SESSION_TRACKER_KEY, SearchSessionTracker.class);
 
         int step = counter.incrementAndGet();
         AssistantMessage assistantWithTools = findAssistantWithToolCalls(chatResponse);
@@ -84,7 +110,29 @@ public class MaxToolCallManager implements ToolCallingManager {
         if (toolCalls.size() == 1) {
             AssistantMessage.ToolCall tc = toolCalls.get(0);
             boolean cacheable = behaviorRegistry.getBehavior(tc.name()).cacheable();
+            boolean isFetchTool = isFetchTool(tc.name());
 
+            // URL 去重检查（执行前拦截）
+            if (isFetchTool && fetchTracker != null) {
+                String url = extractUrlFromArgs(tc.arguments());
+                if (url != null && fetchTracker.isUrlVisited(url)) {
+                    log.info("[MaxToolCallManager] 检测到重复URL，跳过抓取: {}", url);
+                    String skipMsg = "该URL已在本次会话中抓取过，请使用之前的搜索结果。已抓取URL数: " + fetchTracker.getVisitedUrlCount();
+                    List<Message> skipHistory = buildSkipResult(tc, skipMsg);
+                    InfoGainLevel infoGain = infoGainTracker.recordAndGetLevel(skipMsg);
+                    RepetitionResult repetition = repetitionDetector.recordAndDetect(tc.name(), tc.arguments());
+
+                    GuardSignal signal = new GuardSignal(
+                            step, properties.softLimit(), properties.maxIterations(),
+                            infoGain, infoGainTracker.getLastSimilarity(),
+                            repetition, tc.name(),
+                            true, fetchTracker.getFetchCount(), true,
+                            0, false, false);
+                    return new GuardedToolExecutionResult(new CachedToolExecutionResult(skipHistory), signal);
+                }
+            }
+
+            // 正常执行
             if (cacheable) {
                 String cacheKey = tc.name() + ":" + tc.arguments().hashCode();
                 List<Message> cachedResult = duplicateCache.get().get(cacheKey);
@@ -98,18 +146,59 @@ public class MaxToolCallManager implements ToolCallingManager {
                 result = executeSafely(prompt, chatResponse);
             }
 
-            // Record for info gain and repetition detection
+            // 信息增益和重复检测
             String resultText = extractResultText(result);
             InfoGainLevel infoGain = infoGainTracker.recordAndGetLevel(resultText);
             RepetitionResult repetition = repetitionDetector.recordAndDetect(tc.name(), tc.arguments());
 
+            // 搜索工具检测：限制搜索轮次 + 注入规划指令
+            if (isSearchTool(tc.name()) && searchTracker != null) {
+                SearchSessionTracker.SearchResult sr = searchTracker.recordSearch();
+                if (sr.isOverLimit()) {
+                    log.info("[MaxToolCallManager] 搜索次数超限({}/{}), 拒绝搜索", sr.totalSearches(), properties.maxSearchRounds());
+                    String limitMsg = "本次会话已搜索过，请基于已有搜索结果回答。如需更多信息，请用 fetchArticleContent 提取已有结果中的 URL。";
+                    List<Message> limitHistory = buildSkipResult(tc, limitMsg);
+                    GuardSignal signal = new GuardSignal(
+                            step, properties.softLimit(), properties.maxIterations(),
+                            infoGain, infoGainTracker.getLastSimilarity(),
+                            repetition, tc.name(),
+                            false, 0, false, 0, false, false);
+                    return new GuardedToolExecutionResult(new CachedToolExecutionResult(limitHistory), signal);
+                }
+                // 首次搜索 → 注入规划指令
+                log.info("[MaxToolCallManager] 首次搜索完成，注入检索规划指令");
+                result = appendPlanningInjection(result, tc, resultText);
+            }
+
+            // Fetch 专项追踪
+            boolean overMaxFetches = false;
+            boolean stuckNoNewInfo = false;
+            boolean isDuplicateUrl = false;
+            int fetchCount = 0;
+            int consecutiveNoNewInfo = 0;
+
+            if (isFetchTool && fetchTracker != null) {
+                String url = extractUrlFromArgs(tc.arguments());
+                FetchSessionTracker.FetchResult fetchResult = fetchTracker.recordFetch(url, infoGain);
+                fetchCount = fetchResult.totalFetches();
+                isDuplicateUrl = fetchResult.isDuplicateUrl();
+                consecutiveNoNewInfo = fetchResult.consecutiveNoNewInfo();
+                overMaxFetches = fetchTracker.isOverMaxFetches();
+                stuckNoNewInfo = fetchTracker.isStuckNoNewInfo();
+
+                log.info("[MaxToolCallManager] Fetch tracking: count={}, dup={}, consecNoNew={}, overMax={}, stuck={}",
+                        fetchCount, isDuplicateUrl, consecutiveNoNewInfo, overMaxFetches, stuckNoNewInfo);
+            }
+
             GuardSignal signal = new GuardSignal(
                     step, properties.softLimit(), properties.maxIterations(),
                     infoGain, infoGainTracker.getLastSimilarity(),
-                    repetition, tc.name());
+                    repetition, tc.name(),
+                    isFetchTool, fetchCount, isDuplicateUrl,
+                    consecutiveNoNewInfo, overMaxFetches, stuckNoNewInfo);
 
-            log.info("[MaxToolCallManager] 信号: infoGain={}, repetition={}, shouldInject={}",
-                    infoGain, repetition, signal.shouldInject());
+            log.info("[MaxToolCallManager] 信号: infoGain={}, repetition={}, shouldInject={}, fetch={}",
+                    infoGain, repetition, signal.shouldInject(), isFetchTool);
 
             if (signal.isHardLimit()) {
                 log.warn("[MaxToolCallManager] 达到硬上限 ({}/{}), 强制停止", step, properties.maxIterations());
@@ -195,6 +284,55 @@ public class MaxToolCallManager implements ToolCallingManager {
         return last.getText() != null ? last.getText() : "";
     }
 
+    private boolean isFetchTool(String toolName) {
+        return FETCH_TOOL_NAMES.contains(toolName);
+    }
+
+    private boolean isSearchTool(String toolName) {
+        return SEARCH_TOOL_NAMES.contains(toolName);
+    }
+
+    private ToolExecutionResult appendPlanningInjection(ToolExecutionResult result, AssistantMessage.ToolCall tc, String originalText) {
+        List<Message> history = new ArrayList<>(result.conversationHistory());
+        for (int i = history.size() - 1; i >= 0; i--) {
+            if (history.get(i) instanceof ToolResponseMessage toolMsg) {
+                List<ToolResponseMessage.ToolResponse> newResponses = toolMsg.getResponses().stream()
+                        .map(r -> new ToolResponseMessage.ToolResponse(r.id(), r.name(), r.responseData() + PLANNING_INJECTION))
+                        .toList();
+                history.set(i, new ToolResponseMessage(newResponses, toolMsg.getMetadata()));
+                break;
+            }
+        }
+        return new CachedToolExecutionResult(history);
+    }
+
+    private String extractUrlFromArgs(String args) {
+        if (args == null || args.isBlank()) return null;
+        try {
+            int urlIdx = args.indexOf("\"url\"");
+            if (urlIdx < 0) return null;
+            int colonIdx = args.indexOf(':', urlIdx);
+            if (colonIdx < 0) return null;
+            int startQuote = args.indexOf('"', colonIdx + 1);
+            if (startQuote < 0) return null;
+            int endQuote = args.indexOf('"', startQuote + 1);
+            if (endQuote < 0) return null;
+            return args.substring(startQuote + 1, endQuote);
+        } catch (Exception e) {
+            log.debug("[MaxToolCallManager] 无法从参数中提取URL: {}", args);
+            return null;
+        }
+    }
+
+    private List<Message> buildSkipResult(AssistantMessage.ToolCall tc, String skipMsg) {
+        List<Message> history = new ArrayList<>();
+        history.add(new AssistantMessage("", Map.of(), List.of(tc)));
+        List<ToolResponseMessage.ToolResponse> responses = new ArrayList<>();
+        responses.add(new ToolResponseMessage.ToolResponse(tc.id(), tc.name(), skipMsg));
+        history.add(new ToolResponseMessage(responses));
+        return history;
+    }
+
     private record CachedToolExecutionResult(List<Message> conversationHistory) implements ToolExecutionResult {
     }
 
@@ -205,9 +343,13 @@ public class MaxToolCallManager implements ToolCallingManager {
 
         GuardedToolExecutionResult(ToolExecutionResult delegate, GuardSignal signal) {
             this.hardLimit = signal.isHardLimit();
-            String signalText = signal.format();
             List<Message> original = delegate.conversationHistory();
-            this.guardedHistory = appendSignal(original, signalText);
+            // returnDirect=true 时不注入信号，避免被 Spring AI 直接返回给前端
+            if (this.hardLimit) {
+                this.guardedHistory = original;
+            } else {
+                this.guardedHistory = appendSignal(original, signal.format());
+            }
         }
 
         private static List<Message> appendSignal(List<Message> messages, String signal) {

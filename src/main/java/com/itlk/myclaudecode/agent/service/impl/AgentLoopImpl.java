@@ -8,8 +8,10 @@ import com.itlk.myclaudecode.conversation.service.*;
 import com.itlk.myclaudecode.user.entity.User;
 import com.itlk.myclaudecode.user.repository.UserRepository;
 import com.itlk.myclaudecode.tool.FileListTool;
+import com.itlk.myclaudecode.tool.guard.FetchSessionTracker;
 import com.itlk.myclaudecode.tool.guard.InfoGainTracker;
 import com.itlk.myclaudecode.tool.guard.RepetitionDetector;
+import com.itlk.myclaudecode.tool.guard.SearchSessionTracker;
 import com.itlk.myclaudecode.tool.FileReadTool;
 import com.itlk.myclaudecode.tool.FileWriteTool;
 import com.itlk.myclaudecode.tool.FinancialCalcTool;
@@ -108,7 +110,9 @@ public class AgentLoopImpl implements AgentLoop {
                 .toolContext(Map.of(
                         MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0),
                         MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(toolGuardProperties.infoGainWindow(), toolGuardProperties.infoGainThreshold()),
-                        MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold())))
+                        MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold()),
+                        MaxToolCallManager.FETCH_SESSION_TRACKER_KEY, new FetchSessionTracker(toolGuardProperties.maxFetches(), toolGuardProperties.maxConsecutiveNoNewInfo()),
+                        MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY, new SearchSessionTracker(toolGuardProperties.maxSearchRounds())))
                 .build();
 
         String response = chatClient.prompt()
@@ -117,8 +121,9 @@ public class AgentLoopImpl implements AgentLoop {
                 .call()
                 .content();
 
-        chatMessageService.saveMessage(conversation, MessageRole.ASSISTANT, response, null, null);
-        return response;
+        String sanitized = sanitizeOutput(response);
+        chatMessageService.saveMessage(conversation, MessageRole.ASSISTANT, sanitized, null, null);
+        return sanitized;
     }
 
     @Override
@@ -140,7 +145,9 @@ public class AgentLoopImpl implements AgentLoop {
                 .toolContext(Map.of(
                         MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0),
                         MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(toolGuardProperties.infoGainWindow(), toolGuardProperties.infoGainThreshold()),
-                        MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold())))
+                        MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold()),
+                        MaxToolCallManager.FETCH_SESSION_TRACKER_KEY, new FetchSessionTracker(toolGuardProperties.maxFetches(), toolGuardProperties.maxConsecutiveNoNewInfo()),
+                        MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY, new SearchSessionTracker(toolGuardProperties.maxSearchRounds())))
                 .build();
 
         return chatClient.prompt()
@@ -150,17 +157,17 @@ public class AgentLoopImpl implements AgentLoop {
                 .content()
                 .map(delta -> {
                     accumulated.append(delta);
-                    return accumulated.toString();
+                    return sanitizeOutput(accumulated.toString());
                 })
                 .doOnComplete(() -> {
-                    String fullResponse = accumulated.toString();
+                    String fullResponse = sanitizeOutput(accumulated.toString());
                     chatMessageService.saveAssistantMessage(convId, fullResponse);
                 })
                 .timeout(Duration.ofSeconds(300))
                 .onErrorResume(e -> {
                     String errorMsg = "服务端响应超时，请重试";
                     log.error("流式请求异常: {}", e.getMessage());
-                    String partial = accumulated.toString();
+                    String partial = sanitizeOutput(accumulated.toString());
                     if (!partial.isEmpty()) {
                         chatMessageService.saveAssistantMessage(convId, partial);
                     }
@@ -278,5 +285,10 @@ public class AgentLoopImpl implements AgentLoop {
     private String stripXmlTags(String text) {
         if (text == null) return "";
         return text.replaceAll("<[^>]+>", "").replaceAll("\\s+", " ").trim();
+    }
+
+    private static String sanitizeOutput(String text) {
+        if (text == null) return "";
+        return text.replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "").trim();
     }
 }

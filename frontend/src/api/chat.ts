@@ -43,7 +43,7 @@ export function streamChat(
       // 处理剩余 buffer
       if (buffer.trim()) {
         const data = parseEventData(buffer)
-        if (data) lastText = data
+        if (data) lastText = sanitizeContent(data)
       }
 
       callbacks.onDone(lastText)
@@ -79,5 +79,9 @@ function processEvents(raw: string): { content: string; incomplete: string } {
     const data = parseEventData(event)
     if (data) content = data
   }
-  return { content, incomplete }
+  return { content: sanitizeContent(content), incomplete }
+}
+
+function sanitizeContent(text: string): string {
+  return text.replace(/\n*\[GUARD_SIGNAL\][\s\S]*?\[\/GUARD_SIGNAL\]\n*/g, '').trim()
 }
