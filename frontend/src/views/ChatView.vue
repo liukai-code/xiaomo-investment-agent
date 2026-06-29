@@ -48,12 +48,24 @@ function formatTime(ts: string) {
   return d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
 }
 
+function isNearBottom() {
+  if (!messagesEl.value) return true
+  const { scrollTop, scrollHeight, clientHeight } = messagesEl.value
+  return scrollHeight - scrollTop - clientHeight < 80
+}
+
 function scrollToBottom() {
   nextTick(() => {
     if (messagesEl.value) {
       messagesEl.value.scrollTop = messagesEl.value.scrollHeight
     }
   })
+}
+
+function scrollToBottomIfNear() {
+  if (isNearBottom()) {
+    scrollToBottom()
+  }
 }
 
 async function handleCreateConversation() {
@@ -148,7 +160,7 @@ async function handleSend() {
     onChunk(fullText: string) {
       schedule(() => {
         chatStore.updateLastAiMessage(fullText)
-        scrollToBottom()
+        scrollToBottomIfNear()
       })
     },
     onDone(fullText: string) {
@@ -186,7 +198,7 @@ function handleDeepAnalysis(text: string) {
   abortController = streamDeepAnalysis(chatStore.currentConvId!, text, authStore.token, {
     onEvent(event: WorkflowEvent) {
       workflowEvents.value.push(event)
-      scrollToBottom()
+      scrollToBottomIfNear()
     },
     onDone() {
       isWorkflowRunning.value = false
