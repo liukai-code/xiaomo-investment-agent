@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工具管理 - 小墨 AI 助手</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-deep: #020617;
+            --bg-card: #0F172A;
+            --bg-card-hover: #1E293B;
+            --bg-input: #1E293B;
+            --border: rgba(148, 163, 184, 0.1);
+            --border-hover: rgba(148, 163, 184, 0.2);
+            --text-primary: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --text-muted: #64748B;
+            --accent: #22C55E;
+            --accent-glow: rgba(34, 197, 94, 0.25);
+            --danger: #EF4444;
+            --danger-glow: rgba(239, 68, 68, 0.2);
+            --radius: 16px;
+            --radius-sm: 12px;
+            --font-mono: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+            --font-sans: 'Fira Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Background grid pattern */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                radial-gradient(circle at 25% 25%, rgba(34, 197, 94, 0.03) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(99, 102, 241, 0.03) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .page { position: relative; z-index: 1; min-height: 100vh; }
+
+        /* Header */
+        .header {
+            padding: 20px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(12px);
+            background: rgba(2, 6, 23, 0.8);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 14px; }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--accent) 0%, #16A34A 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .logo-icon svg { width: 20px; height: 20px; color: white; }
+
+        .header-title { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+        .header-sub { font-size: 13px; color: var(--text-muted); margin-top: 1px; }
+
+        .back-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            transition: all 0.2s ease-out;
+            cursor: pointer;
+            background: transparent;
+        }
+        .back-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--border-hover);
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .back-btn:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+        .back-btn svg { width: 16px; height: 16px; }
+
+        /* Stats bar */
+        .stats-bar {
+            display: flex;
+            gap: 12px;
+            padding: 24px 32px 0;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        .stat-card {
+            flex: 1;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            transition: border-color 0.2s ease-out;
+        }
+        .stat-card:hover { border-color: var(--border-hover); }
+
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .stat-icon svg { width: 20px; height: 20px; }
+        .stat-icon.total { background: rgba(99, 102, 241, 0.15); color: #818CF8; }
+        .stat-icon.active { background: rgba(34, 197, 94, 0.15); color: #4ADE80; }
+        .stat-icon.inactive { background: rgba(239, 68, 68, 0.12); color: #F87171; }
+
+        .stat-value { font-size: 24px; font-weight: 700; line-height: 1; }
+        .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+        /* Main container */
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 20px 32px 48px;
+        }
+
+        /* Section header */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .section-title { font-size: 14px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .section-count {
+            font-size: 12px;
+            color: var(--text-muted);
+            background: var(--bg-card);
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        /* Tool grid */
+        .tool-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+        }
+
+        .tool-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 18px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            transition: all 0.2s ease-out;
+            cursor: default;
+        }
+        .tool-card:hover {
+            border-color: var(--border-hover);
+            background: var(--bg-card-hover);
+        }
+
+        .tool-info { flex: 1; min-width: 0; }
+
+        .tool-name-row { display: flex; align-items: center; gap: 8px; }
+
+        .tool-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            background: rgba(99, 102, 241, 0.1);
+            color: #818CF8;
+            transition: all 0.25s ease-out;
+        }
+        .tool-card.enabled .tool-icon {
+            background: rgba(34, 197, 94, 0.12);
+            color: #4ADE80;
+        }
+        .tool-icon svg { width: 16px; height: 16px; }
+
+        .tool-name {
+            font-size: 13px;
+            font-weight: 600;
+            font-family: var(--font-mono);
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tool-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            margin-left: 40px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tool-status {
+            font-size: 11px;
+            font-weight: 500;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-left: 40px;
+            margin-top: 6px;
+            display: inline-block;
+        }
+        .tool-status.on { background: rgba(34, 197, 94, 0.1); color: #4ADE80; }
+        .tool-status.off { background: rgba(239, 68, 68, 0.1); color: #F87171; }
+
+        /* Toggle switch */
+        .toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+        .toggle-track {
+            position: absolute;
+            inset: 0;
+            background: rgba(100, 116, 139, 0.3);
+            border-radius: 12px;
+            transition: background 0.25s ease-out;
+            cursor: pointer;
+        }
+        .toggle-track::before {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            left: 3px;
+            top: 3px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+        .toggle input:checked + .toggle-track {
+            background: var(--accent);
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+        .toggle input:checked + .toggle-track::before {
+            transform: translateX(20px);
+            background: white;
+        }
+        .toggle input:focus-visible + .toggle-track {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        /* Loading skeleton */
+        .skeleton-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+        }
+        .skeleton-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 18px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .skeleton-info { display: flex; align-items: center; gap: 12px; flex: 1; }
+        .skeleton-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: var(--bg-card-hover);
+            animation: shimmer 1.5s infinite;
+        }
+        .skeleton-text { height: 14px; border-radius: 4px; background: var(--bg-card-hover); animation: shimmer 1.5s infinite; }
+        .skeleton-text.w-32 { width: 128px; }
+        .skeleton-text.w-20 { width: 80px; margin-top: 8px; }
+        .skeleton-toggle { width: 44px; height: 24px; border-radius: 12px; background: var(--bg-card-hover); animation: shimmer 1.5s infinite; }
+
+        @keyframes shimmer {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+
+        /* Error state */
+        .error-state {
+            text-align: center;
+            padding: 64px 24px;
+        }
+        .error-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+            background: var(--danger-glow);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--danger);
+        }
+        .error-icon svg { width: 24px; height: 24px; }
+        .error-title { font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+        .error-msg { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+        .retry-btn {
+            font-size: 13px;
+            font-weight: 500;
+            padding: 8px 20px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease-out;
+        }
+        .retry-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .retry-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            pointer-events: none;
+        }
+        .toast {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            opacity: 0;
+            transform: translateY(12px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: auto;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast svg { width: 16px; height: 16px; flex-shrink: 0; }
+        .toast.success { border-color: rgba(34, 197, 94, 0.3); }
+        .toast.success svg { color: #4ADE80; }
+        .toast.error { border-color: rgba(239, 68, 68, 0.3); }
+        .toast.error svg { color: #F87171; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header { padding: 16px 20px; }
+            .stats-bar { padding: 16px 20px 0; flex-direction: column; }
+            .container { padding: 16px 20px 48px; }
+            .tool-grid { grid-template-columns: 1fr; }
+            .header-sub { display: none; }
+        }
+
+        @media (max-width: 480px) {
+            .header-title { font-size: 16px; }
+            .back-btn span { display: none; }
+            .stat-card { padding: 12px 16px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <header class="header">
+            <div class="header-left">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="header-title">工具管理</div>
+                    <div class="header-sub">AI Agent 工具开关控制台</div>
+                </div>
+            </div>
+            <a href="/" class="back-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/>
+                </svg>
+                <span>返回对话</span>
+            </a>
+        </header>
+
+        <div class="stats-bar" id="statsBar" style="display:none">
+            <div class="stat-card">
+                <div class="stat-icon total">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="stat-value" id="statTotal">-</div>
+                    <div class="stat-label">工具总数</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon active">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="stat-value" id="statActive">-</div>
+                    <div class="stat-label">已启用</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon inactive">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="stat-value" id="statInactive">-</div>
+                    <div class="stat-label">已禁用</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="section-header" id="sectionHeader" style="display:none">
+                <div class="section-title">工具列表</div>
+                <div class="section-count" id="sectionCount"></div>
+            </div>
+            <div id="content">
+                <div class="skeleton-grid">
+                    <div class="skeleton-card"><div class="skeleton-info"><div class="skeleton-icon"></div><div><div class="skeleton-text w-32"></div><div class="skeleton-text w-20"></div></div></div><div class="skeleton-toggle"></div></div>
+                    <div class="skeleton-card"><div class="skeleton-info"><div class="skeleton-icon"></div><div><div class="skeleton-text w-32"></div><div class="skeleton-text w-20"></div></div></div><div class="skeleton-toggle"></div></div>
+                    <div class="skeleton-card"><div class="skeleton-info"><div class="skeleton-icon"></div><div><div class="skeleton-text w-32"></div><div class="skeleton-text w-20"></div></div></div><div class="skeleton-toggle"></div></div>
+                    <div class="skeleton-card"><div class="skeleton-info"><div class="skeleton-icon"></div><div><div class="skeleton-text w-32"></div><div class="skeleton-text w-20"></div></div></div><div class="skeleton-toggle"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="toast-container" id="toastContainer"></div>
+    </div>
+
+    <script>
+        const API = '/api/auth/tools';
+        const content = document.getElementById('content');
+        const statsBar = document.getElementById('statsBar');
+        const sectionHeader = document.getElementById('sectionHeader');
+        const toastContainer = document.getElementById('toastContainer');
+
+        const TOOL_META = {
+            'compoundInterest':       { desc: '复利终值与现值计算', group: 'calc' },
+            'loanPayment':            { desc: '等额本息月供计算', group: 'calc' },
+            'npv':                    { desc: '净现值评估', group: 'calc' },
+            'irr':                    { desc: '内部收益率计算', group: 'calc' },
+            'sharpeRatio':            { desc: '夏普比率风险调整', group: 'calc' },
+            'getAShareQuote':         { desc: '沪深A股实时行情', group: 'market' },
+            'getHKStockQuote':        { desc: '港股实时行情', group: 'market' },
+            'getUSStockQuote':        { desc: '美股实时行情', group: 'market' },
+            'getFundNav':             { desc: '基金净值查询', group: 'market' },
+            'searchStockByName':      { desc: '按名称搜索股票', group: 'market' },
+            'getDatabaseSchema':      { desc: '获取数据库表结构', group: 'data' },
+            'executeQuery':           { desc: 'SQL查询执行', group: 'data' },
+            'fetchWebpage':           { desc: '网页内容抓取', group: 'web' },
+            'fetchArticleContent':    { desc: '文章正文提取', group: 'web' },
+            'read_file':              { desc: '读取服务器文件', group: 'file' },
+            'write_file':             { desc: '写入服务器文件', group: 'file' },
+            'append_file':            { desc: '追加文件内容', group: 'file' },
+            'list_files':             { desc: '列出目录文件', group: 'file' },
+            'baidu_ai_search':        { desc: '百度AI搜索引擎', group: 'web' },
+        };
+
+        const ICONS = {
+            calc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="16" y2="18"/></svg>',
+            market: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+            data: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>',
+            web: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+            file: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+        };
+
+        function showToast(msg, type = 'success') {
+            const icon = type === 'success'
+                ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+                : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+            const el = document.createElement('div');
+            el.className = `toast ${type}`;
+            el.innerHTML = `${icon}<span>${msg}</span>`;
+            toastContainer.appendChild(el);
+            requestAnimationFrame(() => el.classList.add('show'));
+            setTimeout(() => {
+                el.classList.remove('show');
+                setTimeout(() => el.remove(), 300);
+            }, 2500);
+        }
+
+        function updateStats(tools) {
+            const names = Object.keys(tools);
+            const active = names.filter(n => tools[n]).length;
+            document.getElementById('statTotal').textContent = names.length;
+            document.getElementById('statActive').textContent = active;
+            document.getElementById('statInactive').textContent = names.length - active;
+            document.getElementById('sectionCount').textContent = `${active} / ${names.length} 已启用`;
+            statsBar.style.display = 'flex';
+            sectionHeader.style.display = 'flex';
+        }
+
+        function renderTools(tools) {
+            const names = Object.keys(tools);
+            updateStats(tools);
+
+            let html = '<div class="tool-grid">';
+            for (const name of names) {
+                const enabled = tools[name];
+                const meta = TOOL_META[name] || { desc: '', group: 'file' };
+                const icon = ICONS[meta.group] || ICONS.file;
+                html += `
+                    <div class="tool-card ${enabled ? 'enabled' : ''}" id="card-${name}">
+                        <div class="tool-info">
+                            <div class="tool-name-row">
+                                <div class="tool-icon">${icon}</div>
+                                <div class="tool-name">${name}</div>
+                            </div>
+                            ${meta.desc ? `<div class="tool-desc">${meta.desc}</div>` : ''}
+                            <div class="tool-status ${enabled ? 'on' : 'off'}" id="status-${name}">${enabled ? '运行中' : '已停用'}</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" ${enabled ? 'checked' : ''}
+                                aria-label="切换 ${name}"
+                                onchange="toggleTool('${name}', this.checked)">
+                            <span class="toggle-track"></span>
+                        </label>
+                    </div>`;
+            }
+            html += '</div>';
+            content.innerHTML = html;
+        }
+
+        function renderError(msg) {
+            content.innerHTML = `
+                <div class="error-state">
+                    <div class="error-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                    </div>
+                    <div class="error-title">加载失败</div>
+                    <div class="error-msg">${msg}</div>
+                    <button class="retry-btn" onclick="loadTools()">重新加载</button>
+                </div>`;
+        }
+
+        async function loadTools() {
+            content.innerHTML = `
+                <div class="skeleton-grid">
+                    ${Array(6).fill(`<div class="skeleton-card"><div class="skeleton-info"><div class="skeleton-icon"></div><div><div class="skeleton-text w-32"></div><div class="skeleton-text w-20"></div></div></div><div class="skeleton-toggle"></div></div>`).join('')}
+                </div>`;
+            statsBar.style.display = 'none';
+            sectionHeader.style.display = 'none';
+
+            try {
+                const resp = await fetch(API);
+                const json = await resp.json();
+                if (json.code !== 1) throw new Error(json.msg || '请求失败');
+                renderTools(json.data);
+            } catch (e) {
+                renderError(e.message);
+            }
+        }
+
+        async function toggleTool(name, enabled) {
+            const card = document.getElementById(`card-${name}`);
+            const statusEl = document.getElementById(`status-${name}`);
+            const checkbox = card.querySelector('input[type="checkbox"]');
+
+            try {
+                const resp = await fetch(`${API}/${name}?enabled=${enabled}`, { method: 'PUT' });
+                const json = await resp.json();
+                if (json.code !== 1) throw new Error(json.msg);
+
+                card.classList.toggle('enabled', enabled);
+                statusEl.className = `tool-status ${enabled ? 'on' : 'off'}`;
+                statusEl.textContent = enabled ? '运行中' : '已停用';
+
+                // Update stats
+                const cards = document.querySelectorAll('.tool-card');
+                const total = cards.length;
+                const active = document.querySelectorAll('.tool-card.enabled').length;
+                document.getElementById('statActive').textContent = active;
+                document.getElementById('statInactive').textContent = total - active;
+                document.getElementById('sectionCount').textContent = `${active} / ${total} 已启用`;
+
+                showToast(`${name} 已${enabled ? '启用' : '禁用'}`, 'success');
+            } catch (e) {
+                checkbox.checked = !enabled;
+                showToast(`操作失败：${e.message}`, 'error');
+            }
+        }
+
+        loadTools();
+    </script>
+</body>
+</html>
