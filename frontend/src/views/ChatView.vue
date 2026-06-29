@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, computed } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
@@ -17,6 +17,8 @@ const messagesEl = ref<HTMLDivElement>()
 const inputEl = ref<HTMLTextAreaElement>()
 const inputText = ref('')
 const statusText = ref('READY')
+const activeMenuConvId = ref<number | null>(null)
+const deleteConfirmConvId = ref<number | null>(null)
 
 let abortController: AbortController | null = null
 
@@ -66,6 +68,35 @@ function handleInput() {
   if (!inputEl.value) return
   inputEl.value.style.height = 'auto'
   inputEl.value.style.height = Math.min(inputEl.value.scrollHeight, 120) + 'px'
+}
+
+function toggleMenu(convId: number, e: Event) {
+  e.stopPropagation()
+  activeMenuConvId.value = activeMenuConvId.value === convId ? null : convId
+}
+
+function closeMenu() {
+  activeMenuConvId.value = null
+}
+
+async function handleDeleteConversation(convId: number) {
+  closeMenu()
+  deleteConfirmConvId.value = convId
+}
+
+async function confirmDelete() {
+  if (deleteConfirmConvId.value !== null) {
+    await chatStore.deleteConversation(deleteConfirmConvId.value)
+    deleteConfirmConvId.value = null
+  }
+}
+
+function cancelDelete() {
+  deleteConfirmConvId.value = null
+}
+
+function onDocumentClick() {
+  closeMenu()
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -125,6 +156,11 @@ async function handleSend() {
 
 onMounted(async () => {
   await chatStore.loadConversations()
+  document.addEventListener('click', onDocumentClick)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', onDocumentClick)
 })
 </script>
 
@@ -154,8 +190,16 @@ onMounted(async () => {
           :class="{ active: conv.id === chatStore.currentConvId }"
           @click="handleSwitchConversation(conv.id)"
         >
-          <div class="conv-title">{{ conv.title }}</div>
-          <div class="conv-time">{{ formatTime(conv.updatedAt) }}</div>
+          <div class="conv-content">
+            <div class="conv-title">{{ conv.title }}</div>
+            <div class="conv-time">{{ formatTime(conv.updatedAt) }}</div>
+          </div>
+          <div class="conv-actions">
+            <button class="conv-action-btn" @click="toggleMenu(conv.id, $event)">···</button>
+            <div v-if="activeMenuConvId === conv.id" class="conv-menu" @click.stop>
+              <div class="conv-menu-item conv-menu-item--danger" @click="handleDeleteConversation(conv.id)">删除</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -224,6 +268,18 @@ onMounted(async () => {
           ></textarea>
           <button :disabled="chatStore.isGenerating" @click="handleSend()">发送</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 删除确认弹窗 -->
+  <div v-if="deleteConfirmConvId !== null" class="modal-overlay" @click.self="cancelDelete">
+    <div class="modal-box">
+      <div class="modal-title">确认删除</div>
+      <div class="modal-body">删除后将无法恢复，确定要删除该会话吗？</div>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn--cancel" @click="cancelDelete">取消</button>
+        <button class="modal-btn modal-btn--danger" @click="confirmDelete">删除</button>
       </div>
     </div>
   </div>

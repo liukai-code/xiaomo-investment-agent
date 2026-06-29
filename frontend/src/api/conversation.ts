@@ -48,3 +48,8 @@ export async function generateTitle(convId: number) {
   )
   return data
 }
+
+export async function deleteConversation(convId: number) {
+  const { data } = await request.delete<Result<void>>(`/agent/conversation/${convId}`)
+  return data
+}

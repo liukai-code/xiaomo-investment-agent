@@ -5,6 +5,7 @@ import {
   createConversation as apiCreateConversation,
   getMessages,
   generateTitle as apiGenerateTitle,
+  deleteConversation as apiDeleteConversation,
   type Conversation,
   type ChatMessage,
 } from '@/api/conversation'
@@ -83,6 +84,24 @@ export const useChatStore = defineStore('chat', () => {
     return conversations.value.find((c) => c.id === currentConvId.value)
   }
 
+  async function deleteConversation(convId: number) {
+    const res = await apiDeleteConversation(convId)
+    if (res.code === 1) {
+      const idx = conversations.value.findIndex((c) => c.id === convId)
+      conversations.value.splice(idx, 1)
+      if (currentConvId.value === convId) {
+        if (conversations.value.length > 0) {
+          await switchConversation(conversations.value[0].id)
+        } else {
+          currentConvId.value = null
+          messages.value = []
+        }
+      }
+      return true
+    }
+    return false
+  }
+
   return {
     conversations,
     currentConvId,
@@ -96,5 +115,6 @@ export const useChatStore = defineStore('chat', () => {
     updateLastAiMessage,
     generateTitle,
     getCurrentConversation,
+    deleteConversation,
   }
 })

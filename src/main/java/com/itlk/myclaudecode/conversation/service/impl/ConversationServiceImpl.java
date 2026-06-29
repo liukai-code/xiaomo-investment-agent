@@ -53,4 +53,14 @@ public class ConversationServiceImpl implements ConversationService {
             throw new RuntimeException("无权访问该会话");
         }
     }
+
+    @Override
+    @Transactional
+    public void deleteConversation(Long userId, Long conversationId) {
+        Conversation conversation = getConversation(conversationId);
+        checkOwnership(conversation, userId);
+        conversationRepository.deleteById(conversationId);
+        cacheService.evictConversationList(userId);
+        cacheService.evictMessageCache(conversationId);
+    }
 }

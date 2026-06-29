@@ -140,6 +140,9 @@ body {
   cursor: pointer;
   margin-bottom: 4px;
   transition: all 0.15s;
+  position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .conv-item:hover {
@@ -148,6 +151,11 @@ body {
 
 .conv-item.active {
   background: var(--sidebar-active);
+}
+
+.conv-item .conv-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .conv-item .conv-title {
@@ -162,6 +170,136 @@ body {
 .conv-item.active .conv-title {
   color: var(--accent);
   font-weight: 600;
+}
+
+.conv-item .conv-actions {
+  position: relative;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.conv-item:hover .conv-actions {
+  opacity: 1;
+}
+
+.conv-action-btn {
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 18px;
+  line-height: 1;
+  letter-spacing: 2px;
+  font-weight: 700;
+}
+
+.conv-action-btn:hover {
+  background: var(--border);
+  color: var(--accent);
+}
+
+.conv-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 0;
+  min-width: 100px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+}
+
+.conv-menu-item {
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.conv-menu-item:hover {
+  background: var(--sidebar-hover);
+}
+
+.conv-menu-item--danger {
+  color: #ef4444;
+}
+
+.conv-menu-item--danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* 删除确认弹窗 */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-box {
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px 28px;
+  min-width: 300px;
+  max-width: 380px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.modal-body {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+}
+
+.modal-btn--cancel {
+  background: var(--border);
+  color: var(--text);
+}
+
+.modal-btn--cancel:hover {
+  opacity: 0.8;
+}
+
+.modal-btn--danger {
+  background: #ef4444;
+  color: white;
+}
+
+.modal-btn--danger:hover {
+  background: #dc2626;
 }
 
 .conv-item .conv-time {

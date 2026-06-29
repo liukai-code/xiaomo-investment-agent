@@ -12,4 +12,6 @@ public interface ConversationService {
     Conversation getConversation(Long conversationId);
 
     void checkOwnership(Conversation conversation, Long userId);
+
+    void deleteConversation(Long userId, Long conversationId);
 }

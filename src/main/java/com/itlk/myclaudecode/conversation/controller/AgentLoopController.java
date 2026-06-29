@@ -63,6 +63,15 @@ public class AgentLoopController {
         return Result.success(chatMessageService.getHistory(userId, id));
     }
 
+    @DeleteMapping("/conversation/{id}")
+    public Result<Void> deleteConversation(
+            @PathVariable Long id,
+            HttpServletRequest request) {
+        Long userId = getUserId(request);
+        conversationService.deleteConversation(userId, id);
+        return Result.success(null);
+    }
+
     @PostMapping("/conversation/{id}/generate-title")
     public Result<String> generateTitle(
             @PathVariable Long id,
