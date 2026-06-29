@@ -310,6 +310,14 @@ export function parseBlocks(text: string): MarkdownBlock[] {
     flushTable(false)
   }
 
+  // Stabilize last block key during streaming to avoid per-frame DOM recreation
+  if (blocks.length > 0) {
+    const lastBlock = blocks[blocks.length - 1]
+    if (!lastBlock.closed) {
+      lastBlock.key = `${lastBlock.type}-last`
+    }
+  }
+
   return blocks
 }
 

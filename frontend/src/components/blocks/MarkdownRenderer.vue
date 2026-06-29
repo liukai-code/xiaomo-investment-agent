@@ -27,6 +27,9 @@ const { blocks } = useMarkdownBlocks(textRef)
 <template>
   <!-- JSON blocks rendering -->
   <template v-if="parsed.isJson">
+    <div v-if="parsed.blocks.length === 0 && isStreaming" class="json-loading">
+      <StreamingCursor />
+    </div>
     <MessageBlock
       v-for="(block, i) in parsed.blocks"
       :key="i"

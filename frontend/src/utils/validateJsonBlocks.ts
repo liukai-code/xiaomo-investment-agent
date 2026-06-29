@@ -91,15 +91,16 @@ export function parseAndValidate(raw: string): ValidatedMessage {
     if (blocks.length > 0) {
       return { blocks, isJson: true }
     }
-    // Parsed but no valid blocks — fallback
-    return { blocks: makeFallbackBlock(raw), isJson: false }
+    // Parsed but no valid blocks — latch to JSON path to avoid flashing raw text
+    return { blocks: [], isJson: true }
   } catch {
     // JSON parse failed — try partial extraction
     const partialBlocks = tryExtractPartialBlocks(cleaned)
     if (partialBlocks.length > 0) {
       return { blocks: partialBlocks, isJson: true }
     }
-    return { blocks: makeFallbackBlock(raw), isJson: false }
+    // JSON detected but incomplete — latch to JSON path, wait for more blocks
+    return { blocks: [], isJson: true }
   }
 }
 
