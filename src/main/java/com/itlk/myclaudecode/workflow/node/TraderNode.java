@@ -1,5 +1,10 @@
 package com.itlk.myclaudecode.workflow.node;
 
+import com.itlk.myclaudecode.agent.service.impl.MaxToolCallManager;
+import com.itlk.myclaudecode.tool.guard.FetchSessionTracker;
+import com.itlk.myclaudecode.tool.guard.InfoGainTracker;
+import com.itlk.myclaudecode.tool.guard.RepetitionDetector;
+import com.itlk.myclaudecode.tool.guard.SearchSessionTracker;
 import com.itlk.myclaudecode.workflow.engine.WorkflowNode;
 import com.itlk.myclaudecode.workflow.event.WorkflowEvent;
 import com.itlk.myclaudecode.workflow.state.WorkflowState;
@@ -13,6 +18,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 public class TraderNode implements WorkflowNode {
@@ -55,6 +62,13 @@ public class TraderNode implements WorkflowNode {
                         .thinking(AnthropicApi.ThinkingType.DISABLED, null)
                         .temperature(0.4)
                         .maxTokens(4096)
+                        .toolContext(Map.of(
+                                MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0),
+                                MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(3, 0.8),
+                                MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(3),
+                                MaxToolCallManager.FETCH_SESSION_TRACKER_KEY, new FetchSessionTracker(3, 2),
+                                MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY, new SearchSessionTracker(1)
+                        ))
                         .build())
                 .stream()
                 .content()

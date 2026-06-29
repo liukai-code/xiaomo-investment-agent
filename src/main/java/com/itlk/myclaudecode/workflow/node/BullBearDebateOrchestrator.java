@@ -38,18 +38,23 @@ public class BullBearDebateOrchestrator implements WorkflowNode {
         log.info("开始多空辩论，共 {} 轮", rounds);
         List<DebateMessage> debateHistory = new CopyOnWriteArrayList<>();
 
-        // 逐轮交替辩论
-        Flux<WorkflowEvent> debateChain = Flux.empty();
-        for (int i = 0; i < rounds; i++) {
-            debateChain = debateChain
-                    .concatWith(bull.debateRound(state, debateHistory, sink))
-                    .concatWith(bear.debateRound(state, debateHistory, sink));
-        }
+        // 用 Flux.defer 包装每一轮，确保按序执行
+        Flux<WorkflowEvent> chain = Flux.defer(() -> {
+            // 构建逐轮辩论链
+            @SuppressWarnings("unchecked")
+            Flux<WorkflowEvent>[] roundFluxes = new Flux[rounds * 2];
+            for (int i = 0; i < rounds; i++) {
+                roundFluxes[i * 2] = Flux.defer(() -> bull.debateRound(state, debateHistory, sink));
+                roundFluxes[i * 2 + 1] = Flux.defer(() -> bear.debateRound(state, debateHistory, sink));
+            }
+            return Flux.concat(roundFluxes);
+        });
 
         // 辩论结束后，裁决者做出判断
-        return debateChain
+        return chain
                 .concatWith(Flux.defer(() -> {
                     state.getBullBearDebate().addAll(debateHistory);
+                    log.info("辩论记录已写入状态，共 {} 条", debateHistory.size());
                     return judge.makeJudgment(state, debateHistory, sink)
                             .doOnNext(event -> {
                                 if (event.type() == WorkflowEventType.AGENT_COMPLETE) {

@@ -47,13 +47,14 @@ public class RiskDebateOrchestrator implements WorkflowNode {
         List<DebateMessage> riskDebateHistory = new CopyOnWriteArrayList<>();
 
         // 逐轮三方辩论
-        Flux<WorkflowEvent> debateChain = Flux.empty();
+        @SuppressWarnings("unchecked")
+        Flux<WorkflowEvent>[] roundFluxes = new Flux[rounds * 3];
         for (int i = 0; i < rounds; i++) {
-            debateChain = debateChain
-                    .concatWith(aggressive.debateRound(state, riskDebateHistory, sink))
-                    .concatWith(conservative.debateRound(state, riskDebateHistory, sink))
-                    .concatWith(neutral.debateRound(state, riskDebateHistory, sink));
+            roundFluxes[i * 3] = Flux.defer(() -> aggressive.debateRound(state, riskDebateHistory, sink));
+            roundFluxes[i * 3 + 1] = Flux.defer(() -> conservative.debateRound(state, riskDebateHistory, sink));
+            roundFluxes[i * 3 + 2] = Flux.defer(() -> neutral.debateRound(state, riskDebateHistory, sink));
         }
+        Flux<WorkflowEvent> debateChain = Flux.concat(roundFluxes);
 
         // 辩论结束后，风险裁决官做出最终裁决
         return debateChain
