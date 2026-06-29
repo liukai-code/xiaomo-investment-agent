@@ -50,17 +50,6 @@ public class MaxToolCallManager implements ToolCallingManager {
             "bailian_web_search", "webSearch", "web_search"
     );
 
-    private static final String PLANNING_INJECTION = """
-
-            [检索规划指令]
-            搜索结果已返回。请立即停止搜索，按以下流程操作：
-            1. 从上述结果中选择最多 3 个最相关的 URL
-            2. 用 fetchArticleContent 逐一提取正文
-            3. 基于提取的内容直接回答用户
-            注意：不要再调用搜索工具，不要再抓取超出上述列表的 URL。
-            [/检索规划指令]
-            """;
-
     private final ToolCallingManager delegate;
     private final ToolGuardProperties properties;
     private final ToolBehaviorRegistry behaviorRegistry;
@@ -156,7 +145,7 @@ public class MaxToolCallManager implements ToolCallingManager {
                 SearchSessionTracker.SearchResult sr = searchTracker.recordSearch();
                 if (sr.isOverLimit()) {
                     log.info("[MaxToolCallManager] 搜索次数超限({}/{}), 拒绝搜索", sr.totalSearches(), properties.maxSearchRounds());
-                    String limitMsg = "本次会话已搜索过，请基于已有搜索结果回答。如需更多信息，请用 fetchArticleContent 提取已有结果中的 URL。";
+                    String limitMsg = "本次会话搜索次数已达上限。请立即停止所有工具调用，基于已有的搜索结果直接回答用户。不要再调用搜索或抓取工具。";
                     List<Message> limitHistory = buildSkipResult(tc, limitMsg);
                     GuardSignal signal = new GuardSignal(
                             step, properties.softLimit(), properties.maxIterations(),
@@ -165,9 +154,6 @@ public class MaxToolCallManager implements ToolCallingManager {
                             false, 0, false, 0, false, false);
                     return new GuardedToolExecutionResult(new CachedToolExecutionResult(limitHistory), signal);
                 }
-                // 首次搜索 → 注入规划指令
-                log.info("[MaxToolCallManager] 首次搜索完成，注入检索规划指令");
-                result = appendPlanningInjection(result, tc, resultText);
             }
 
             // Fetch 专项追踪
@@ -201,7 +187,11 @@ public class MaxToolCallManager implements ToolCallingManager {
                     infoGain, repetition, signal.shouldInject(), isFetchTool);
 
             if (signal.isHardLimit()) {
-                log.warn("[MaxToolCallManager] 达到硬上限 ({}/{}), 强制停止", step, properties.maxIterations());
+                if (overMaxFetches) {
+                    log.warn("[MaxToolCallManager] 达到 fetch 硬上限 (fetchCount={}), 强制停止", fetchCount);
+                } else {
+                    log.warn("[MaxToolCallManager] 达到迭代硬上限 ({}/{}), 强制停止", step, properties.maxIterations());
+                }
                 return new GuardedToolExecutionResult(result, signal);
             }
 
@@ -292,20 +282,6 @@ public class MaxToolCallManager implements ToolCallingManager {
         return SEARCH_TOOL_NAMES.contains(toolName);
     }
 
-    private ToolExecutionResult appendPlanningInjection(ToolExecutionResult result, AssistantMessage.ToolCall tc, String originalText) {
-        List<Message> history = new ArrayList<>(result.conversationHistory());
-        for (int i = history.size() - 1; i >= 0; i--) {
-            if (history.get(i) instanceof ToolResponseMessage toolMsg) {
-                List<ToolResponseMessage.ToolResponse> newResponses = toolMsg.getResponses().stream()
-                        .map(r -> new ToolResponseMessage.ToolResponse(r.id(), r.name(), r.responseData() + PLANNING_INJECTION))
-                        .toList();
-                history.set(i, new ToolResponseMessage(newResponses, toolMsg.getMetadata()));
-                break;
-            }
-        }
-        return new CachedToolExecutionResult(history);
-    }
-
     private String extractUrlFromArgs(String args) {
         if (args == null || args.isBlank()) return null;
         try {
@@ -344,12 +320,7 @@ public class MaxToolCallManager implements ToolCallingManager {
         GuardedToolExecutionResult(ToolExecutionResult delegate, GuardSignal signal) {
             this.hardLimit = signal.isHardLimit();
             List<Message> original = delegate.conversationHistory();
-            // returnDirect=true 时不注入信号，避免被 Spring AI 直接返回给前端
-            if (this.hardLimit) {
-                this.guardedHistory = original;
-            } else {
-                this.guardedHistory = appendSignal(original, signal.format());
-            }
+            this.guardedHistory = appendSignal(original, signal.format());
         }
 
         private static List<Message> appendSignal(List<Message> messages, String signal) {

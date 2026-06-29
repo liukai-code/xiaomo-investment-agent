@@ -11,6 +11,8 @@ import com.itlk.myclaudecode.tool.annotation.ToolBehavior;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -34,9 +36,9 @@ public class FinancialDataTool {
     }
 
     @ToolBehavior(deterministic = false, cacheable = false)
-    @Tool(description = "查询A股股票实时行情。当用户询问A股股价、涨跌幅、成交量时调用。股票代码格式：沪市6位数字如600519（贵州茅台），深市6位数字如000858（五粮液）。")
+    @Tool(description = "查询A股股票实时行情。需要6位数字股票代码(沪市以6开头如600519,深市以0/3开头如000858)。如果只知道股票名称,必须先调用 searchStockByName 获取代码,严禁猜测代码。")
     public String getAShareQuote(
-            @ToolParam(description = "A股股票代码，如600519、000858") String stockCode) {
+            @ToolParam(description = "A股6位数字代码,如600519、000858。注意:此代码必须来自 searchStockByName 的返回结果,不要从搜索结果或网页内容中提取代码,那些代码经常是错误的") String stockCode) {
         log.info("[FinancialDataTool] getAShareQuote 入参: stockCode={}", stockCode);
         try {
             validateCode(stockCode, "股票代码");
@@ -98,6 +100,98 @@ public class FinancialDataTool {
             log.error("[FinancialDataTool] getFundNav 异常: {}", e.getMessage(), e);
             return "查询基金净值失败: " + e.getMessage();
         }
+    }
+
+    @ToolBehavior(deterministic = false, cacheable = true)
+    @Tool(description = "通过中文名称模糊搜索股票代码。当用户提到股票名称但未提供代码时(如亨通光电、贵州茅台),先调用此工具获取代码,再用 getAShareQuote 查询行情。支持A股沪市和深市。")
+    public String searchStockByName(
+            @ToolParam(description = "股票中文名称或关键词,如亨通光电、茅台") String name) {
+        log.info("[FinancialDataTool] searchStockByName 入参: name={}", name);
+        try {
+            if (name == null || name.isBlank()) {
+                return "搜索关键词不能为空";
+            }
+            String result = searchEastMoney(name.trim());
+            if (result == null || result.isBlank()) {
+                result = searchSinaFallback(name.trim());
+            }
+            if (result == null || result.isBlank()) {
+                result = "未找到与" + name + "相关的A股股票，请确认名称是否正确。";
+            }
+            log.info("[FinancialDataTool] searchStockByName 出参: {}", result);
+            return result;
+        } catch (Exception e) {
+            log.error("[FinancialDataTool] searchStockByName 异常: {}", e.getMessage(), e);
+            return "股票搜索失败: " + e.getMessage();
+        }
+    }
+
+    private String searchEastMoney(String keyword) throws Exception {
+        String url = "https://searchapi.eastmoney.com/api/suggest/get"
+                + "?input=" + java.net.URLEncoder.encode(keyword, "UTF-8")
+                + "&type=14&token=D43BF722C8E33BDC906FB84D85E326E8&count=5";
+        log.info("[FinancialDataTool] searchEastMoney 请求URL: {}", url);
+
+        Headers headers = new Headers.Builder()
+                .add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .build();
+
+        String body = httpGet(url, headers);
+        if (body == null || body.isBlank()) return null;
+
+        JsonNode root = objectMapper.readTree(body);
+        JsonNode quotes = root.path("QuotationCodeTable").path("Data");
+        if (!quotes.isArray() || quotes.isEmpty()) return null;
+
+        List<String> results = new ArrayList<>();
+        for (JsonNode item : quotes) {
+            String code = item.path("Code").asText("");
+            String name = item.path("Name").asText("");
+            String mktNum = item.path("MktNum").asText("");
+            if (code.length() == 6 && ("1".equals(mktNum) || "0".equals(mktNum))) {
+                results.add(formatSearchResult(code, name));
+            }
+            if (results.size() >= 5) break;
+        }
+        return results.isEmpty() ? null : String.join("\n", results);
+    }
+
+    private String searchSinaFallback(String keyword) throws Exception {
+        String url = "https://suggest3.sinajs.cn/suggest/type=&key="
+                + java.net.URLEncoder.encode(keyword, "UTF-8") + "&name=suggest";
+        log.info("[FinancialDataTool] searchSinaFallback 请求URL: {}", url);
+
+        Headers headers = new Headers.Builder()
+                .add("User-Agent", "Mozilla/5.0")
+                .add("Referer", "https://finance.sina.com.cn")
+                .build();
+
+        String body = httpGet(url, headers);
+        if (body == null || body.isBlank()) return null;
+
+        List<String> results = new ArrayList<>();
+        String data = body.contains("\"") ? body.split("\"")[1] : "";
+        for (String entry : data.split(";")) {
+            if (entry.length() < 5) continue;
+            String[] parts = entry.split(",");
+            if (parts.length < 2) continue;
+            String id = parts[0];
+            String name = parts[1];
+            if (id.length() < 8) continue;
+            String market = id.substring(0, 2);
+            String code = id.substring(2);
+            if (("sh".equals(market) || "sz".equals(market)) && code.length() == 6
+                    && (code.startsWith("6") || code.startsWith("0") || code.startsWith("3"))) {
+                results.add(formatSearchResult(code, name));
+            }
+            if (results.size() >= 5) break;
+        }
+        return results.isEmpty() ? null : String.join("\n", results);
+    }
+
+    private String formatSearchResult(String code, String name) {
+        String market = code.startsWith("6") ? "沪市" : "深市";
+        return code + " " + name + "（" + market + "）";
     }
 
     private String fetchTencentQuote(String symbol, String stockCode, String marketName) {

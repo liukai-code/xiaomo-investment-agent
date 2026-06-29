@@ -54,7 +54,7 @@ frontend/src/
 | Tool | Methods | Notes |
 |------|---------|-------|
 | FinancialCalcTool | 22 methods: compoundInterest, loanPayment, npv, irr, sharpeRatio 等 | BigDecimal 精度 |
-| FinancialDataTool | getAShareQuote, getHKStockQuote, getUSStockQuote, getFundNav | 腾讯/东方财富 API |
+| FinancialDataTool | getAShareQuote, getHKStockQuote, getUSStockQuote, getFundNav, searchStockByName | 腾讯/东方财富 API |
 | SqlTool | getDatabaseSchema, executeQuery | SELECT only, 禁止危险关键词 |
 | WebFetchTool | fetchWebpage, fetchArticleContent | max 20K chars, 屏蔽内网 IP |
 | FileReadTool | read_file | max 10MB, 限制项目目录 |

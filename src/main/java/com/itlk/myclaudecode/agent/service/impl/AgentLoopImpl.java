@@ -144,7 +144,7 @@ public class AgentLoopImpl implements AgentLoop {
 
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
-                .temperature(0.7)
+                .temperature(0.3)
                 .toolContext(Map.of(
                         MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0),
                         MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(toolGuardProperties.infoGainWindow(), toolGuardProperties.infoGainThreshold()),
@@ -179,7 +179,7 @@ public class AgentLoopImpl implements AgentLoop {
 
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
-                .temperature(0.7)
+                .temperature(0.3)
                 .toolContext(Map.of(
                         MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0),
                         MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(toolGuardProperties.infoGainWindow(), toolGuardProperties.infoGainThreshold()),
