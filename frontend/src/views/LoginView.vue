@@ -2,12 +2,10 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { useThemeStore } from '@/stores/theme'
 import GalaxyBackground from '@/components/common/GalaxyBackground.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
-const themeStore = useThemeStore()
 
 const activeTab = ref<'login' | 'register'>('login')
 const loginUsername = ref('')
@@ -53,13 +51,10 @@ async function handleRegister() {
 
 <template>
   <div class="auth-page">
-    <GalaxyBackground :dark="!themeStore.isLight" />
+    <GalaxyBackground :dark="false" />
     <div class="auth-container">
       <div class="auth-header">
         <div class="auth-logo">&gt;_ TERMINAL</div>
-        <button class="auth-theme" @click="themeStore.toggle()" :title="themeStore.isLight ? '深色模式' : '浅色模式'">
-          {{ themeStore.isLight ? '☾' : '☀' }}
-        </button>
       </div>
       <div class="auth-tabs">
         <button

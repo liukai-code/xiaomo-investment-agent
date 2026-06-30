@@ -3,7 +3,6 @@ import { ref, nextTick, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
-import { useThemeStore } from '@/stores/theme'
 import { streamChat, streamDeepAnalysis, type WorkflowEvent } from '@/api/chat'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
 import WorkflowPanel from '@/components/workflow/WorkflowPanel.vue'
@@ -12,7 +11,6 @@ import { useRafThrottle } from '@/composables/useMarkdownBlocks'
 const router = useRouter()
 const authStore = useAuthStore()
 const chatStore = useChatStore()
-const themeStore = useThemeStore()
 
 const messagesEl = ref<HTMLDivElement>()
 const inputEl = ref<HTMLTextAreaElement>()
@@ -291,9 +289,6 @@ onUnmounted(() => {
       <div class="sidebar-footer">
         <span class="user-name">{{ authStore.username }}</span>
         <div class="footer-actions">
-          <button @click="themeStore.toggle()" :title="themeStore.isLight ? '深色模式' : '浅色模式'">
-            {{ themeStore.isLight ? '☾' : '☀' }}
-          </button>
           <button id="logoutBtn" @click="handleLogout()" title="退出登录">⏻</button>
         </div>
       </div>

@@ -1,23 +1,4 @@
 :root {
-  --bg: #1a1a2e;
-  --surface: #16213e;
-  --surface-2: #1a1a2e;
-  --border: #2a2a4a;
-  --text: #e0e0e0;
-  --text-dim: #8a8a9a;
-  --accent: #3b82f6;
-  --accent-dim: #3b82f620;
-  --user-bg: #1e3a5f;
-  --danger: #ef4444;
-  --green: #22c55e;
-  --red: #ef4444;
-  --sidebar-bg: #0f172a;
-  --sidebar-hover: #162032;
-  --sidebar-active: #1e3a5f;
-  --scanline-opacity: 0;
-}
-
-html.light {
   --bg: #f8fafc;
   --surface: #ffffff;
   --surface-2: #f1f5f9;
@@ -685,23 +666,6 @@ body {
   color: var(--accent);
 }
 
-.auth-theme {
-  position: absolute;
-  right: 0;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  cursor: pointer;
-  font-size: 16px;
-  padding: 6px 10px;
-  transition: all 0.2s;
-}
-
-.auth-theme:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
 
 .auth-tabs {
   display: flex;
@@ -778,15 +742,15 @@ body {
   min-height: 16px;
 }
 
-/* ========== 亮色主题 Markdown ========== */
-html.light .message.ai .bubble code { color: #1e293b; }
-html.light .message.ai .bubble pre { background: #f1f5f9; border-color: var(--border); }
-html.light .message.ai .bubble pre code { color: #1e293b; }
-html.light .message.ai .bubble strong { color: var(--accent); }
-html.light .message.ai .bubble em { color: #64748b; }
-html.light .message.ai .bubble blockquote { color: #64748b; border-color: #cbd5e1; }
-html.light .message.ai .bubble th { background: #f1f5f9; }
-html.light .message.ai .bubble th, html.light .message.ai .bubble td { border-color: var(--border); }
+/* ========== Markdown ========== */
+.message.ai .bubble code { color: #1e293b; }
+.message.ai .bubble pre { background: #f1f5f9; border-color: var(--border); }
+.message.ai .bubble pre code { color: #1e293b; }
+.message.ai .bubble strong { color: var(--accent); }
+.message.ai .bubble em { color: #64748b; }
+.message.ai .bubble blockquote { color: #64748b; border-color: #cbd5e1; }
+.message.ai .bubble th { background: #f1f5f9; }
+.message.ai .bubble th, .message.ai .bubble td { border-color: var(--border); }
 
 /* ========== Galaxy Background ========== */
 .galaxy-container {
