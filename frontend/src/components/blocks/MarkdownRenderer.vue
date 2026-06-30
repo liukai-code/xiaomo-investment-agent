@@ -9,6 +9,7 @@ import ListBlock from './ListBlock.vue'
 import TableBlock from './TableBlock.vue'
 import BlockquoteBlock from './BlockquoteBlock.vue'
 import HrBlock from './HrBlock.vue'
+import MathBlock from './MathBlock.vue'
 
 const props = defineProps<{
   text: string
@@ -27,6 +28,7 @@ const { blocks } = useMarkdownBlocks(toRef(props, 'text'))
     <TableBlock v-else-if="block.type === 'table'" :block="block" />
     <BlockquoteBlock v-else-if="block.type === 'blockquote'" :block="block" />
     <HrBlock v-else-if="block.type === 'hr'" />
+    <MathBlock v-else-if="block.type === 'math'" :block="block" />
   </template>
   <StreamingCursor v-if="isStreaming" />
 </template>

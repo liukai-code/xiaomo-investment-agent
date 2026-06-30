@@ -5,6 +5,7 @@ import type {
   ListBlock,
   ListItem,
   TableBlock,
+  MathBlock,
 } from '@/types/blocks'
 
 // --- djb2 hash ---
@@ -29,13 +30,14 @@ export function parseBlocks(text: string): MarkdownBlock[] {
   const lines = text.split('\n')
   const blocks: MarkdownBlock[] = []
   let paragraphLines: string[] = []
-  let state: 'NORMAL' | 'IN_CODE' = 'NORMAL'
+  let state: 'NORMAL' | 'IN_CODE' | 'IN_MATH' = 'NORMAL'
   let codeBlock: CodeBlock | null = null
   let codeFenceLen = 0
   let listBlock: ListBlock | null = null
   let blockquoteLines: string[] = []
 
   // table accumulation
+  let mathLines: string[] = []
   let tableHeader: string[] = []
   let tableAlignments: ('left' | 'center' | 'right')[] = []
   let tableRows: string[][] = []
@@ -161,6 +163,25 @@ export function parseBlocks(text: string): MarkdownBlock[] {
       continue
     }
 
+    // === IN MATH STATE ===
+    if (state === 'IN_MATH') {
+      if (/^\$\$\s*$/.test(line)) {
+        const tex = mathLines.join('\n')
+        blocks.push({
+          type: 'math',
+          tex,
+          display: true,
+          closed: true,
+          key: blockKey('math', tex),
+        })
+        mathLines = []
+        state = 'NORMAL'
+      } else {
+        mathLines.push(line)
+      }
+      continue
+    }
+
     // === NORMAL STATE ===
 
     // Empty line
@@ -196,6 +217,33 @@ export function parseBlocks(text: string): MarkdownBlock[] {
         text: headingMatch[2],
         closed: true,
         key: blockKey(`h${level}`, headingMatch[2]),
+      })
+      continue
+    }
+
+    // Display math $$...$$
+    if (/^\$\$\s*$/.test(line)) {
+      flushParagraph(true)
+      flushBlockquote(true)
+      flushList(true)
+      flushTable(true)
+      mathLines = []
+      state = 'IN_MATH'
+      continue
+    }
+    // Single-line display math $$...$$
+    const inlineMathMatch = line.match(/^\$\$(.+)\$\$\s*$/)
+    if (inlineMathMatch) {
+      flushParagraph(true)
+      flushBlockquote(true)
+      flushList(true)
+      flushTable(true)
+      blocks.push({
+        type: 'math',
+        tex: inlineMathMatch[1],
+        display: true,
+        closed: true,
+        key: blockKey('math', inlineMathMatch[1]),
       })
       continue
     }
@@ -301,6 +349,17 @@ export function parseBlocks(text: string): MarkdownBlock[] {
     codeBlock.closed = false
     codeBlock.key = blockKey('code', codeBlock.language + codeBlock.code)
     blocks.push(codeBlock)
+  }
+
+  if (state === 'IN_MATH') {
+    const tex = mathLines.join('\n')
+    blocks.push({
+      type: 'math',
+      tex,
+      display: true,
+      closed: false,
+      key: blockKey('math', tex),
+    })
   }
 
   if (state === 'NORMAL') {

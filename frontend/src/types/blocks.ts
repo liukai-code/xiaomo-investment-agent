@@ -6,6 +6,7 @@ export type BlockType =
   | 'table'
   | 'blockquote'
   | 'hr'
+  | 'math'
 
 export interface BaseBlock {
   type: BlockType
@@ -59,6 +60,12 @@ export interface HrBlock extends BaseBlock {
   type: 'hr'
 }
 
+export interface MathBlock extends BaseBlock {
+  type: 'math'
+  tex: string
+  display: boolean
+}
+
 export type MarkdownBlock =
   | HeadingBlock
   | ParagraphBlock
@@ -67,3 +74,4 @@ export type MarkdownBlock =
   | TableBlock
   | BlockquoteBlock
   | HrBlock
+  | MathBlock
