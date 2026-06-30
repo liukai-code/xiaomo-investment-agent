@@ -11,19 +11,19 @@
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --bg-deep: #020617;
-            --bg-card: #0F172A;
-            --bg-card-hover: #1E293B;
-            --bg-input: #1E293B;
-            --border: rgba(148, 163, 184, 0.1);
-            --border-hover: rgba(148, 163, 184, 0.2);
-            --text-primary: #F8FAFC;
-            --text-secondary: #94A3B8;
-            --text-muted: #64748B;
-            --accent: #22C55E;
-            --accent-glow: rgba(34, 197, 94, 0.25);
-            --danger: #EF4444;
-            --danger-glow: rgba(239, 68, 68, 0.2);
+            --bg-deep: #f8fafc;
+            --bg-card: #ffffff;
+            --bg-card-hover: #f1f5f9;
+            --bg-input: #f1f5f9;
+            --border: rgba(148, 163, 184, 0.2);
+            --border-hover: rgba(148, 163, 184, 0.35);
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --accent: #16a34a;
+            --accent-glow: rgba(22, 163, 74, 0.2);
+            --danger: #dc2626;
+            --danger-glow: rgba(220, 38, 38, 0.15);
             --radius: 16px;
             --radius-sm: 12px;
             --font-mono: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
@@ -61,7 +61,7 @@
             justify-content: space-between;
             border-bottom: 1px solid var(--border);
             backdrop-filter: blur(12px);
-            background: rgba(2, 6, 23, 0.8);
+            background: rgba(248, 250, 252, 0.85);
             position: sticky;
             top: 0;
             z-index: 100;
@@ -101,7 +101,7 @@
         .back-btn:hover {
             color: var(--text-primary);
             border-color: var(--border-hover);
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(0, 0, 0, 0.03);
         }
         .back-btn:focus-visible {
             outline: 2px solid var(--accent);
