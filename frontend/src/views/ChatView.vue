@@ -255,9 +255,10 @@ onUnmounted(() => {
     <div class="sidebar">
       <div class="sidebar-header">
         <div class="sidebar-brand">
-          <div class="logo">
-            <span class="logo-dot"></span>
-            Financial Agent
+          <img src="/logo.png" alt="Logo" class="logo-img" />
+          <div class="logo-text">
+            <div class="logo-title">小墨</div>
+            <div class="logo-sub">Financial Agent</div>
           </div>
         </div>
         <button class="new-chat-btn" @click="handleCreateConversation()">
