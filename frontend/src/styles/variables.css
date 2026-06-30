@@ -558,11 +558,7 @@ body {
 }
 
 .message.ai .bubble {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  padding: 0;
 }
 
 /* ========== 流式光标 ========== */
