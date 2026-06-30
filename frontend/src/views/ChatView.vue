@@ -287,9 +287,13 @@ onUnmounted(() => {
       </div>
 
       <div class="sidebar-footer">
-        <span class="user-name">{{ authStore.username }}</span>
-        <div class="footer-actions">
-          <button id="logoutBtn" @click="handleLogout()" title="退出登录">⏻</button>
+        <div class="footer-item" title="设置">
+          <span class="footer-icon">⚙</span>
+          <span class="footer-label">设置</span>
+        </div>
+        <div class="footer-item" @click="handleLogout()" title="退出登录">
+          <span class="footer-icon">⏻</span>
+          <span class="footer-label">退出登录</span>
         </div>
       </div>
     </div>
@@ -301,9 +305,8 @@ onUnmounted(() => {
           <span class="dot"></span>
           <span class="title">{{ currentTitle }}</span>
         </div>
-        <span class="status" :style="{ color: chatStore.isGenerating ? 'var(--accent)' : 'var(--text-dim)' }">
-          {{ statusText }}
-        </span>
+        <div class="header-right">
+        </div>
       </div>
 
       <div ref="messagesEl" class="chat-messages">

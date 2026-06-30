@@ -311,48 +311,38 @@ body {
 }
 
 .sidebar-footer {
-  padding: 12px 16px;
-  border-top: 1px solid var(--border);
+  padding: 10px 16px;
+  border-top: 1px solid transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.footer-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-}
-
-.sidebar-footer .user-name {
-  font-size: 13px;
-  color: var(--text-dim);
-  font-weight: 500;
-}
-
-.sidebar-footer .footer-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.sidebar-footer button {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  width: 32px;
-  height: 32px;
+  gap: 10px;
+  padding: 6px 12px;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
+  transition: background 0.15s;
+  color: var(--text);
+  font-size: 13px;
 }
 
-.sidebar-footer button:hover {
+.footer-item:hover {
   background: var(--sidebar-hover);
-  border-color: var(--accent);
-  color: var(--accent);
+  color: var(--text);
 }
 
-.sidebar-footer #logoutBtn:hover {
-  border-color: var(--danger);
-  color: var(--danger);
+.footer-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+.footer-label {
+  font-weight: 500;
 }
 
 .empty-state {
@@ -376,13 +366,15 @@ body {
 }
 
 .chat-header {
-  padding: 16px 24px;
+  padding: 0 24px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   user-select: none;
+  height: 60px;
+  box-sizing: border-box;
 }
 
 .chat-header .left {
@@ -417,6 +409,74 @@ body {
   padding: 4px 10px;
   background: var(--surface-2);
   border-radius: 6px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+  padding: 6px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  background: var(--green);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.header-icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+}
+
+.header-icon-btn:hover {
+  color: var(--text);
+}
+
+.user-avatar {
+  width: 34px;
+  height: 34px;
+  background: var(--accent);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.user-avatar:hover {
+  opacity: 0.85;
 }
 
 /* ========== 消息区域 ========== */
