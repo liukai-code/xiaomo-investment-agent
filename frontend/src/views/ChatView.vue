@@ -328,7 +328,10 @@ onUnmounted(() => {
           class="message"
           :class="msg.role === 'USER' ? 'user' : 'ai'"
         >
-          <div class="label">{{ msg.role === 'USER' ? 'YOU' : 'AI' }}</div>
+          <div class="msg-header">
+            <img v-if="msg.role !== 'USER'" src="/logo.png" alt="AI" class="msg-avatar" />
+            <div class="label">{{ msg.role === 'USER' ? 'YOU' : '小墨' }}</div>
+          </div>
           <div class="bubble">
             <template v-if="msg.role === 'USER'">{{ msg.content }}</template>
             <template v-else>

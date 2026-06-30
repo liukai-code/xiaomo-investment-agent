@@ -92,6 +92,15 @@ body {
   border-radius: 10px;
   object-fit: contain;
   flex-shrink: 0;
+  background: var(--sidebar-bg);
+}
+
+.message .msg-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  object-fit: contain;
+  background: var(--surface);
 }
 
 .sidebar-brand .logo-text {
@@ -468,12 +477,18 @@ body {
   align-items: flex-start;
 }
 
+.message .msg-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  padding: 0 4px;
+}
+
 .message .label {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.5px;
-  margin-bottom: 6px;
-  padding: 0 4px;
 }
 
 .message.user .label {
