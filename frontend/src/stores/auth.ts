@@ -7,6 +7,7 @@ export const useAuthStore = defineStore('auth', () => {
   const userId = ref(Number(localStorage.getItem('userId')) || 0)
   const username = ref(localStorage.getItem('username') || '')
   const isAuthenticated = ref(false)
+  const loading = ref(false)
 
   function setAuth(t: string, uid: number, uname: string) {
     token.value = t
@@ -29,20 +30,30 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function login(uname: string, password: string) {
-    const res = await apiLogin(uname, password)
-    if (res.code === 1) {
-      setAuth(res.data.token, res.data.userId, res.data.username)
-      return { success: true }
+    loading.value = true
+    try {
+      const res = await apiLogin(uname, password)
+      if (res.code === 1) {
+        setAuth(res.data.token, res.data.userId, res.data.username)
+        return { success: true }
+      }
+      return { success: false, msg: res.msg || '登录失败' }
+    } finally {
+      loading.value = false
     }
-    return { success: false, msg: res.msg || '登录失败' }
   }
 
   async function register(uname: string, password: string) {
-    const res = await apiRegister(uname, password)
-    if (res.code === 1) {
-      return { success: true }
+    loading.value = true
+    try {
+      const res = await apiRegister(uname, password)
+      if (res.code === 1) {
+        return { success: true }
+      }
+      return { success: false, msg: res.msg || '注册失败' }
+    } finally {
+      loading.value = false
     }
-    return { success: false, msg: res.msg || '注册失败' }
   }
 
   async function logout() {
@@ -73,5 +84,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, userId, username, isAuthenticated, login, register, logout, checkAuth, clearAuth }
+  return { token, userId, username, isAuthenticated, loading, login, register, logout, checkAuth, clearAuth }
 })
