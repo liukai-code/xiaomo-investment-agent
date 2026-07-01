@@ -45,7 +45,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -57,6 +59,7 @@ public class AgentLoopImpl implements AgentLoop {
     private ChatClient chatClient;
     private final ToolGuardProperties toolGuardProperties;
     private final ToolConfigService toolConfigService;
+    private List<ToolCallback> allWrappedCallbacks;
 
     @Resource
     private UserRepository userRepository;
@@ -116,14 +119,14 @@ public class AgentLoopImpl implements AgentLoop {
                 log.info("已注册 MCP 工具: {}", (Object) toolCallbackProvider.getToolCallbacks());
             }
 
-            this.chatClient = ChatClient.builder(chatModel)
-                    .defaultToolCallbacks(wrappedCallbacks.toArray(new ToolCallback[0]))
-                    .build();
+            this.allWrappedCallbacks = wrappedCallbacks;
+            this.chatClient = ChatClient.builder(chatModel).build();
 
             toolConfigService.initDefaults(toolNames);
             log.info("工具拦截器已包装，共 {} 个工具: {}", toolNames.size(), toolNames);
         } catch (Exception e) {
             log.error("工具初始化失败，回退到直接注册", e);
+            this.allWrappedCallbacks = List.of();
             ChatClient.Builder builder = ChatClient.builder(chatModel)
                     .defaultTools(fileReadTool, fileWriteTool, fileListTool,
                             financialCalcTool, financialDataTool, sqlTool, webFetchTool);
@@ -163,8 +166,17 @@ public class AgentLoopImpl implements AgentLoop {
                 .toolContext(toolCtx)
                 .build();
 
+        Set<String> enabledNames = toolConfigService.listAll().entrySet().stream()
+                .filter(Map.Entry::getValue)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
+        List<ToolCallback> enabledTools = allWrappedCallbacks.stream()
+                .filter(cb -> enabledNames.contains(cb.getToolDefinition().name()))
+                .toList();
+
         String response = chatClient.prompt()
                 .messages(context.toArray(new Message[0]))
+                .tools(enabledTools.toArray(new ToolCallback[0]))
                 .options(options)
                 .call()
                 .content();
@@ -206,8 +218,17 @@ public class AgentLoopImpl implements AgentLoop {
                 .toolContext(streamToolCtx)
                 .build();
 
+        Set<String> enabledNames = toolConfigService.listAll().entrySet().stream()
+                .filter(Map.Entry::getValue)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
+        List<ToolCallback> enabledTools = allWrappedCallbacks.stream()
+                .filter(cb -> enabledNames.contains(cb.getToolDefinition().name()))
+                .toList();
+
         return chatClient.prompt()
                 .messages(context.toArray(new Message[0]))
+                .tools(enabledTools.toArray(new ToolCallback[0]))
                 .options(options)
                 .stream()
                 .content()
