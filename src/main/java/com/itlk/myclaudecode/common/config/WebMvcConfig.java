@@ -25,6 +25,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/index.html",
                         "/admin.html",
                         "/favicon.ico",
+                        "/logo1.png",
                         "/error",
                         "/assets/**"
                 );
@@ -33,6 +34,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         registry.addResourceHandler("/admin.html")
+                .addResourceLocations("classpath:/admin/");
+        registry.addResourceHandler("/logo1.png")
                 .addResourceLocations("classpath:/admin/");
         registry.addResourceHandler("/**")
                 .addResourceLocations("classpath:/static/");
