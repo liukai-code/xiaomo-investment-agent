@@ -1,0 +1,155 @@
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { getQrCode, getQrCodeState } from '@/api/yangjibao'
+import { X, Loader2 } from 'lucide-vue-next'
+
+const emit = defineEmits<{
+  success: [token: string]
+  close: []
+}>()
+
+const qrUrl = ref('')
+const qrId = ref('')
+const loading = ref(true)
+const error = ref('')
+let timer: ReturnType<typeof setInterval> | null = null
+
+const qrImgSrc = computed(() => {
+  if (!qrUrl.value) return ''
+  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUrl.value)}`
+})
+
+onMounted(async () => {
+  try {
+    const qr = await getQrCode()
+    qrUrl.value = qr.url
+    qrId.value = qr.id
+    loading.value = false
+
+    timer = setInterval(async () => {
+      try {
+        const state = await getQrCodeState(qrId.value)
+        console.log('[YJB] 扫码状态:', state)
+        if (state.state === 2 && state.token) {
+          console.log('[YJB] 扫码成功, token:', state.token)
+          if (timer) clearInterval(timer)
+          timer = null
+          emit('success', state.token)
+        }
+      } catch (e) {
+        console.error('[YJB] 轮询异常:', e)
+      }
+    }, 2000)
+  } catch (e: any) {
+    error.value = '获取二维码失败，请重试'
+    loading.value = false
+  }
+})
+
+onUnmounted(() => {
+  if (timer) {
+    clearInterval(timer)
+    timer = null
+  }
+})
+
+function handleClose() {
+  emit('close')
+}
+</script>
+
+<template>
+  <div class="modal-overlay" @click.self="handleClose">
+    <div class="modal-box yjb-qr-modal">
+      <div class="modal-header">
+        <div class="modal-title">扫码登录养基宝</div>
+        <button class="close-btn" @click="handleClose">
+          <X :size="18" />
+        </button>
+      </div>
+      <div class="qr-content">
+        <div v-if="loading" class="qr-loading">
+          <Loader2 :size="32" class="spin" />
+          <span>获取二维码中...</span>
+        </div>
+        <div v-else-if="error" class="qr-error">{{ error }}</div>
+        <template v-else>
+          <img :src="qrImgSrc" alt="登录二维码" class="qr-img" />
+          <div class="qr-tip">请使用微信扫码登录</div>
+        </template>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.yjb-qr-modal {
+  width: 320px;
+  padding: 0;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.close-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.qr-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 20px;
+}
+
+.qr-img {
+  width: 200px;
+  height: 200px;
+  border-radius: 8px;
+}
+
+.qr-tip {
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.qr-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 0;
+  color: var(--text-dim);
+}
+
+.qr-error {
+  padding: 40px 0;
+  color: var(--red);
+  font-size: 14px;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+</style>

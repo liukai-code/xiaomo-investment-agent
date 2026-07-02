@@ -7,11 +7,15 @@ import { streamChat, streamDeepAnalysis, type WorkflowEvent } from '@/api/chat'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
 import WorkflowPanel from '@/components/workflow/WorkflowPanel.vue'
 import { useRafThrottle } from '@/composables/useMarkdownBlocks'
-import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next'
+import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen, Landmark } from 'lucide-vue-next'
+import { useYangjibaoStore } from '@/stores/yangjibao'
+import YjbQrLogin from '@/components/yangjibao/YjbQrLogin.vue'
+import YjbPanel from '@/components/yangjibao/YjbPanel.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const chatStore = useChatStore()
+const yjbStore = useYangjibaoStore()
 
 const messagesEl = ref<HTMLDivElement>()
 const inputEl = ref<HTMLTextAreaElement>()
@@ -323,6 +327,9 @@ onUnmounted(() => {
           <span class="title">{{ currentTitle }}</span>
         </div>
         <div class="header-right">
+          <button class="user-avatar-btn" @click.stop="yjbStore.openPanel()" title="养基宝持仓">
+            <Landmark :size="20" />
+          </button>
           <div class="user-menu-wrapper">
             <button class="user-avatar-btn" @click.stop="showUserMenu = !showUserMenu">
               <User :size="20" />
@@ -409,6 +416,9 @@ onUnmounted(() => {
         </div>
       </template>
     </div>
+
+    <!-- 养基宝右侧面板 -->
+    <YjbPanel v-if="yjbStore.panelVisible" />
   </div>
 
   <!-- 删除确认弹窗 -->
@@ -422,5 +432,11 @@ onUnmounted(() => {
       </div>
     </div>
   </div>
+  <!-- 养基宝二维码登录弹窗 -->
+  <YjbQrLogin
+    v-if="yjbStore.qrModalVisible"
+    @success="yjbStore.onQrLoginSuccess"
+    @close="yjbStore.qrModalVisible = false"
+  />
   </div>
 </template>
