@@ -1,0 +1,45 @@
+/* ========== Login Page Dark Theme ========== */
+.login-page {
+  --login-bg-primary: #08172F;
+  --login-bg-secondary: #0C2245;
+  --login-bg-tertiary: #102E66;
+  --login-glow-blue: #1a5fff;
+  --login-glow-cyan: #00d4ff;
+  --login-glow-purple: #7c3aed;
+  --login-card-bg: rgba(255, 255, 255, 0.08);
+  --login-card-border: rgba(255, 255, 255, 0.12);
+  --login-text: #e2e8f0;
+  --login-text-dim: rgba(148, 163, 184, 0.7);
+  --login-accent: #3b82f6;
+  --login-accent-glow: rgba(59, 130, 246, 0.4);
+  --login-input-bg: rgba(255, 255, 255, 0.06);
+  --login-input-border: rgba(255, 255, 255, 0.1);
+  --login-input-focus-border: #3b82f6;
+  --login-success: #22c55e;
+  --login-danger: #ef4444;
+}
+
+/* Shared keyframes for login page layers */
+@keyframes loginFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes loginFadeSlideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes loginSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes loginSweepLight {
+  from { left: -100%; }
+  to { left: 200%; }
+}
+
+@keyframes loginOrbitRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

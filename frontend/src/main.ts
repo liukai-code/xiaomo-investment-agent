@@ -5,6 +5,7 @@ import router from './router'
 
 import 'katex/dist/katex.min.css'
 import './styles/variables.css'
+import './styles/login.css'
 import './styles/markdown.css'
 
 const app = createApp(App)
