@@ -805,7 +805,7 @@ body {
 
 .auth-field input {
   width: 100%;
-  padding: 16px 16px 8px;
+  padding: 24px 16px 8px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -834,7 +834,7 @@ body {
 
 .auth-field input:focus + label,
 .auth-field input.has-value + label {
-  top: 10px;
+  top: 6px;
   transform: translateY(0);
   font-size: 11px;
   color: var(--accent);
@@ -885,6 +885,15 @@ body {
 /* 错误消息 */
 .auth-error {
   color: var(--danger);
+  font-size: 13px;
+  min-height: 20px;
+  margin-bottom: 4px;
+  animation: auth-fade-in 0.2s ease;
+}
+
+/* 成功消息 */
+.auth-success {
+  color: var(--green);
   font-size: 13px;
   min-height: 20px;
   margin-bottom: 4px;

@@ -14,6 +14,7 @@ const activeTab = ref<'login' | 'register'>('login')
 const loginUsername = ref('')
 const loginPassword = ref('')
 const loginError = ref('')
+const loginMsgType = ref<'error' | 'success'>('error')
 const regUsername = ref('')
 const regPassword = ref('')
 const regPassword2 = ref('')
@@ -22,11 +23,13 @@ const regError = ref('')
 function switchTab(tab: 'login' | 'register') {
   activeTab.value = tab
   loginError.value = ''
+  loginMsgType.value = 'error'
   regError.value = ''
 }
 
 async function handleLogin() {
   loginError.value = ''
+  loginMsgType.value = 'error'
   const result = await authStore.login(loginUsername.value.trim(), loginPassword.value)
   if (result.success) {
     router.push('/')
@@ -45,6 +48,7 @@ async function handleRegister() {
   if (result.success) {
     switchTab('login')
     loginUsername.value = regUsername.value.trim()
+    loginMsgType.value = 'success'
     loginError.value = '注册成功，请登录'
   } else {
     regError.value = result.msg || '注册失败'
@@ -106,7 +110,7 @@ async function handleRegister() {
               />
               <label>密码</label>
             </div>
-            <div class="auth-error">{{ loginError }}</div>
+            <div :class="loginMsgType === 'success' ? 'auth-success' : 'auth-error'">{{ loginError }}</div>
             <button type="submit" class="auth-submit" :disabled="authStore.loading">
               <span v-if="authStore.loading" class="spinner"></span>
               {{ authStore.loading ? '登录中...' : '登 录' }}
