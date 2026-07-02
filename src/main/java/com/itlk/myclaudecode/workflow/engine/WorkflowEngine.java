@@ -20,7 +20,8 @@ public class WorkflowEngine {
                     log.info("工作流进入节点: {}", node.name());
                     state.setCurrentPhase(node.name());
                     sink.tryEmitNext(WorkflowEvent.phaseStart(node.name()));
-                    return node.execute(state, sink);
+                    return node.execute(state, sink)
+                            .doOnComplete(() -> sink.tryEmitNext(WorkflowEvent.phaseComplete(node.name())));
                 })
                 .doOnComplete(() -> {
                     log.info("工作流执行完成");

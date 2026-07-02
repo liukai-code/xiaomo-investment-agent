@@ -4,8 +4,8 @@ import com.itlk.myclaudecode.agent.config.ToolGuardProperties;
 import com.itlk.myclaudecode.tool.FileListTool;
 import com.itlk.myclaudecode.tool.FileReadTool;
 import com.itlk.myclaudecode.tool.FileWriteTool;
-import com.itlk.myclaudecode.tool.FinancialCalcTool;
-import com.itlk.myclaudecode.tool.FinancialDataTool;
+import com.itlk.myclaudecode.tool.FinancialCalcRouterTool;
+import com.itlk.myclaudecode.tool.FinancialDataRouterTool;
 import com.itlk.myclaudecode.tool.SqlTool;
 import com.itlk.myclaudecode.tool.WebFetchTool;
 import com.itlk.myclaudecode.tool.config.ToolConfigService;
@@ -41,8 +41,8 @@ public class WorkflowAgentFactory {
             FileReadTool fileReadTool,
             FileWriteTool fileWriteTool,
             FileListTool fileListTool,
-            FinancialCalcTool financialCalcTool,
-            FinancialDataTool financialDataTool,
+            FinancialCalcRouterTool financialCalcRouterTool,
+            FinancialDataRouterTool financialDataRouterTool,
             SqlTool sqlTool,
             WebFetchTool webFetchTool,
             ToolCallbackProvider mcpProvider,
@@ -56,7 +56,7 @@ public class WorkflowAgentFactory {
         // 复用 AgentLoopImpl 相同的工具注册模式
         ToolCallbackProvider provider = MethodToolCallbackProvider.builder()
                 .toolObjects(fileReadTool, fileWriteTool, fileListTool,
-                        financialCalcTool, financialDataTool, sqlTool, webFetchTool)
+                        financialCalcRouterTool, financialDataRouterTool, sqlTool, webFetchTool)
                 .build();
 
         List<ToolCallback> callbacks = new ArrayList<>();
