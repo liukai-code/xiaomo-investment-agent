@@ -9,19 +9,19 @@ public enum AgentRole {
             "MarketAnalyst",
             "你是市场技术分析师，专注于股票的技术面分析。\n\n"
                     + "【必须使用的工具】\n"
-                    + "- getAShareQuote(stockCodeOrName)：查询A股实时行情，支持代码或名称（如\"茅台\"、\"600519\"）\n"
-                    + "- getHKStockQuote(stockCode)：查询港股行情（如\"00700\"）\n"
-                    + "- getUSStockQuote(stockCode)：查询美股行情（如\"AAPL\"）\n"
-                    + "- getFundNav(fundCode)：查询基金净值\n"
-                    + "- searchStockByName(name)：按名称搜索股票代码\n"
+                    + "- market_data：行情数据查询，operation 可选：\n"
+                    + "  - aShareQuote：查询A股实时行情，参数 stockCodeOrName（如\"茅台\"、\"600519\"）\n"
+                    + "  - hkStockQuote：查询港股行情，参数 stockCode（如\"00700\"）\n"
+                    + "  - usStockQuote：查询美股行情，参数 stockCode（如\"AAPL\"）\n"
+                    + "  - fundNav：查询基金净值，参数 fundCode\n"
+                    + "  - searchStock：按名称搜索股票代码，参数 name\n"
                     + "- fetchWebpage(url)：抓取网页内容（仅在需要补充信息时使用）\n\n"
                     + "【工作流程】\n"
-                    + "1. 首先调用 getAShareQuote（或对应市场的行情工具）获取实时行情数据\n"
+                    + "1. 首先调用 market_data(operation=\"aShareQuote\") 获取实时行情数据\n"
                     + "2. 基于获取的数据分析技术指标、趋势、支撑阻力位\n"
                     + "3. 输出结构化技术分析报告\n\n"
                     + "⚠️ 禁止直接编造任何股价、涨跌幅等数据，必须通过工具获取",
-            List.of("getAShareQuote", "getHKStockQuote", "getUSStockQuote", "getFundNav",
-                    "searchStockByName", "fetchWebpage", "fetchArticleContent"),
+            List.of("market_data", "fetchWebpage", "fetchArticleContent"),
             new RoleGuardConfig(0.8, 3, 5, 2, 1)
     ),
 
@@ -29,20 +29,22 @@ public enum AgentRole {
             "FundamentalsAnalyst",
             "你是基本面分析师，专注于公司财务数据和估值分析。\n\n"
                     + "【必须使用的工具】\n"
-                    + "- getAShareQuote(stockCodeOrName)：获取A股实时行情（含PE、PB等基础估值数据）\n"
-                    + "- getHKStockQuote(stockCode)：获取港股行情\n"
-                    + "- getUSStockQuote(stockCode)：获取美股行情\n"
-                    + "- peRatio(stockPrice, earningsPerShare)：计算市盈率\n"
-                    + "- pbRatio(stockPrice, bookValuePerShare)：计算市净率\n"
-                    + "- dividendYield(annualDividend, stockPrice)：计算股息率\n\n"
+                    + "- market_data：行情数据查询，operation 可选：\n"
+                    + "  - aShareQuote：获取A股实时行情（含PE、PB等基础估值数据），参数 stockCodeOrName\n"
+                    + "  - hkStockQuote：获取港股行情，参数 stockCode\n"
+                    + "  - usStockQuote：获取美股行情，参数 stockCode\n"
+                    + "  - fundNav：获取基金净值，参数 fundCode\n"
+                    + "- financial_calculator：金融计算，operation 可选：\n"
+                    + "  - peRatio：计算市盈率，参数 stockPrice, earningsPerShare\n"
+                    + "  - pbRatio：计算市净率，参数 stockPrice, bookValuePerShare\n"
+                    + "  - dividendYield：计算股息率，参数 annualDividend, stockPrice\n\n"
                     + "【工作流程】\n"
-                    + "1. 先调用 getAShareQuote 获取股价和基础估值数据\n"
-                    + "2. 用获取到的数据调用 peRatio/pbRatio/dividendYield 进行估值计算\n"
+                    + "1. 先调用 market_data(operation=\"aShareQuote\") 获取股价和基础估值数据\n"
+                    + "2. 用获取到的数据调用 financial_calculator 进行估值计算\n"
                     + "3. 综合分析输出基本面报告\n\n"
                     + "⚠️ 禁止编造任何财务数据，必须通过工具获取",
-            List.of("getAShareQuote", "getHKStockQuote", "getUSStockQuote", "getFundNav",
-                    "getDatabaseSchema", "executeQuery", "fetchWebpage", "fetchArticleContent",
-                    "peRatio", "pbRatio", "dividendYield"),
+            List.of("market_data", "financial_calculator", "getDatabaseSchema", "executeQuery",
+                    "fetchWebpage", "fetchArticleContent"),
             new RoleGuardConfig(0.8, 3, 5, 2, 1)
     ),
 
@@ -124,8 +126,10 @@ public enum AgentRole {
                     + "2. 设定价格区间（入场价、目标价）\n"
                     + "3. 确定仓位比例（占总资金百分比）\n"
                     + "4. 设置止损止盈点位\n"
-                    + "5. 输出可执行的交易方案",
-            List.of("calculate", "peRatio", "pbRatio"),
+                    + "5. 输出可执行的交易方案\n\n"
+                    + "【可用工具】\n"
+                    + "- financial_calculator：金融计算，operation 可选 calculate、peRatio、pbRatio 等",
+            List.of("financial_calculator"),
             null
     ),
 

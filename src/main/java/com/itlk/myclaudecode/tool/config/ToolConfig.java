@@ -3,7 +3,9 @@ package com.itlk.myclaudecode.tool.config;
 import com.itlk.myclaudecode.tool.FileListTool;
 import com.itlk.myclaudecode.tool.FileReadTool;
 import com.itlk.myclaudecode.tool.FileWriteTool;
+import com.itlk.myclaudecode.tool.FinancialCalcRouterTool;
 import com.itlk.myclaudecode.tool.FinancialCalcTool;
+import com.itlk.myclaudecode.tool.FinancialDataRouterTool;
 import com.itlk.myclaudecode.tool.FinancialDataTool;
 import com.itlk.myclaudecode.tool.SqlTool;
 import com.itlk.myclaudecode.tool.WebFetchTool;
@@ -45,6 +47,16 @@ public class ToolConfig {
     @Bean
     public FinancialDataTool financialDataTool() {
         return new FinancialDataTool();
+    }
+
+    @Bean
+    public FinancialCalcRouterTool financialCalcRouterTool(FinancialCalcTool financialCalcTool) {
+        return new FinancialCalcRouterTool(financialCalcTool);
+    }
+
+    @Bean
+    public FinancialDataRouterTool financialDataRouterTool(FinancialDataTool financialDataTool) {
+        return new FinancialDataRouterTool(financialDataTool);
     }
 
     @Bean

@@ -14,8 +14,8 @@ import com.itlk.myclaudecode.tool.guard.RepetitionDetector;
 import com.itlk.myclaudecode.tool.guard.SearchSessionTracker;
 import com.itlk.myclaudecode.tool.FileReadTool;
 import com.itlk.myclaudecode.tool.FileWriteTool;
-import com.itlk.myclaudecode.tool.FinancialCalcTool;
-import com.itlk.myclaudecode.tool.FinancialDataTool;
+import com.itlk.myclaudecode.tool.FinancialCalcRouterTool;
+import com.itlk.myclaudecode.tool.FinancialDataRouterTool;
 import com.itlk.myclaudecode.tool.SqlTool;
 import com.itlk.myclaudecode.tool.WebFetchTool;
 import jakarta.annotation.Resource;
@@ -83,8 +83,8 @@ public class AgentLoopImpl implements AgentLoop {
                          FileReadTool fileReadTool,
                          FileWriteTool fileWriteTool,
                          FileListTool fileListTool,
-                         FinancialCalcTool financialCalcTool,
-                         FinancialDataTool financialDataTool,
+                         FinancialCalcRouterTool financialCalcRouterTool,
+                         FinancialDataRouterTool financialDataRouterTool,
                          SqlTool sqlTool,
                          WebFetchTool webFetchTool,
                          ToolCallbackProvider toolCallbackProvider,
@@ -99,7 +99,7 @@ public class AgentLoopImpl implements AgentLoop {
         try {
             ToolCallbackProvider provider = MethodToolCallbackProvider.builder()
                     .toolObjects(fileReadTool, fileWriteTool, fileListTool,
-                            financialCalcTool, financialDataTool, sqlTool, webFetchTool)
+                            financialCalcRouterTool, financialDataRouterTool, sqlTool, webFetchTool)
                     .build();
             ToolCallback[] originalCallbacks = provider.getToolCallbacks();
             List<ToolCallback> wrappedCallbacks = new ArrayList<>();
@@ -129,7 +129,7 @@ public class AgentLoopImpl implements AgentLoop {
             this.allWrappedCallbacks = List.of();
             ChatClient.Builder builder = ChatClient.builder(chatModel)
                     .defaultTools(fileReadTool, fileWriteTool, fileListTool,
-                            financialCalcTool, financialDataTool, sqlTool, webFetchTool);
+                            financialCalcRouterTool, financialDataRouterTool, sqlTool, webFetchTool);
             if (toolCallbackProvider != null) {
                 builder.defaultToolCallbacks(toolCallbackProvider);
             }
