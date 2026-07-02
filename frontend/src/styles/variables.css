@@ -656,6 +656,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 16px;
+  padding-bottom: 180px;
   user-select: none;
 }
 
@@ -664,17 +665,22 @@ body {
   font-weight: 700;
   color: var(--text);
   letter-spacing: -0.5px;
+  animation: fadeInUp 0.5s ease-out;
 }
 
 .welcome-sub {
-  font-size: 15px;
-  color: var(--text-dim);
-  margin-bottom: 12px;
+  animation: fadeInUp 0.5s ease-out 0.1s both;
 }
 
 .welcome-input {
   width: 100%;
   max-width: 600px;
+  animation: fadeInUp 0.5s ease-out 0.2s both;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ========== Markdown ========== */

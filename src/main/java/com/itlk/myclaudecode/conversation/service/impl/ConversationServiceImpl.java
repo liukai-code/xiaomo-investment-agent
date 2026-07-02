@@ -22,9 +22,14 @@ public class ConversationServiceImpl implements ConversationService {
     @Override
     @Transactional
     public Conversation createConversation(Long userId, String title) {
+        String effectiveTitle = title != null ? title : "新对话";
+        Conversation existing = conversationRepository.findFirstByUserIdAndTitleOrderByUpdatedAtDesc(userId, effectiveTitle);
+        if (existing != null) {
+            return existing;
+        }
         Conversation conversation = new Conversation();
         conversation.setUserId(userId);
-        conversation.setTitle(title);
+        conversation.setTitle(effectiveTitle);
         Conversation saved = conversationRepository.save(conversation);
         cacheService.evictConversationList(userId);
         return saved;
