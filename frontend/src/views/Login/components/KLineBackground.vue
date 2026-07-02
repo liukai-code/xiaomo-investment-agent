@@ -82,11 +82,12 @@ function candleY(value: number): number {
 .kline-bg {
   position: fixed;
   left: 0;
-  top: 10%;
+  top: 35%;
   width: 100%;
   height: 70%;
   z-index: 2;
   opacity: 0.25;
+  filter: blur(4px);
   pointer-events: none;
   overflow: hidden;
   animation: loginFadeIn 1.5s ease-out 0.4s both;

@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
-const router = useRouter()
+const emit = defineEmits<{ 'login-success': [] }>()
 const authStore = useAuthStore()
 
 const activeTab = ref<'login' | 'register'>('login')
@@ -28,7 +27,7 @@ async function handleLogin() {
   loginMsgType.value = 'error'
   const result = await authStore.login(loginUsername.value.trim(), loginPassword.value)
   if (result.success) {
-    router.push('/')
+    emit('login-success')
   } else {
     loginError.value = result.msg || '登录失败'
   }
@@ -142,12 +141,12 @@ async function handleRegister() {
 .login-card {
   width: 100%;
   max-width: 400px;
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.045);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 20px;
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.25), 0 0 30px rgba(59, 130, 246, 0.08);
   padding: 40px;
   animation: loginFadeSlideUp 0.6s ease-out 0.6s both;
 }
@@ -183,8 +182,8 @@ async function handleRegister() {
 .login-field input {
   width: 100%;
   padding: 24px 16px 8px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   color: var(--login-text);
   font-size: 14px;
@@ -195,8 +194,8 @@ async function handleRegister() {
 }
 
 .login-field input:focus {
-  border-color: var(--login-accent);
-  box-shadow: 0 0 0 3px var(--login-accent-glow);
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 .login-field label {
