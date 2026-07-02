@@ -7,7 +7,7 @@ import { streamChat, streamDeepAnalysis, type WorkflowEvent } from '@/api/chat'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
 import WorkflowPanel from '@/components/workflow/WorkflowPanel.vue'
 import { useRafThrottle } from '@/composables/useMarkdownBlocks'
-import { Settings, LogOut, MoreHorizontal, User } from 'lucide-vue-next'
+import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -20,6 +20,7 @@ const statusText = ref('READY')
 const activeMenuConvId = ref<number | null>(null)
 const deleteConfirmConvId = ref<number | null>(null)
 const showUserMenu = ref(false)
+const sidebarCollapsed = ref(false)
 
 let abortController: AbortController | null = null
 
@@ -86,6 +87,10 @@ async function handleSwitchConversation(id: number) {
 async function handleLogout() {
   await authStore.logout()
   router.push('/login')
+}
+
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value
 }
 
 function handleInput() {
@@ -254,14 +259,19 @@ onUnmounted(() => {
   <div class="chat-bg">
   <div class="app">
     <!-- 侧边栏 -->
-    <div class="sidebar">
+    <div class="sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-header">
-        <div class="sidebar-brand">
-          <img src="/logo.png" alt="Logo" class="logo-img" />
-          <div class="logo-text">
-            <div class="logo-title">小墨</div>
-            <div class="logo-sub">Financial Agent</div>
+        <div class="sidebar-header-top">
+          <div class="sidebar-brand">
+            <img src="/logo.png" alt="Logo" class="logo-img" />
+            <div class="logo-text">
+              <div class="logo-title">小墨</div>
+              <div class="logo-sub">Financial Agent</div>
+            </div>
           </div>
+          <button class="sidebar-collapse-btn" @click="toggleSidebar" title="折叠侧边栏">
+            <PanelLeftClose :size="18" />
+          </button>
         </div>
         <button class="new-chat-btn" @click="handleCreateConversation()">
           + 新对话
@@ -306,6 +316,9 @@ onUnmounted(() => {
     <div class="chat-container">
       <div class="chat-header">
         <div class="left">
+          <button v-if="sidebarCollapsed" class="sidebar-expand-btn" @click="toggleSidebar" title="展开侧边栏">
+            <PanelLeftOpen :size="18" />
+          </button>
           <span class="dot"></span>
           <span class="title">{{ currentTitle }}</span>
         </div>
