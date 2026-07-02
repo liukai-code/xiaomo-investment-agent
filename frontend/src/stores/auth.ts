@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { login as apiLogin, register as apiRegister, logout as apiLogout, getMe } from '@/api/auth'
+import { useChatStore } from './chat'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('token') || '')
@@ -63,6 +64,8 @@ export const useAuthStore = defineStore('auth', () => {
       // ignore
     }
     clearAuth()
+    const chatStore = useChatStore()
+    chatStore.reset()
   }
 
   async function checkAuth() {

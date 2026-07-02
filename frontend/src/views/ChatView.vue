@@ -67,7 +67,8 @@ function scrollToBottomIfNear() {
 }
 
 async function handleCreateConversation() {
-  await chatStore.createConversation()
+  chatStore.currentConvId = null
+  chatStore.messages = []
 }
 
 async function handleSwitchConversation(id: number) {

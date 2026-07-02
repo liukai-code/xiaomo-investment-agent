@@ -102,6 +102,13 @@ export const useChatStore = defineStore('chat', () => {
     return false
   }
 
+  function reset() {
+    conversations.value = []
+    currentConvId.value = null
+    messages.value = []
+    isGenerating.value = false
+  }
+
   return {
     conversations,
     currentConvId,
@@ -116,5 +123,6 @@ export const useChatStore = defineStore('chat', () => {
     generateTitle,
     getCurrentConversation,
     deleteConversation,
+    reset,
   }
 })
