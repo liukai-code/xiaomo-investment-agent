@@ -7,7 +7,7 @@ import { streamChat, streamDeepAnalysis, type WorkflowEvent } from '@/api/chat'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
 import WorkflowPanel from '@/components/workflow/WorkflowPanel.vue'
 import { useRafThrottle } from '@/composables/useMarkdownBlocks'
-import { Settings, LogOut } from 'lucide-vue-next'
+import { Settings, LogOut, MoreHorizontal } from 'lucide-vue-next'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -280,7 +280,7 @@ onUnmounted(() => {
             <div class="conv-time">{{ formatTime(conv.updatedAt) }}</div>
           </div>
           <div class="conv-actions">
-            <button class="conv-action-btn" @click="toggleMenu(conv.id, $event)">···</button>
+            <button class="conv-action-btn" @click="toggleMenu(conv.id, $event)"><MoreHorizontal :size="18" /></button>
             <div v-if="activeMenuConvId === conv.id" class="conv-menu" @click.stop>
               <div class="conv-menu-item conv-menu-item--danger" @click="handleDeleteConversation(conv.id)">删除</div>
             </div>
