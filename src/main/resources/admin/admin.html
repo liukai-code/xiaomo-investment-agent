@@ -251,6 +251,83 @@
         .tool-status.on { background: rgba(34, 197, 94, 0.1); color: #4ADE80; }
         .tool-status.off { background: rgba(239, 68, 68, 0.1); color: #F87171; }
 
+        .router-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 1px 6px;
+            border-radius: 4px;
+            background: rgba(99, 102, 241, 0.15);
+            color: #A5B4FC;
+            letter-spacing: 0.5px;
+        }
+
+        .tool-card.router-card {
+            flex-direction: column;
+            align-items: stretch;
+            cursor: pointer;
+        }
+        .tool-card.router-card .tool-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+        .tool-card.router-card .tool-header .tool-info { flex: 1; min-width: 0; }
+
+        .router-ops {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, margin 0.3s ease-out;
+            margin-top: 0;
+        }
+        .tool-card.router-card.expanded .router-ops {
+            max-height: 600px;
+            margin-top: 14px;
+        }
+        .router-ops-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 6px;
+        }
+        .router-op-item {
+            font-size: 12px;
+            font-family: var(--font-mono);
+            color: var(--text-secondary);
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .router-op-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .router-op-desc {
+            font-family: var(--font-sans);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .expand-arrow {
+            width: 20px;
+            height: 20px;
+            color: var(--text-muted);
+            transition: transform 0.25s ease-out;
+            flex-shrink: 0;
+        }
+        .tool-card.router-card.expanded .expand-arrow {
+            transform: rotate(90deg);
+        }
+        .tool-card.router-card {
+            grid-column: span 2;
+        }
+        @media (max-width: 640px) {
+            .tool-card.router-card { grid-column: span 1; }
+        }
+
         /* Toggle switch */
         .toggle {
             position: relative;
@@ -508,35 +585,39 @@
         const toastContainer = document.getElementById('toastContainer');
 
         const TOOL_META = {
-            'calculate':              { desc: '数学表达式计算', group: 'calc' },
-            'compoundInterest':       { desc: '复利终值计算', group: 'calc' },
-            'simpleInterest':         { desc: '单利终值计算', group: 'calc' },
-            'annualizedReturn':       { desc: '年化收益率换算', group: 'calc' },
-            'dcaReturn':              { desc: '定投收益计算', group: 'calc' },
-            'compoundDca':            { desc: '复利+定投综合计算', group: 'calc' },
-            'ruleOf72':               { desc: '72法则翻倍估算', group: 'calc' },
-            'peRatio':                { desc: '市盈率计算', group: 'calc' },
-            'pbRatio':                { desc: '市净率计算', group: 'calc' },
-            'dividendYield':          { desc: '股息率计算', group: 'calc' },
-            'loanPayment':            { desc: '等额本息月供计算', group: 'calc' },
-            'npv':                    { desc: '净现值评估', group: 'calc' },
-            'irr':                    { desc: '内部收益率计算', group: 'calc' },
-            'bondPrice':              { desc: '债券定价', group: 'calc' },
-            'bondYtm':                { desc: '债券到期收益率', group: 'calc' },
-            'retirementTarget':       { desc: '退休本金估算', group: 'calc' },
-            'withdrawalPlan':         { desc: '定额提取计划', group: 'calc' },
-            'sharpeRatio':            { desc: '夏普比率风险调整', group: 'calc' },
-            'maxDrawdown':            { desc: '最大回撤计算', group: 'calc' },
-            'cagr':                   { desc: '复合年增长率', group: 'calc' },
-            'totalReturn':            { desc: '总收益率计算', group: 'calc' },
-            'inflationAdjusted':      { desc: '通胀调整购买力', group: 'calc' },
-            'getAShareQuote':         { desc: '沪深A股实时行情', group: 'market' },
-            'getHKStockQuote':        { desc: '港股实时行情', group: 'market' },
-            'getUSStockQuote':        { desc: '美股实时行情', group: 'market' },
-            'getFundNav':             { desc: '基金净值查询', group: 'market' },
-            'searchStockByName':      { desc: '按名称搜索股票', group: 'market' },
+            'financial_calculator':   { desc: '金融计算器', group: 'calc', router: true, operations: [
+                { name: 'calculate',            desc: '数学表达式计算' },
+                { name: 'compoundInterest',     desc: '复利终值计算' },
+                { name: 'simpleInterest',       desc: '单利终值计算' },
+                { name: 'annualizedReturn',     desc: '年化收益率换算' },
+                { name: 'dcaReturn',            desc: '定投收益计算' },
+                { name: 'compoundDca',          desc: '复利+定投综合计算' },
+                { name: 'ruleOf72',             desc: '72法则翻倍估算' },
+                { name: 'peRatio',              desc: '市盈率计算' },
+                { name: 'pbRatio',              desc: '市净率计算' },
+                { name: 'dividendYield',        desc: '股息率计算' },
+                { name: 'loanPayment',          desc: '等额本息月供计算' },
+                { name: 'npv',                  desc: '净现值评估' },
+                { name: 'irr',                  desc: '内部收益率计算' },
+                { name: 'bondPrice',            desc: '债券定价' },
+                { name: 'bondYtm',              desc: '债券到期收益率' },
+                { name: 'retirementTarget',     desc: '退休本金估算' },
+                { name: 'withdrawalPlan',       desc: '定额提取计划' },
+                { name: 'sharpeRatio',          desc: '夏普比率风险调整' },
+                { name: 'maxDrawdown',          desc: '最大回撤计算' },
+                { name: 'cagr',                 desc: '复合年增长率' },
+                { name: 'totalReturn',          desc: '总收益率计算' },
+                { name: 'inflationAdjusted',    desc: '通胀调整购买力' },
+            ]},
+            'market_data':            { desc: '行情数据查询', group: 'market', router: true, operations: [
+                { name: 'aShareQuote',          desc: '沪深A股实时行情' },
+                { name: 'hkStockQuote',         desc: '港股实时行情' },
+                { name: 'usStockQuote',         desc: '美股实时行情' },
+                { name: 'fundNav',              desc: '基金净值查询' },
+                { name: 'searchStock',          desc: '按名称搜索股票代码' },
+            ]},
             'getDatabaseSchema':      { desc: '获取数据库表结构', group: 'data' },
-            'executeQuery':           { desc: 'SQL查询执行', group: 'data' },
+            'executeQuery':           { desc: 'SQL查询执行（只读SELECT）', group: 'data' },
             'fetchWebpage':           { desc: '网页内容抓取', group: 'web' },
             'fetchArticleContent':    { desc: '文章正文提取', group: 'web' },
             'bailian_web_search':     { desc: '百炼AI搜索引擎', group: 'web' },
@@ -588,26 +669,68 @@
                 const enabled = tools[name];
                 const meta = TOOL_META[name] || { desc: '', group: 'file' };
                 const icon = ICONS[meta.group] || ICONS.file;
-                html += `
-                    <div class="tool-card ${enabled ? 'enabled' : ''}" id="card-${name}">
-                        <div class="tool-info">
-                            <div class="tool-name-row">
-                                <div class="tool-icon">${icon}</div>
-                                <div class="tool-name">${name}</div>
+
+                if (meta.router) {
+                    const opsHtml = meta.operations.map(op =>
+                        `<div class="router-op-item">
+                            <span class="router-op-name">${op.name}</span>
+                            <span class="router-op-desc">${op.desc}</span>
+                        </div>`
+                    ).join('');
+                    html += `
+                        <div class="tool-card router-card ${enabled ? 'enabled' : ''}" id="card-${name}">
+                            <div class="tool-header">
+                                <div class="tool-info">
+                                    <div class="tool-name-row">
+                                        <div class="tool-icon">${icon}</div>
+                                        <div class="tool-name">${name}</div>
+                                        <span class="router-badge">Router</span>
+                                    </div>
+                                    ${meta.desc ? `<div class="tool-desc">${meta.desc}（${meta.operations.length} 种 operation）</div>` : ''}
+                                    <div class="tool-status ${enabled ? 'on' : 'off'}" id="status-${name}">${enabled ? '运行中' : '已停用'}</div>
+                                </div>
+                                <label class="toggle">
+                                    <input type="checkbox" ${enabled ? 'checked' : ''}
+                                        aria-label="切换 ${name}"
+                                        onchange="toggleTool('${name}', this.checked)">
+                                    <span class="toggle-track"></span>
+                                </label>
+                                <svg class="expand-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                             </div>
-                            ${meta.desc ? `<div class="tool-desc">${meta.desc}</div>` : ''}
-                            <div class="tool-status ${enabled ? 'on' : 'off'}" id="status-${name}">${enabled ? '运行中' : '已停用'}</div>
-                        </div>
-                        <label class="toggle">
-                            <input type="checkbox" ${enabled ? 'checked' : ''}
-                                aria-label="切换 ${name}"
-                                onchange="toggleTool('${name}', this.checked)">
-                            <span class="toggle-track"></span>
-                        </label>
-                    </div>`;
+                            <div class="router-ops">
+                                <div class="router-ops-grid">${opsHtml}</div>
+                            </div>
+                        </div>`;
+                } else {
+                    html += `
+                        <div class="tool-card ${enabled ? 'enabled' : ''}" id="card-${name}">
+                            <div class="tool-info">
+                                <div class="tool-name-row">
+                                    <div class="tool-icon">${icon}</div>
+                                    <div class="tool-name">${name}</div>
+                                </div>
+                                ${meta.desc ? `<div class="tool-desc">${meta.desc}</div>` : ''}
+                                <div class="tool-status ${enabled ? 'on' : 'off'}" id="status-${name}">${enabled ? '运行中' : '已停用'}</div>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" ${enabled ? 'checked' : ''}
+                                    aria-label="切换 ${name}"
+                                    onchange="toggleTool('${name}', this.checked)">
+                                <span class="toggle-track"></span>
+                            </label>
+                        </div>`;
+                }
             }
             html += '</div>';
             content.innerHTML = html;
+
+            // Bind expand/collapse on router cards
+            document.querySelectorAll('.tool-card.router-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    if (e.target.closest('.toggle')) return;
+                    card.classList.toggle('expanded');
+                });
+            });
         }
 
         function renderError(msg) {
