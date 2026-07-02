@@ -46,6 +46,12 @@ logging:
 server:
   port: 4545
 
+# WebFetch 代理配置（可选）
+webfetch:
+  proxy:
+    host: ${WEBFETCH_PROXY_HOST:}
+    port: ${WEBFETCH_PROXY_PORT:}
+
 # SQL Tool 配置
 sql-tool:
   default-max-rows: 100

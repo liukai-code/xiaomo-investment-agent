@@ -24,6 +24,12 @@ public class ToolConfig {
     @Value("${sql-tool.query-timeout-seconds:30}")
     private int sqlQueryTimeoutSeconds;
 
+    @Value("${webfetch.proxy.host:}")
+    private String webfetchProxyHost;
+
+    @Value("${webfetch.proxy.port:0}")
+    private int webfetchProxyPort;
+
     @Bean
     public FileReadTool fileReadTool() {
         return new FileReadTool();
@@ -66,6 +72,6 @@ public class ToolConfig {
 
     @Bean
     public WebFetchTool webFetchTool() {
-        return new WebFetchTool();
+        return new WebFetchTool(webfetchProxyHost, webfetchProxyPort);
     }
 }

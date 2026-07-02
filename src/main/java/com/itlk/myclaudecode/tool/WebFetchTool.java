@@ -11,6 +11,8 @@ import com.itlk.myclaudecode.tool.annotation.ToolBehavior;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.URI;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -23,15 +25,37 @@ public class WebFetchTool {
     private static final Pattern URL_PATTERN = Pattern.compile("^https?://.+");
     private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-    private final OkHttpClient okHttpClient;
+    private final OkHttpClient directClient;
+    private final OkHttpClient proxyClient;
+    private final boolean hasProxy;
 
     public WebFetchTool() {
-        this.okHttpClient = new OkHttpClient.Builder()
+        this(null, 0);
+    }
+
+    public WebFetchTool(String proxyHost, int proxyPort) {
+        this.directClient = new OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(15, TimeUnit.SECONDS)
                 .followRedirects(true)
                 .followSslRedirects(true)
                 .build();
+
+        if (proxyHost != null && !proxyHost.isBlank()) {
+            Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyHost, proxyPort));
+            this.proxyClient = new OkHttpClient.Builder()
+                    .connectTimeout(10, TimeUnit.SECONDS)
+                    .readTimeout(15, TimeUnit.SECONDS)
+                    .followRedirects(true)
+                    .followSslRedirects(true)
+                    .proxy(proxy)
+                    .build();
+            this.hasProxy = true;
+            log.info("[WebFetchTool] 已配置代理: {}:{}", proxyHost, proxyPort);
+        } else {
+            this.proxyClient = null;
+            this.hasProxy = false;
+        }
     }
 
     @ToolBehavior(deterministic = false, cacheable = false)
@@ -107,7 +131,19 @@ public class WebFetchTool {
                 .header("Accept-Encoding", "identity")
                 .build();
 
-        try (Response response = okHttpClient.newCall(request).execute()) {
+        if (hasProxy) {
+            try {
+                return executeRequest(proxyClient, request);
+            } catch (java.net.ConnectException e) {
+                log.warn("[WebFetchTool] 代理连接失败，回退直连: {}", e.getMessage());
+                return executeRequest(directClient, request);
+            }
+        }
+        return executeRequest(directClient, request);
+    }
+
+    private String executeRequest(OkHttpClient client, Request request) throws Exception {
+        try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 throw new RuntimeException("HTTP请求失败: " + response.code());
             }
