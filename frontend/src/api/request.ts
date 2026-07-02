@@ -19,7 +19,8 @@ request.interceptors.response.use(
     if (err.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('userId')
-      localStorage.removeItem('username')
+      localStorage.removeItem('email')
+      localStorage.removeItem('accountId')
       router.push('/login')
     }
     return Promise.reject(err)

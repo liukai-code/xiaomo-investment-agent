@@ -316,8 +316,8 @@ onUnmounted(() => {
             </button>
             <div v-if="showUserMenu" class="user-dropdown" @click.stop>
               <div class="user-dropdown-header">
-                <div class="user-dropdown-name">{{ authStore.username }}</div>
-                <div class="user-dropdown-id">ID: {{ authStore.userId }}</div>
+                <div class="user-dropdown-name">{{ authStore.accountId }}</div>
+                <div class="user-dropdown-id">{{ authStore.email }}</div>
               </div>
             </div>
           </div>

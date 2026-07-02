@@ -7,7 +7,8 @@ interface AuthResponse {
   data: {
     token: string
     userId: number
-    username: string
+    email: string
+    accountId: string
   }
 }
 
@@ -16,7 +17,8 @@ interface MeResponse {
   msg?: string
   data: {
     id: number
-    username: string
+    email: string
+    accountId: string
   }
 }
 
@@ -25,23 +27,24 @@ interface RegisterResponse {
   msg?: string
   data: {
     id: number
-    username: string
+    email: string
+    accountId: string
   }
 }
 
-export async function login(username: string, password: string) {
+export async function login(email: string, password: string) {
   const hashed = await sha256(password)
   const { data } = await request.post<AuthResponse>('/api/auth/login', {
-    username,
+    email,
     password: hashed,
   })
   return data
 }
 
-export async function register(username: string, password: string) {
+export async function register(email: string, password: string) {
   const hashed = await sha256(password)
   const { data } = await request.post<RegisterResponse>('/api/auth/register', {
-    username,
+    email,
     password: hashed,
   })
   return data

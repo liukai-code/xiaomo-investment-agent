@@ -6,11 +6,11 @@ const emit = defineEmits<{ 'login-success': [] }>()
 const authStore = useAuthStore()
 
 const activeTab = ref<'login' | 'register'>('login')
-const loginUsername = ref('')
+const loginEmail = ref('')
 const loginPassword = ref('')
 const loginError = ref('')
 const loginMsgType = ref<'error' | 'success'>('error')
-const regUsername = ref('')
+const regEmail = ref('')
 const regPassword = ref('')
 const regPassword2 = ref('')
 const regError = ref('')
@@ -25,7 +25,7 @@ function switchTab(tab: 'login' | 'register') {
 async function handleLogin() {
   loginError.value = ''
   loginMsgType.value = 'error'
-  const result = await authStore.login(loginUsername.value.trim(), loginPassword.value)
+  const result = await authStore.login(loginEmail.value.trim(), loginPassword.value)
   if (result.success) {
     emit('login-success')
   } else {
@@ -39,10 +39,10 @@ async function handleRegister() {
     regError.value = '两次密码不一致'
     return
   }
-  const result = await authStore.register(regUsername.value.trim(), regPassword.value)
+  const result = await authStore.register(regEmail.value.trim(), regPassword.value)
   if (result.success) {
     switchTab('login')
-    loginUsername.value = regUsername.value.trim()
+    loginEmail.value = regEmail.value.trim()
     loginMsgType.value = 'success'
     loginError.value = '注册成功，请登录'
   } else {
@@ -62,13 +62,13 @@ async function handleRegister() {
       <form v-if="activeTab === 'login'" key="login" class="login-form" @submit.prevent="handleLogin">
         <div class="login-field">
           <input
-            v-model="loginUsername"
-            type="text"
-            :class="{ 'has-value': loginUsername.length > 0 }"
-            autocomplete="username"
+            v-model="loginEmail"
+            type="email"
+            :class="{ 'has-value': loginEmail.length > 0 }"
+            autocomplete="email"
             required
           />
-          <label>用户名</label>
+          <label>邮箱</label>
         </div>
         <div class="login-field">
           <input
@@ -90,13 +90,13 @@ async function handleRegister() {
       <form v-else key="register" class="login-form" @submit.prevent="handleRegister">
         <div class="login-field">
           <input
-            v-model="regUsername"
-            type="text"
-            :class="{ 'has-value': regUsername.length > 0 }"
-            autocomplete="username"
+            v-model="regEmail"
+            type="email"
+            :class="{ 'has-value': regEmail.length > 0 }"
+            autocomplete="email"
             required
           />
-          <label>用户名</label>
+          <label>邮箱</label>
         </div>
         <div class="login-field">
           <input

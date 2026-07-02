@@ -85,6 +85,10 @@ Local dev: copy `application.yml.example` to `src/main/resources/application-loc
 ## API Endpoints
 
 Auth: `POST /api/auth/{register,login,logout}`, `GET /api/auth/me`
+- register/login 接收 `{email, password}`，register 返回 `{id, email, accountId}`，login 返回 `{token, userId, email, accountId}`
+- me 返回 `{id, email, accountId}`
+- 注册时自动生成唯一六位数字账号 `user_123456` 格式入库
+
 Agent: `GET/POST /agent/conversation/*`, `GET /agent/chat`, `GET /agent/chat/stream`
 Response: `{ code: 1|0, msg, data }`
 

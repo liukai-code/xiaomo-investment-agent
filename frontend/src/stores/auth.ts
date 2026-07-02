@@ -6,36 +6,42 @@ import { useChatStore } from './chat'
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('token') || '')
   const userId = ref(Number(localStorage.getItem('userId')) || 0)
-  const username = ref(localStorage.getItem('username') || '')
+  const email = ref(localStorage.getItem('email') || '')
+  const accountId = ref(localStorage.getItem('accountId') || '')
   const isAuthenticated = ref(false)
   const loading = ref(false)
 
-  function setAuth(t: string, uid: number, uname: string) {
+  function setAuth(t: string, uid: number, uemail: string, uaccountId: string) {
     token.value = t
     userId.value = uid
-    username.value = uname
+    email.value = uemail
+    accountId.value = uaccountId
     isAuthenticated.value = true
     localStorage.setItem('token', t)
     localStorage.setItem('userId', String(uid))
-    localStorage.setItem('username', uname)
+    localStorage.setItem('email', uemail)
+    localStorage.setItem('accountId', uaccountId)
   }
 
   function clearAuth() {
     token.value = ''
     userId.value = 0
-    username.value = ''
+    email.value = ''
+    accountId.value = ''
     isAuthenticated.value = false
     localStorage.removeItem('token')
     localStorage.removeItem('userId')
+    localStorage.removeItem('email')
+    localStorage.removeItem('accountId')
     localStorage.removeItem('username')
   }
 
-  async function login(uname: string, password: string) {
+  async function login(uemail: string, password: string) {
     loading.value = true
     try {
-      const res = await apiLogin(uname, password)
+      const res = await apiLogin(uemail, password)
       if (res.code === 1) {
-        setAuth(res.data.token, res.data.userId, res.data.username)
+        setAuth(res.data.token, res.data.userId, res.data.email, res.data.accountId)
         return { success: true }
       }
       return { success: false, msg: res.msg || '登录失败' }
@@ -44,10 +50,10 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function register(uname: string, password: string) {
+  async function register(uemail: string, password: string) {
     loading.value = true
     try {
-      const res = await apiRegister(uname, password)
+      const res = await apiRegister(uemail, password)
       if (res.code === 1) {
         return { success: true }
       }
@@ -73,6 +79,7 @@ export const useAuthStore = defineStore('auth', () => {
       isAuthenticated.value = false
       return false
     }
+    localStorage.removeItem('username')
     try {
       const res = await getMe()
       if (res.code === 1) {
@@ -87,5 +94,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, userId, username, isAuthenticated, loading, login, register, logout, checkAuth, clearAuth }
+  return { token, userId, email, accountId, isAuthenticated, loading, login, register, logout, checkAuth, clearAuth }
 })
