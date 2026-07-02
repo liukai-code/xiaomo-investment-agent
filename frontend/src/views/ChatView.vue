@@ -309,58 +309,77 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div ref="messagesEl" class="chat-messages">
-        <!-- 欢迎页 -->
-        <div v-if="chatStore.messages.length === 0" class="welcome">
-          <div class="logo">Financial Agent</div>
-          <div class="sub">AI 金融投资助手</div>
-          <div class="hint">
-            <kbd>Enter</kbd> 发送 &nbsp; <kbd>Shift+Enter</kbd> 换行
-          </div>
-        </div>
-
-        <!-- 消息列表 -->
-        <div
-          v-for="msg in chatStore.messages"
-          :key="msg.id"
-          class="message"
-          :class="msg.role === 'USER' ? 'user' : 'ai'"
-        >
-          <div class="msg-header">
-            <img v-if="msg.role !== 'USER'" src="/logo.png" alt="AI" class="msg-avatar" />
-            <div class="label">{{ msg.role === 'USER' ? 'YOU' : '小墨' }}</div>
-          </div>
-          <div class="bubble">
-            <template v-if="msg.role === 'USER'">{{ msg.content }}</template>
-            <template v-else>
-              <!-- 工作流面板：仅最后一条 AI 消息且处于工作流模式时显示 -->
-              <template v-if="isWorkflowMode && msg === chatStore.messages[chatStore.messages.length - 1] && workflowEvents.length > 0">
-                <WorkflowPanel :events="workflowEvents" :is-running="isWorkflowRunning" />
-              </template>
-              <template v-else>
-                <MarkdownRenderer
-                  :text="msg.content"
-                  :is-streaming="chatStore.isGenerating && msg === chatStore.messages[chatStore.messages.length - 1]"
-                />
-              </template>
-            </template>
-          </div>
-        </div>
-      </div>
-
-      <div class="chat-input-area">
-        <div class="chat-input">
+      <!-- 欢迎页：居中显示 -->
+      <div v-if="chatStore.messages.length === 0" class="welcome-page">
+        <div class="welcome-title">你好，我是小墨</div>
+        <div class="welcome-sub">你的 AI 金融投资助手，随时为你解答</div>
+        <div class="chat-input welcome-input">
           <textarea
             ref="inputEl"
             v-model="inputText"
             rows="1"
-            placeholder="输入你的问题..."
+            placeholder="有问题，尽管问"
             @input="handleInput"
             @keydown="handleKeydown"
           ></textarea>
-          <button :disabled="chatStore.isGenerating" @click="handleSend()">发送</button>
+          <button class="send-btn" :disabled="chatStore.isGenerating" @click="handleSend()" title="发送">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
         </div>
       </div>
+
+      <!-- 对话页：消息列表 + 底部输入 -->
+      <template v-else>
+        <div ref="messagesEl" class="chat-messages">
+          <div
+            v-for="msg in chatStore.messages"
+            :key="msg.id"
+            class="message"
+            :class="msg.role === 'USER' ? 'user' : 'ai'"
+          >
+            <div class="msg-header">
+              <img v-if="msg.role !== 'USER'" src="/logo.png" alt="AI" class="msg-avatar" />
+              <div class="label">{{ msg.role === 'USER' ? 'YOU' : '小墨' }}</div>
+            </div>
+            <div class="bubble">
+              <template v-if="msg.role === 'USER'">{{ msg.content }}</template>
+              <template v-else>
+                <template v-if="isWorkflowMode && msg === chatStore.messages[chatStore.messages.length - 1] && workflowEvents.length > 0">
+                  <WorkflowPanel :events="workflowEvents" :is-running="isWorkflowRunning" />
+                </template>
+                <template v-else>
+                  <MarkdownRenderer
+                    :text="msg.content"
+                    :is-streaming="chatStore.isGenerating && msg === chatStore.messages[chatStore.messages.length - 1]"
+                  />
+                </template>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-input-area">
+          <div class="chat-input">
+            <textarea
+              ref="inputEl"
+              v-model="inputText"
+              rows="1"
+              placeholder="有问题，尽管问"
+              @input="handleInput"
+              @keydown="handleKeydown"
+            ></textarea>
+            <button class="send-btn" :disabled="chatStore.isGenerating" @click="handleSend()" title="发送">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </template>
     </div>
   </div>
 

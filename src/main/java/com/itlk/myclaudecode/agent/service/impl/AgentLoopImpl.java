@@ -176,7 +176,7 @@ public class AgentLoopImpl implements AgentLoop {
 
         String response = chatClient.prompt()
                 .messages(context.toArray(new Message[0]))
-                .tools(enabledTools.toArray(new ToolCallback[0]))
+                .toolCallbacks(enabledTools.toArray(new ToolCallback[0]))
                 .options(options)
                 .call()
                 .content();
@@ -228,7 +228,7 @@ public class AgentLoopImpl implements AgentLoop {
 
         return chatClient.prompt()
                 .messages(context.toArray(new Message[0]))
-                .tools(enabledTools.toArray(new ToolCallback[0]))
+                .toolCallbacks(enabledTools.toArray(new ToolCallback[0]))
                 .options(options)
                 .stream()
                 .content()
