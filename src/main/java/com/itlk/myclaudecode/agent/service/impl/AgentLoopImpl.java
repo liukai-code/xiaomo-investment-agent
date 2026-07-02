@@ -153,6 +153,7 @@ public class AgentLoopImpl implements AgentLoop {
         toolCtx.put(MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold()));
         toolCtx.put(MaxToolCallManager.FETCH_SESSION_TRACKER_KEY, new FetchSessionTracker(toolGuardProperties.maxFetches(), toolGuardProperties.maxConsecutiveNoNewInfo()));
         toolCtx.put(MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY, new SearchSessionTracker(toolGuardProperties.maxSearchRounds()));
+        toolCtx.put(MaxToolCallManager.MAX_FETCHES_KEY, toolGuardProperties.maxFetches());
         toolCtx.put(MaxToolCallManager.DUPLICATE_CACHE_KEY, new LinkedHashMap<String, java.util.List<Message>>(16, 0.75f, true) {
             @Override
             protected boolean removeEldestEntry(Map.Entry<String, java.util.List<Message>> eldest) {
@@ -205,6 +206,7 @@ public class AgentLoopImpl implements AgentLoop {
         streamToolCtx.put(MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold()));
         streamToolCtx.put(MaxToolCallManager.FETCH_SESSION_TRACKER_KEY, new FetchSessionTracker(toolGuardProperties.maxFetches(), toolGuardProperties.maxConsecutiveNoNewInfo()));
         streamToolCtx.put(MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY, new SearchSessionTracker(toolGuardProperties.maxSearchRounds()));
+        streamToolCtx.put(MaxToolCallManager.MAX_FETCHES_KEY, toolGuardProperties.maxFetches());
         streamToolCtx.put(MaxToolCallManager.DUPLICATE_CACHE_KEY, new LinkedHashMap<String, java.util.List<Message>>(16, 0.75f, true) {
             @Override
             protected boolean removeEldestEntry(Map.Entry<String, java.util.List<Message>> eldest) {

@@ -15,6 +15,7 @@ public record GuardSignal(
         String toolName,
         boolean isFetchTool,
         int fetchCount,
+        int maxFetches,
         boolean isDuplicateUrl,
         int consecutiveNoNewInfo,
         boolean overMaxFetches,
@@ -65,7 +66,7 @@ public record GuardSignal(
             sb.append(", repeat=").append(repetition.name().toLowerCase());
         }
         if (isFetchTool) {
-            sb.append(", fetch=").append(fetchCount).append("/3");
+            sb.append(", fetch=").append(fetchCount).append("/").append(maxFetches);
         }
         sb.append("\n[/GUARD]");
         return sb.toString();
@@ -75,7 +76,7 @@ public record GuardSignal(
         switch (level) {
             case FORCE:
                 if (overMaxFetches) {
-                    return "已达到最大抓取次数(3次)，必须基于已有内容直接回答用户。不要再调用任何fetch工具。";
+                    return "已达到最大抓取次数(" + maxFetches + "次)，必须基于已有内容直接回答用户。不要再调用任何fetch工具。";
                 }
                 return "已达到硬上限，必须基于已有结果直接回答用户。";
             case CRITICAL:

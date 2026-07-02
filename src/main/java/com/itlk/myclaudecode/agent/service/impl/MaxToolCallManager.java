@@ -48,6 +48,7 @@ public class MaxToolCallManager implements ToolCallingManager {
     public static final String SEARCH_SESSION_TRACKER_KEY = "searchSessionTracker";
     public static final String DUPLICATE_CACHE_KEY = "duplicateCache";
     public static final String REPORT_COMPLETENESS_KEY = "reportCompleteness";
+    public static final String MAX_FETCHES_KEY = "maxFetches";
 
     private static final Set<String> FETCH_TOOL_NAMES = Set.of(
             "fetchArticleContent", "fetchWebpage"
@@ -93,6 +94,8 @@ public class MaxToolCallManager implements ToolCallingManager {
         SearchSessionTracker searchTracker = extractFromContext(prompt, SEARCH_SESSION_TRACKER_KEY, SearchSessionTracker.class);
         Map<String, List<Message>> duplicateCache = extractFromContext(prompt, DUPLICATE_CACHE_KEY, Map.class);
         ReportCompletenessChecker completenessChecker = extractFromContext(prompt, REPORT_COMPLETENESS_KEY, ReportCompletenessChecker.class);
+        Integer maxFetchesCtx = extractFromContext(prompt, MAX_FETCHES_KEY, Integer.class);
+        int maxFetches = maxFetchesCtx != null ? maxFetchesCtx : properties.maxFetches();
 
         int step = counter.incrementAndGet();
         AssistantMessage assistantWithTools = findAssistantWithToolCalls(chatResponse);
@@ -117,7 +120,7 @@ public class MaxToolCallManager implements ToolCallingManager {
                         step, properties.softLimit(), properties.maxIterations(),
                         properties.escalationWarning(), properties.escalationFinal(),
                         InfoGainLevel.UNKNOWN, 0.0, RepetitionResult.NONE, tc.name(),
-                        false, 0, false, 0, false, false);
+                        false, 0, maxFetches, false, 0, false, false);
                 return new GuardedToolExecutionResult(new CachedToolExecutionResult(skipHistory), signal);
             }
 
@@ -136,7 +139,7 @@ public class MaxToolCallManager implements ToolCallingManager {
                             properties.escalationWarning(), properties.escalationFinal(),
                             infoGain, infoGainTracker.getLastSimilarity(),
                             repetition, tc.name(),
-                            true, fetchTracker.getFetchCount(), true,
+                            true, fetchTracker.getFetchCount(), maxFetches, true,
                             0, false, false);
                     return new GuardedToolExecutionResult(new CachedToolExecutionResult(skipHistory), signal);
                 }
@@ -173,7 +176,7 @@ public class MaxToolCallManager implements ToolCallingManager {
                             properties.escalationWarning(), properties.escalationFinal(),
                             infoGain, infoGainTracker.getLastSimilarity(),
                             repetition, tc.name(),
-                            false, 0, false, 0, false, false);
+                            false, 0, maxFetches, false, 0, false, false);
                     return new GuardedToolExecutionResult(new CachedToolExecutionResult(limitHistory), signal);
                 }
             }
@@ -203,7 +206,7 @@ public class MaxToolCallManager implements ToolCallingManager {
                     properties.escalationWarning(), properties.escalationFinal(),
                     infoGain, infoGainTracker.getLastSimilarity(),
                     repetition, tc.name(),
-                    isFetchTool, fetchCount, isDuplicateUrl,
+                    isFetchTool, fetchCount, maxFetches, isDuplicateUrl,
                     consecutiveNoNewInfo, overMaxFetches, stuckNoNewInfo);
 
             log.info("[MaxToolCallManager] 信号: level={}, infoGain={}, repetition={}, shouldInject={}, fetch={}",

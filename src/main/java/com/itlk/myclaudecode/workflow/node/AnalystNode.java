@@ -88,6 +88,7 @@ public class AnalystNode implements WorkflowNode {
         toolCtx.put(MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(repetitionThreshold));
         toolCtx.put(MaxToolCallManager.FETCH_SESSION_TRACKER_KEY, new FetchSessionTracker(maxFetches, maxConsecutiveNoNewInfo));
         toolCtx.put(MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY, new SearchSessionTracker(maxSearchRounds));
+        toolCtx.put(MaxToolCallManager.MAX_FETCHES_KEY, maxFetches);
         toolCtx.put(MaxToolCallManager.DUPLICATE_CACHE_KEY, new LinkedHashMap<String, List<Message>>(16, 0.75f, true) {
             @Override
             protected boolean removeEldestEntry(Map.Entry<String, List<Message>> eldest) {
