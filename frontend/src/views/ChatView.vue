@@ -7,7 +7,7 @@ import { streamChat, streamDeepAnalysis, type WorkflowEvent } from '@/api/chat'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
 import WorkflowPanel from '@/components/workflow/WorkflowPanel.vue'
 import { useRafThrottle } from '@/composables/useMarkdownBlocks'
-import { Settings, LogOut, MoreHorizontal } from 'lucide-vue-next'
+import { Settings, LogOut, MoreHorizontal, User } from 'lucide-vue-next'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -19,6 +19,7 @@ const inputText = ref('')
 const statusText = ref('READY')
 const activeMenuConvId = ref<number | null>(null)
 const deleteConfirmConvId = ref<number | null>(null)
+const showUserMenu = ref(false)
 
 let abortController: AbortController | null = null
 
@@ -120,6 +121,7 @@ function cancelDelete() {
 
 function onDocumentClick() {
   closeMenu()
+  showUserMenu.value = false
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -308,6 +310,17 @@ onUnmounted(() => {
           <span class="title">{{ currentTitle }}</span>
         </div>
         <div class="header-right">
+          <div class="user-menu-wrapper">
+            <button class="user-avatar-btn" @click.stop="showUserMenu = !showUserMenu">
+              <User :size="20" />
+            </button>
+            <div v-if="showUserMenu" class="user-dropdown" @click.stop>
+              <div class="user-dropdown-header">
+                <div class="user-dropdown-name">{{ authStore.username }}</div>
+                <div class="user-dropdown-id">ID: {{ authStore.userId }}</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
