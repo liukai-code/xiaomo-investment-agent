@@ -7,6 +7,7 @@ import { streamChat, streamDeepAnalysis, type WorkflowEvent } from '@/api/chat'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
 import WorkflowPanel from '@/components/workflow/WorkflowPanel.vue'
 import { useRafThrottle } from '@/composables/useMarkdownBlocks'
+import { Settings, LogOut } from 'lucide-vue-next'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -289,11 +290,11 @@ onUnmounted(() => {
 
       <div class="sidebar-footer">
         <div class="footer-item" title="设置">
-          <span class="footer-icon">⚙</span>
+          <Settings :size="18" />
           <span class="footer-label">设置</span>
         </div>
         <div class="footer-item" @click="handleLogout()" title="退出登录">
-          <span class="footer-icon">⏻</span>
+          <LogOut :size="18" />
           <span class="footer-label">退出登录</span>
         </div>
       </div>

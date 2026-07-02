@@ -9,7 +9,7 @@
 ## Tech Stack
 
 - **Backend**: Java 17, Spring Boot 3.5, Spring AI 1.0 (Anthropic), Spring Data JPA + PostgreSQL, Spring Data Redis
-- **Frontend**: Vue 3, TypeScript, Vite 6, Pinia, Vue Router 4, marked + highlight.js, DOMPurify
+- **Frontend**: Vue 3, TypeScript, Vite 6, Pinia, Vue Router 4, lucide-vue-next, marked + highlight.js, DOMPurify
 - **Infra**: PostgreSQL, Redis, Docker (multi-stage build: Node 20 + JDK 17 + JRE 17)
 
 ## Build & Run
@@ -100,3 +100,4 @@ Response: `{ code: 1|0, msg, data }`
 - 统一响应体: `Result<T>`
 - 前端密码传输: 客户端 SHA-256 → 服务端 BCrypt
 - 流式输出: 后端 Flux 累积全文，前端 SSE 解析替换
+- 前端图标统一使用 `lucide-vue-next`，不使用其他图标库
