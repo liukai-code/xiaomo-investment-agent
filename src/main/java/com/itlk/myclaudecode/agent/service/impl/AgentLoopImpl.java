@@ -18,6 +18,7 @@ import com.itlk.myclaudecode.tool.FinancialCalcRouterTool;
 import com.itlk.myclaudecode.tool.FinancialDataRouterTool;
 import com.itlk.myclaudecode.tool.SqlTool;
 import com.itlk.myclaudecode.tool.WebFetchTool;
+import com.itlk.myclaudecode.tool.YangJiBaoTool;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
@@ -33,6 +34,7 @@ import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import com.itlk.myclaudecode.tool.config.ToolCallbackContextWrapper;
 import com.itlk.myclaudecode.tool.config.ToolConfigService;
 import com.itlk.myclaudecode.tool.config.ToolEnabledCheckWrapper;
 import org.springframework.transaction.annotation.Transactional;
@@ -87,6 +89,7 @@ public class AgentLoopImpl implements AgentLoop {
                          FinancialDataRouterTool financialDataRouterTool,
                          SqlTool sqlTool,
                          WebFetchTool webFetchTool,
+                         YangJiBaoTool yangJiBaoTool,
                          ToolCallbackProvider toolCallbackProvider,
                          ToolGuardProperties toolGuardProperties,
                          ToolConfigService toolConfigService,
@@ -99,7 +102,8 @@ public class AgentLoopImpl implements AgentLoop {
         try {
             ToolCallbackProvider provider = MethodToolCallbackProvider.builder()
                     .toolObjects(fileReadTool, fileWriteTool, fileListTool,
-                            financialCalcRouterTool, financialDataRouterTool, sqlTool, webFetchTool)
+                            financialCalcRouterTool, financialDataRouterTool, sqlTool, webFetchTool,
+                            yangJiBaoTool)
                     .build();
             ToolCallback[] originalCallbacks = provider.getToolCallbacks();
             List<ToolCallback> wrappedCallbacks = new ArrayList<>();
@@ -129,7 +133,8 @@ public class AgentLoopImpl implements AgentLoop {
             this.allWrappedCallbacks = List.of();
             ChatClient.Builder builder = ChatClient.builder(chatModel)
                     .defaultTools(fileReadTool, fileWriteTool, fileListTool,
-                            financialCalcRouterTool, financialDataRouterTool, sqlTool, webFetchTool);
+                            financialCalcRouterTool, financialDataRouterTool, sqlTool, webFetchTool,
+                            yangJiBaoTool);
             if (toolCallbackProvider != null) {
                 builder.defaultToolCallbacks(toolCallbackProvider);
             }
@@ -147,7 +152,11 @@ public class AgentLoopImpl implements AgentLoop {
 
         List<Message> context = buildContext(conversation.getId(), userId);
 
+        Long convId = conversation.getId();
+        YangJiBaoTool.setUserId(convId.toString(), userId);
+
         Map<String, Object> toolCtx = new HashMap<>();
+        toolCtx.put("conversationId", convId.toString());
         toolCtx.put(MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0));
         toolCtx.put(MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(toolGuardProperties.infoGainWindow(), toolGuardProperties.infoGainThreshold()));
         toolCtx.put(MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold()));
@@ -173,18 +182,23 @@ public class AgentLoopImpl implements AgentLoop {
                 .collect(Collectors.toSet());
         List<ToolCallback> enabledTools = allWrappedCallbacks.stream()
                 .filter(cb -> enabledNames.contains(cb.getToolDefinition().name()))
+                .<ToolCallback>map(cb -> new ToolCallbackContextWrapper(cb))
                 .toList();
 
-        String response = chatClient.prompt()
-                .messages(context.toArray(new Message[0]))
-                .toolCallbacks(enabledTools.toArray(new ToolCallback[0]))
-                .options(options)
-                .call()
-                .content();
+        try {
+            String response = chatClient.prompt()
+                    .messages(context.toArray(new Message[0]))
+                    .toolCallbacks(enabledTools.toArray(new ToolCallback[0]))
+                    .options(options)
+                    .call()
+                    .content();
 
-        String sanitized = sanitizeOutput(response);
-        chatMessageService.saveMessage(conversation, MessageRole.ASSISTANT, sanitized, null, null);
-        return sanitized;
+            String sanitized = sanitizeOutput(response);
+            chatMessageService.saveMessage(conversation, MessageRole.ASSISTANT, sanitized, null, null);
+            return sanitized;
+        } finally {
+            YangJiBaoTool.clearUserId(convId.toString());
+        }
     }
 
     @Override
@@ -197,10 +211,12 @@ public class AgentLoopImpl implements AgentLoop {
 
         List<Message> context = buildContext(conversation.getId(), userId);
         Long convId = conversation.getId();
+        YangJiBaoTool.setUserId(convId.toString(), userId);
 
         StringBuilder accumulated = new StringBuilder();
 
         Map<String, Object> streamToolCtx = new HashMap<>();
+        streamToolCtx.put("conversationId", convId.toString());
         streamToolCtx.put(MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0));
         streamToolCtx.put(MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(toolGuardProperties.infoGainWindow(), toolGuardProperties.infoGainThreshold()));
         streamToolCtx.put(MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold()));
@@ -226,6 +242,7 @@ public class AgentLoopImpl implements AgentLoop {
                 .collect(Collectors.toSet());
         List<ToolCallback> enabledTools = allWrappedCallbacks.stream()
                 .filter(cb -> enabledNames.contains(cb.getToolDefinition().name()))
+                .<ToolCallback>map(cb -> new ToolCallbackContextWrapper(cb))
                 .toList();
 
         return chatClient.prompt()
@@ -251,7 +268,8 @@ public class AgentLoopImpl implements AgentLoop {
                         chatMessageService.saveAssistantMessage(convId, partial);
                     }
                     return Flux.just("\n\n[" + errorMsg + "]");
-                });
+                })
+                .doFinally(signal -> YangJiBaoTool.clearUserId(convId.toString()));
     }
 
     @Override

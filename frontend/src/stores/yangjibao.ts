@@ -5,6 +5,7 @@ import {
   getAccountCollect,
   getFundHoldings,
   getIndexData,
+  syncHoldingsToBackend,
 } from '@/api/yangjibao'
 import type { UserAccount, AccountCollect, FundHoldItem, IndexData } from '@/types/yangjibao'
 
@@ -96,6 +97,8 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
       ])
       accountCollect.value = collect
       fundHoldings.value = holdings
+      // 异步同步到后端，供 Agent 分析使用
+      syncHoldingsToBackend(selectedAccountId.value, collect, holdings)
     } catch (err) {
       console.error('持仓数据加载失败', err)
     }

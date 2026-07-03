@@ -9,6 +9,8 @@ import com.itlk.myclaudecode.tool.FinancialDataRouterTool;
 import com.itlk.myclaudecode.tool.FinancialDataTool;
 import com.itlk.myclaudecode.tool.SqlTool;
 import com.itlk.myclaudecode.tool.WebFetchTool;
+import com.itlk.myclaudecode.tool.YangJiBaoTool;
+import com.itlk.myclaudecode.yjb.service.YjbService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -73,5 +75,10 @@ public class ToolConfig {
     @Bean
     public WebFetchTool webFetchTool() {
         return new WebFetchTool(webfetchProxyHost, webfetchProxyPort);
+    }
+
+    @Bean
+    public YangJiBaoTool yangJiBaoTool(YjbService yjbService) {
+        return new YangJiBaoTool(yjbService);
     }
 }

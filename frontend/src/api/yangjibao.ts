@@ -1,5 +1,6 @@
 import axios from 'axios'
 import CryptoJS from 'crypto-js'
+import request from './request'
 import type { QrCode, QrCodeState, UserAccount, AccountCollect, FundHoldItem, IndexData } from '@/types/yangjibao'
 
 const BASE_URL = '/yjb-api'
@@ -83,4 +84,20 @@ export async function getIndexData(): Promise<IndexData[]> {
   const resp = await marketClient.get('/market/v1/quote/index-data')
   const data = extractData<any>(resp)
   return Array.isArray(data) ? data : []
+}
+
+export async function syncHoldingsToBackend(
+  accountId: string,
+  accountCollect: AccountCollect,
+  holdings: FundHoldItem[],
+): Promise<void> {
+  try {
+    await request.post('/api/yjb/sync', {
+      accountId,
+      accountCollect,
+      holdings,
+    })
+  } catch (err) {
+    console.warn('[YJB] 同步持仓到后端失败（不影响前端展示）', err)
+  }
 }
