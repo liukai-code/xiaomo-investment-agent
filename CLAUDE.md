@@ -35,10 +35,11 @@ docker-compose up --build        # app + PostgreSQL + Redis
 src/main/java/com/itlk/myclaudecode/
 ├── agent/service/impl/AgentLoopImpl.java   # Core: AI chat loop, context management, tool registration
 ├── auth/                                    # Token auth (Redis-backed, 72h TTL, single-session)
-├── common/config/                           # WebMvcConfig, RedisConfig, McpKeepAliveService
+├── common/config/                           # WebMvcConfig, RedisConfig, McpKeepAliveService, HttpClientService
 ├── common/exception/                        # GlobalExceptionHandler
 ├── conversation/                            # Conversation + ChatMessage CRUD, Redis caching
-├── tool/                                    # 7 AI tools (see Tools section)
+├── tool/                                    # AI tools (see Tools section)
+│   └── astock/                              # A股数据工具集 (8 Router Tools + EastMoneyRateLimiter)
 └── user/                                    # User entity + repository
 
 frontend/src/
@@ -51,6 +52,8 @@ frontend/src/
 
 ## Tools (tool/ package)
 
+### 基础工具
+
 | Tool | Methods | Notes |
 |------|---------|-------|
 | FinancialCalcTool | 22 methods: compoundInterest, loanPayment, npv, irr, sharpeRatio 等 | BigDecimal 精度 |
@@ -61,6 +64,21 @@ frontend/src/
 | FileWriteTool | write_file, append_file | 限制项目目录 |
 | FileListTool | list_files | 支持递归和 glob |
 | MCP Tools | Baidu AI Search | via ToolCallbackProvider, 60s 保活 |
+
+### A股数据工具集 (tool/astock/)
+
+基于 [a-stock-data](docs/a-stock-data/) 移植，44个数据端点 → 8个Router Tool。东财接口统一走 `EastMoneyRateLimiter`（串行限流 ≥1s + 随机抖动）。
+
+| Tool | Operations | 数据源 |
+|------|-----------|--------|
+| AStockQuoteRouterTool | tencentQuote, baiduKline, mootdx*(TODO) | 腾讯/百度 |
+| AStockReportRouterTool | stockReport, industryReport, downloadReportPdf, thsEpsForecast, iwencaiSearch, iwencaiQuery | 东财/同花顺/iwencai |
+| AStockSignalRouterTool | conceptBlocks, fundFlowMinute, dragonTigerBoard, dailyDragonTiger, lockupExpiry, industryRanking | 东财 push2/datacenter |
+| AStockCapitalRouterTool | marginTrading, blockTrade, holderNumChange, dividendHistory, fundFlow120d, northboundFlow | 东财 datacenter/Redis |
+| AStockNewsRouterTool | stockNews, globalNews, cninfoAnnouncements, irmQA, sinaFinancialReport | 东财/巨潮/新浪 |
+| AStockLimitUpRouterTool | ztPool, zbPool, dtPool, yztPool, thsLimitUpPool, sentimentOverview | 东财 push2ex/同花顺 |
+| AStockOptionRouterTool | optionCodes, optionTQuote, optionGreeks | 新浪 |
+| AStockSentimentRouterTool | thsHotList, emHotRank, emConceptHit | 同花顺/东财 |
 
 ## Key Configuration
 
@@ -79,6 +97,7 @@ frontend/src/
 | `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` | Redis config |
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL` | AI model API |
 | `BAIDU_MCP_URL` / `BAIDU_MCP_SSE_ENDPOINT` | Baidu MCP |
+| `IWENCAI_API_KEY` | iwencai NL语义搜索 API Key（可选） |
 
 Local dev: copy `application.yml.example` to `src/main/resources/application-local.yml` (gitignored).
 

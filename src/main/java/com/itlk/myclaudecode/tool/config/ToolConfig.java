@@ -10,6 +10,7 @@ import com.itlk.myclaudecode.tool.FinancialDataTool;
 import com.itlk.myclaudecode.tool.SqlTool;
 import com.itlk.myclaudecode.tool.WebFetchTool;
 import com.itlk.myclaudecode.tool.YangJiBaoTool;
+import com.itlk.myclaudecode.tool.astock.*;
 import com.itlk.myclaudecode.yjb.service.YjbService;
 import com.itlk.myclaudecode.common.config.HttpClientService;
 import org.springframework.beans.factory.annotation.Value;
@@ -85,5 +86,50 @@ public class ToolConfig {
     @Bean
     public YangJiBaoTool yangJiBaoTool(YjbService yjbService) {
         return new YangJiBaoTool(yjbService);
+    }
+
+    // ===== A股数据工具集 =====
+
+    @Bean
+    public AStockQuoteRouterTool aStockQuoteRouterTool(HttpClientService httpClientService) {
+        return new AStockQuoteRouterTool(httpClientService);
+    }
+
+    @Bean
+    public AStockReportRouterTool aStockReportRouterTool(HttpClientService httpClientService,
+                                                          EastMoneyRateLimiter emRateLimiter,
+                                                          @Value("${astock.iwencai.api-key:}") String iwencaiApiKey) {
+        return new AStockReportRouterTool(httpClientService, emRateLimiter, iwencaiApiKey);
+    }
+
+    @Bean
+    public AStockSignalRouterTool aStockSignalRouterTool(EastMoneyRateLimiter emRateLimiter) {
+        return new AStockSignalRouterTool(emRateLimiter);
+    }
+
+    @Bean
+    public AStockCapitalRouterTool aStockCapitalRouterTool(EastMoneyRateLimiter emRateLimiter,
+                                                            org.springframework.data.redis.core.StringRedisTemplate redisTemplate) {
+        return new AStockCapitalRouterTool(emRateLimiter, redisTemplate);
+    }
+
+    @Bean
+    public AStockNewsRouterTool aStockNewsRouterTool(EastMoneyRateLimiter emRateLimiter) {
+        return new AStockNewsRouterTool(emRateLimiter);
+    }
+
+    @Bean
+    public AStockLimitUpRouterTool aStockLimitUpRouterTool(EastMoneyRateLimiter emRateLimiter) {
+        return new AStockLimitUpRouterTool(emRateLimiter);
+    }
+
+    @Bean
+    public AStockOptionRouterTool aStockOptionRouterTool(HttpClientService httpClientService) {
+        return new AStockOptionRouterTool(httpClientService);
+    }
+
+    @Bean
+    public AStockSentimentRouterTool aStockSentimentRouterTool(EastMoneyRateLimiter emRateLimiter) {
+        return new AStockSentimentRouterTool(emRateLimiter);
     }
 }

@@ -46,6 +46,18 @@ spring:
 server:
   port: 4545
 
+# A股数据工具配置
+astock:
+  eastmoney:
+    min-interval-ms: 1000       # 东财请求最小间隔(ms)
+    jitter-max-ms: 500          # 随机抖动最大值(ms)
+    connect-timeout-seconds: 10
+    read-timeout-seconds: 15
+  iwencai:
+    api-key: ${IWENCAI_API_KEY:}
+  northbound:
+    history-days: 30             # 北向资金历史缓存天数
+
 # SQL Tool 配置
 sql-tool:
   default-max-rows: 100

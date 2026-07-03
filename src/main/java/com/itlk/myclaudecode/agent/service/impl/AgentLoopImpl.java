@@ -19,6 +19,7 @@ import com.itlk.myclaudecode.tool.FinancialDataRouterTool;
 import com.itlk.myclaudecode.tool.SqlTool;
 import com.itlk.myclaudecode.tool.WebFetchTool;
 import com.itlk.myclaudecode.tool.YangJiBaoTool;
+import com.itlk.myclaudecode.tool.astock.*;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
@@ -90,6 +91,14 @@ public class AgentLoopImpl implements AgentLoop {
                          SqlTool sqlTool,
                          WebFetchTool webFetchTool,
                          YangJiBaoTool yangJiBaoTool,
+                         AStockQuoteRouterTool aStockQuoteRouterTool,
+                         AStockReportRouterTool aStockReportRouterTool,
+                         AStockSignalRouterTool aStockSignalRouterTool,
+                         AStockCapitalRouterTool aStockCapitalRouterTool,
+                         AStockNewsRouterTool aStockNewsRouterTool,
+                         AStockLimitUpRouterTool aStockLimitUpRouterTool,
+                         AStockOptionRouterTool aStockOptionRouterTool,
+                         AStockSentimentRouterTool aStockSentimentRouterTool,
                          ToolCallbackProvider toolCallbackProvider,
                          ToolGuardProperties toolGuardProperties,
                          ToolConfigService toolConfigService,
@@ -103,7 +112,10 @@ public class AgentLoopImpl implements AgentLoop {
             ToolCallbackProvider provider = MethodToolCallbackProvider.builder()
                     .toolObjects(fileReadTool, fileWriteTool, fileListTool,
                             financialCalcRouterTool, financialDataRouterTool, sqlTool, webFetchTool,
-                            yangJiBaoTool)
+                            yangJiBaoTool,
+                            aStockQuoteRouterTool, aStockReportRouterTool, aStockSignalRouterTool,
+                            aStockCapitalRouterTool, aStockNewsRouterTool, aStockLimitUpRouterTool,
+                            aStockOptionRouterTool, aStockSentimentRouterTool)
                     .build();
             ToolCallback[] originalCallbacks = provider.getToolCallbacks();
             List<ToolCallback> wrappedCallbacks = new ArrayList<>();
@@ -134,7 +146,10 @@ public class AgentLoopImpl implements AgentLoop {
             ChatClient.Builder builder = ChatClient.builder(chatModel)
                     .defaultTools(fileReadTool, fileWriteTool, fileListTool,
                             financialCalcRouterTool, financialDataRouterTool, sqlTool, webFetchTool,
-                            yangJiBaoTool);
+                            yangJiBaoTool,
+                            aStockQuoteRouterTool, aStockReportRouterTool, aStockSignalRouterTool,
+                            aStockCapitalRouterTool, aStockNewsRouterTool, aStockLimitUpRouterTool,
+                            aStockOptionRouterTool, aStockSentimentRouterTool);
             if (toolCallbackProvider != null) {
                 builder.defaultToolCallbacks(toolCallbackProvider);
             }
