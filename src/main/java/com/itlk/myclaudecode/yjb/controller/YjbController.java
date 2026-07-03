@@ -15,6 +15,7 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @RestController
@@ -111,14 +112,24 @@ public class YjbController {
             }
 
             // 确定要同步的账户
-            String syncAccountId = accountId;
-            if (syncAccountId == null || syncAccountId.isBlank()) {
-                syncAccountId = accounts.get(0).id;
-            }
+            String finalAccountId = (accountId != null && !accountId.isBlank())
+                    ? accountId : accounts.get(0).id;
 
-            // 拉取数据
-            YjbApiClient.AccountCollectResponse collect = yjbApiClient.getAccountCollect(yjbToken, syncAccountId);
-            List<YjbApiClient.FundHoldResponse> fundHolds = yjbApiClient.getFundHoldings(yjbToken, syncAccountId);
+            // 并行拉取账户汇总 + 持仓明细
+            CompletableFuture<YjbApiClient.AccountCollectResponse> collectFuture =
+                    CompletableFuture.supplyAsync(() -> {
+                        try { return yjbApiClient.getAccountCollect(yjbToken, finalAccountId); }
+                        catch (Exception e) { throw new RuntimeException(e); }
+                    });
+            CompletableFuture<List<YjbApiClient.FundHoldResponse>> holdFuture =
+                    CompletableFuture.supplyAsync(() -> {
+                        try { return yjbApiClient.getFundHoldings(yjbToken, finalAccountId); }
+                        catch (Exception e) { throw new RuntimeException(e); }
+                    });
+            CompletableFuture.allOf(collectFuture, holdFuture).join();
+
+            YjbApiClient.AccountCollectResponse collect = collectFuture.join();
+            List<YjbApiClient.FundHoldResponse> fundHolds = holdFuture.join();
 
             // 转为实体
             BigDecimal holdCost = collect.holdCost != null ? collect.holdCost : BigDecimal.ZERO;
@@ -141,8 +152,8 @@ public class YjbController {
                 return h;
             }).toList();
 
-            log.info("[YJB] 同步持仓数据: userId={}, accountId={}, 基金数={}", userId, syncAccountId, holdings.size());
-            yjbService.syncHoldings(userId, syncAccountId, holdCost, todayIncome, todayIncomeRate, holdings);
+            log.info("[YJB] 同步持仓数据: userId={}, accountId={}, 基金数={}", userId, finalAccountId, holdings.size());
+            yjbService.syncHoldings(userId, finalAccountId, holdCost, todayIncome, todayIncomeRate, holdings);
 
             // 返回数据给前端
             Map<String, Object> result = new HashMap<>();
@@ -153,17 +164,18 @@ public class YjbController {
                     "today_income_rate", todayIncomeRate
             ));
             result.put("holdings", holdings);
-            result.put("selectedAccountId", syncAccountId);
+            result.put("selectedAccountId", finalAccountId);
             return Result.success(result);
 
         } catch (Exception e) {
             log.error("[YJB] 同步持仓失败: userId={}", userId, e);
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
             // token 可能过期，清除
-            if (e.getMessage() != null && e.getMessage().contains("code=")) {
+            if (cause.getMessage() != null && cause.getMessage().contains("code=")) {
                 yjbTokenStore.removeToken(userId);
                 return Result.error("养基宝登录已过期，请重新扫码");
             }
-            return Result.error("同步失败: " + e.getMessage());
+            return Result.error("同步失败: " + cause.getMessage());
         }
     }
 
