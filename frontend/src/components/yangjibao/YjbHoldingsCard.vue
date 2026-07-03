@@ -1,18 +1,16 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useYangjibaoStore } from '@/stores/yangjibao'
 import IndexQuotes from './IndexQuotes.vue'
 import AccountSummary from './AccountSummary.vue'
 import FundHoldings from './FundHoldings.vue'
-import { TrendingUp, RefreshCw, DoorOpen, X, Loader2 } from 'lucide-vue-next'
+import { TrendingUp, RefreshCw, X, Loader2 } from 'lucide-vue-next'
 
 const yjbStore = useYangjibaoStore()
+const activeTab = ref<'summary' | 'market'>('summary')
 
 function handleClose() {
   yjbStore.cardVisible = false
-}
-
-function handleLogout() {
-  yjbStore.logout()
 }
 </script>
 
@@ -38,9 +36,6 @@ function handleLogout() {
         <button class="yjb-icon-btn" @click="yjbStore.loadAllData()" title="刷新数据">
           <RefreshCw :size="15" />
         </button>
-        <button class="yjb-icon-btn" @click="handleLogout" title="退出登录">
-          <DoorOpen :size="15" />
-        </button>
         <button class="yjb-icon-btn" @click="handleClose" title="收起">
           <X :size="15" />
         </button>
@@ -55,29 +50,46 @@ function handleLogout() {
 
     <!-- Content -->
     <template v-else>
-      <!-- Index Quotes -->
-      <div class="yjb-card-section">
-        <IndexQuotes :data="yjbStore.indexData" />
+      <!-- Tabs -->
+      <div class="yjb-tabs">
+        <button
+          class="yjb-tab"
+          :class="{ active: activeTab === 'summary' }"
+          @click="activeTab = 'summary'"
+        >账户汇总</button>
+        <button
+          class="yjb-tab"
+          :class="{ active: activeTab === 'market' }"
+          @click="activeTab = 'market'"
+        >行情中心</button>
       </div>
 
-      <div class="yjb-card-divider"></div>
+      <!-- Tab: 账户汇总 -->
+      <Transition name="tab-fade" mode="out-in">
+        <div v-if="activeTab === 'summary'" key="summary">
+          <div class="yjb-card-section">
+            <AccountSummary
+              :data="yjbStore.accountCollect"
+              :accounts="yjbStore.accounts"
+              :selected-account-id="yjbStore.selectedAccountId"
+              @switch-account="yjbStore.switchAccount"
+            />
+          </div>
 
-      <!-- Account Summary -->
-      <div class="yjb-card-section">
-        <AccountSummary
-          :data="yjbStore.accountCollect"
-          :accounts="yjbStore.accounts"
-          :selected-account-id="yjbStore.selectedAccountId"
-          @switch-account="yjbStore.switchAccount"
-        />
-      </div>
+          <div class="yjb-card-divider"></div>
 
-      <div class="yjb-card-divider"></div>
+          <div class="yjb-card-section">
+            <FundHoldings :data="yjbStore.fundHoldings" />
+          </div>
+        </div>
 
-      <!-- Holdings Table -->
-      <div class="yjb-card-section">
-        <FundHoldings :data="yjbStore.fundHoldings" />
-      </div>
+        <!-- Tab: 行情中心 -->
+        <div v-else key="market">
+          <div class="yjb-card-section">
+            <IndexQuotes :data="yjbStore.indexData" />
+          </div>
+        </div>
+      </Transition>
     </template>
 
     <!-- Footer -->
@@ -114,7 +126,7 @@ function handleLogout() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .yjb-card-title-area {
@@ -166,6 +178,58 @@ function handleLogout() {
 .yjb-icon-btn:hover {
   background: #f3f4f6;
   color: var(--text);
+}
+
+/* Tab transition */
+.tab-fade-enter-active,
+.tab-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.tab-fade-enter-from,
+.tab-fade-leave-to {
+  opacity: 0;
+}
+
+/* Tabs */
+.yjb-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.yjb-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: #9ca3af;
+  padding: 8px 0 10px;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s;
+}
+
+.yjb-tab:hover {
+  color: var(--text);
+}
+
+.yjb-tab.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.yjb-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
 }
 
 /* Sections */

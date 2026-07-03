@@ -541,6 +541,7 @@ watch(() => yjbStore.cardVisible, (visible) => {
   flex-shrink: 0;
   overflow: hidden;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: 20px;
   background: var(--bg);
 }
