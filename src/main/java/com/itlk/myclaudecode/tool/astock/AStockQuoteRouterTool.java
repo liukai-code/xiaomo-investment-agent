@@ -122,6 +122,11 @@ public class AStockQuoteRouterTool {
     private String baiduKline(String stockCode, String startTime) {
         try {
             String code = AStockUtils.normalizeCode(stockCode);
+            // 默认取最近120个交易日，避免返回全部历史数据
+            if (startTime == null || startTime.isBlank()) {
+                startTime = java.time.LocalDate.now().minusDays(180)
+                        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            }
             String url = "https://finance.pae.baidu.com/selfselect/getstockquotation"
                     + "?all=1&isIndex=false&isBk=false&isBlock=false&isFutures=false"
                     + "&isStock=true&newFormat=1&group=quotation_kline_ab&finClientType=pc"
@@ -140,8 +145,9 @@ public class AStockQuoteRouterTool {
             JsonNode root = objectMapper.readTree(responseStr);
             JsonNode result = root.path("Result");
             JsonNode md = result.path("newMarketData");
-            JsonNode keysNode = md.path("keys");
             String rows = md.path("marketData").asText("");
+            log.info("[AStockQuoteRouterTool] baiduKline 响应: code={}, responseSize={}, rows={}",
+                    code, responseStr.length(), rows.isEmpty() ? 0 : rows.split(";").length);
 
             if (rows.isEmpty()) {
                 return "未找到 " + code + " 的K线数据";
@@ -150,12 +156,9 @@ public class AStockQuoteRouterTool {
             StringBuilder sb = new StringBuilder();
             sb.append(String.format("=== %s K线数据（百度）===\n\n", code));
 
-            // 显示字段名
-            List<String> keys = new ArrayList<>();
-            keysNode.forEach(k -> keys.add(k.asText()));
-            sb.append("字段: ").append(String.join(", ", keys.stream().limit(10).toList())).append("\n\n");
-
             // 显示最近5根K线
+            // fields: timestamp,time,open,close,volume,high,low,amount,range,ratio,turnoverratio,preClose,
+            //         ma5avgprice,ma5volume,ma10avgprice,ma10volume,ma20avgprice,ma20volume
             String[] klines = rows.split(";");
             int start = Math.max(0, klines.length - 5);
             sb.append("最近").append(klines.length - start).append("根K线:\n");
@@ -167,10 +170,12 @@ public class AStockQuoteRouterTool {
                             parseDouble(fields[3]), parseDouble(fields[4]),
                             fields[5], fields[6]));
                 }
-                // 如果有 MA 均线数据
-                if (fields.length >= 10) {
-                    sb.append(String.format("    MA5:%.2f  MA10:%.2f  MA20:%.2f\n",
-                            parseDouble(fields[7]), parseDouble(fields[8]), parseDouble(fields[9])));
+                // MA均线: index 12=MA5均价, 14=MA10均价, 16=MA20均价
+                if (fields.length >= 17) {
+                    String ma5 = "MA5:" + fields[12];
+                    String ma10 = "MA10:" + fields[14];
+                    String ma20 = "MA20:" + fields[16];
+                    sb.append(String.format("    %s  %s  %s\n", ma5, ma10, ma20));
                 }
             }
             sb.append(String.format("\n共 %d 根K线\n", klines.length));
