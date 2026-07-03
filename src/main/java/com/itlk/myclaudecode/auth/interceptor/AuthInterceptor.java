@@ -36,6 +36,7 @@ public class AuthInterceptor implements HandlerInterceptor {
             return false;
         }
 
+        tokenManager.refreshToken(token, userId);
         request.setAttribute("userId", userId);
         request.setAttribute("token", token);
         return true;

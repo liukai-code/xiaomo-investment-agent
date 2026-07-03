@@ -39,6 +39,12 @@ public class TokenManagerImpl implements TokenManager {
     }
 
     @Override
+    public void refreshToken(String token, Long userId) {
+        stringRedisTemplate.expire(TOKEN_PREFIX + token, TOKEN_EXPIRE_HOURS, TimeUnit.HOURS);
+        stringRedisTemplate.expire(TOKEN_PREFIX + "user:" + userId, TOKEN_EXPIRE_HOURS, TimeUnit.HOURS);
+    }
+
+    @Override
     public void removeToken(String token) {
         String userId = stringRedisTemplate.opsForValue().get(TOKEN_PREFIX + token);
         if (userId != null) {

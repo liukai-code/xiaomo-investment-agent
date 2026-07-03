@@ -6,5 +6,7 @@ public interface TokenManager {
 
     Long getUserId(String token);
 
+    void refreshToken(String token, Long userId);
+
     void removeToken(String token);
 }
