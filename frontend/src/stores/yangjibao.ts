@@ -49,15 +49,12 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
       cardVisible.value = false
       return
     }
-    if (!yjbLoggedIn.value) {
-      await checkLogin()
-    }
+    await checkLogin()
     if (yjbLoggedIn.value) {
       cardVisible.value = true
-      if (fundHoldings.value.length === 0) {
-        loadAllData()
-      }
+      loadAllData()
     } else {
+      clearYjbAuth()
       qrModalVisible.value = true
     }
   }
@@ -78,6 +75,10 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
 
   async function loadAllData() {
     loading.value = true
+    accounts.value = []
+    accountCollect.value = null
+    fundHoldings.value = []
+    indexData.value = []
     try {
       const [idxData, syncResult] = await Promise.all([
         getIndexData(),
