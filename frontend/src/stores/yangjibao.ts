@@ -21,7 +21,7 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
   const indexData = ref<IndexData[]>([])
 
   const loading = ref(false)
-  const panelVisible = ref(false)
+  const cardVisible = ref(false)
   const qrModalVisible = ref(false)
 
   function setYjbToken(token: string) {
@@ -41,18 +41,18 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
 
   function logout() {
     clearYjbAuth()
-    panelVisible.value = false
+    cardVisible.value = false
   }
 
-  async function openPanel() {
-    if (panelVisible.value) {
-      panelVisible.value = false
+  function openCard() {
+    if (cardVisible.value) {
+      cardVisible.value = false
       return
     }
     if (isLoggedIn.value) {
-      panelVisible.value = true
+      cardVisible.value = true
       if (fundHoldings.value.length === 0) {
-        await loadAllData()
+        loadAllData()
       }
     } else {
       qrModalVisible.value = true
@@ -63,7 +63,7 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
     console.log('[YJB] 登录成功, token:', token)
     setYjbToken(token)
     qrModalVisible.value = false
-    panelVisible.value = true
+    cardVisible.value = true
     await loadAllData()
   }
 
@@ -109,8 +109,8 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
   return {
     yjbToken, isLoggedIn, accounts, selectedAccountId,
     accountCollect, fundHoldings, indexData,
-    loading, panelVisible, qrModalVisible,
-    openPanel, onQrLoginSuccess, logout,
+    loading, cardVisible, qrModalVisible,
+    openCard, onQrLoginSuccess, logout,
     loadAllData, loadAccountData, switchAccount, clearYjbAuth,
   }
 })

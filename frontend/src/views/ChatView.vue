@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onUnmounted, computed } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
@@ -10,7 +10,7 @@ import { useRafThrottle } from '@/composables/useMarkdownBlocks'
 import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next'
 import { useYangjibaoStore } from '@/stores/yangjibao'
 import YjbQrLogin from '@/components/yangjibao/YjbQrLogin.vue'
-import YjbPanel from '@/components/yangjibao/YjbPanel.vue'
+import YjbHoldingsCard from '@/components/yangjibao/YjbHoldingsCard.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -257,6 +257,12 @@ onMounted(async () => {
 onUnmounted(() => {
   document.removeEventListener('click', onDocumentClick)
 })
+
+watch(() => yjbStore.cardVisible, (visible) => {
+  if (visible) {
+    nextTick(() => scrollToBottom())
+  }
+})
 </script>
 
 <template>
@@ -328,7 +334,7 @@ onUnmounted(() => {
         </div>
         <div class="header-right">
           <div class="yjb-trigger-wrapper">
-            <button class="yjb-connect-btn" @click.stop="yjbStore.openPanel()">
+            <button class="yjb-connect-btn" @click.stop="yjbStore.openCard()">
               <span v-if="yjbStore.isLoggedIn" class="yjb-status-dot connected"></span>
               <span v-else class="yjb-status-dot"></span>
               {{ yjbStore.isLoggedIn ? '已连接养基宝' : '连接养基宝' }}
@@ -353,81 +359,89 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- 欢迎页：居中显示 -->
-      <div v-if="chatStore.messages.length === 0" class="welcome-page">
-        <div class="welcome-title">你好，我是小墨</div>
-        <div class="welcome-sub">你的 AI 金融投资助手，随时为你解答</div>
-        <div class="chat-input welcome-input">
-          <textarea
-            ref="inputEl"
-            v-model="inputText"
-            rows="1"
-            placeholder="有问题，尽管问"
-            @input="handleInput"
-            @keydown="handleKeydown"
-          ></textarea>
-          <button class="send-btn" :disabled="chatStore.isGenerating" @click="handleSend()" title="发送">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13"></line>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-            </svg>
-          </button>
+      <!-- 主内容区：聊天 + 右侧卡片 -->
+      <div class="chat-main-area">
+        <!-- 聊天区域 -->
+        <div class="chat-content">
+          <!-- 欢迎页 -->
+          <div v-if="chatStore.messages.length === 0" class="welcome-page">
+            <div class="welcome-title">你好，我是小墨</div>
+            <div class="welcome-sub">你的 AI 金融投资助手，随时为你解答</div>
+            <div class="chat-input welcome-input">
+              <textarea
+                ref="inputEl"
+                v-model="inputText"
+                rows="1"
+                placeholder="有问题，尽管问"
+                @input="handleInput"
+                @keydown="handleKeydown"
+              ></textarea>
+              <button class="send-btn" :disabled="chatStore.isGenerating" @click="handleSend()" title="发送">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- 对话页 -->
+          <template v-else>
+            <div ref="messagesEl" class="chat-messages">
+              <div
+                v-for="msg in chatStore.messages"
+                :key="msg.id"
+                class="message"
+                :class="msg.role === 'USER' ? 'user' : 'ai'"
+              >
+                <div class="msg-header">
+                  <img v-if="msg.role !== 'USER'" src="/logo.png" alt="AI" class="msg-avatar" />
+                  <div class="label">{{ msg.role === 'USER' ? 'YOU' : '小墨' }}</div>
+                </div>
+                <div class="bubble">
+                  <template v-if="msg.role === 'USER'">{{ msg.content }}</template>
+                  <template v-else>
+                    <template v-if="isWorkflowMode && msg === chatStore.messages[chatStore.messages.length - 1] && workflowEvents.length > 0">
+                      <WorkflowPanel :events="workflowEvents" :is-running="isWorkflowRunning" />
+                    </template>
+                    <template v-else>
+                      <MarkdownRenderer
+                        :text="msg.content"
+                        :is-streaming="chatStore.isGenerating && msg === chatStore.messages[chatStore.messages.length - 1]"
+                      />
+                    </template>
+                  </template>
+                </div>
+              </div>
+            </div>
+
+            <div class="chat-input-area">
+              <div class="chat-input">
+                <textarea
+                  ref="inputEl"
+                  v-model="inputText"
+                  rows="1"
+                  placeholder="有问题，尽管问"
+                  @input="handleInput"
+                  @keydown="handleKeydown"
+                ></textarea>
+                <button class="send-btn" :disabled="chatStore.isGenerating" @click="handleSend()" title="发送">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- 右侧养基宝卡片 -->
+        <div v-if="yjbStore.cardVisible && yjbStore.isLoggedIn" class="holdings-side-card">
+          <YjbHoldingsCard />
         </div>
       </div>
-
-      <!-- 对话页：消息列表 + 底部输入 -->
-      <template v-else>
-        <div ref="messagesEl" class="chat-messages">
-          <div
-            v-for="msg in chatStore.messages"
-            :key="msg.id"
-            class="message"
-            :class="msg.role === 'USER' ? 'user' : 'ai'"
-          >
-            <div class="msg-header">
-              <img v-if="msg.role !== 'USER'" src="/logo.png" alt="AI" class="msg-avatar" />
-              <div class="label">{{ msg.role === 'USER' ? 'YOU' : '小墨' }}</div>
-            </div>
-            <div class="bubble">
-              <template v-if="msg.role === 'USER'">{{ msg.content }}</template>
-              <template v-else>
-                <template v-if="isWorkflowMode && msg === chatStore.messages[chatStore.messages.length - 1] && workflowEvents.length > 0">
-                  <WorkflowPanel :events="workflowEvents" :is-running="isWorkflowRunning" />
-                </template>
-                <template v-else>
-                  <MarkdownRenderer
-                    :text="msg.content"
-                    :is-streaming="chatStore.isGenerating && msg === chatStore.messages[chatStore.messages.length - 1]"
-                  />
-                </template>
-              </template>
-            </div>
-          </div>
-        </div>
-
-        <div class="chat-input-area">
-          <div class="chat-input">
-            <textarea
-              ref="inputEl"
-              v-model="inputText"
-              rows="1"
-              placeholder="有问题，尽管问"
-              @input="handleInput"
-              @keydown="handleKeydown"
-            ></textarea>
-            <button class="send-btn" :disabled="chatStore.isGenerating" @click="handleSend()" title="发送">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13"></line>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </template>
     </div>
-
-    <!-- 养基宝右侧面板 -->
-    <YjbPanel v-if="yjbStore.panelVisible" />
   </div>
 
   <!-- 删除确认弹窗 -->
@@ -482,5 +496,29 @@ onUnmounted(() => {
 .yjb-status-dot.connected {
   background: var(--green);
   box-shadow: 0 0 4px var(--green);
+}
+
+.chat-main-area {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.chat-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.holdings-side-card {
+  width: 420px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 20px;
+  background: var(--bg);
 }
 </style>
