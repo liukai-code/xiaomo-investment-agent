@@ -7,7 +7,7 @@ import { streamChat, streamDeepAnalysis, type WorkflowEvent } from '@/api/chat'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
 import WorkflowPanel from '@/components/workflow/WorkflowPanel.vue'
 import { useRafThrottle } from '@/composables/useMarkdownBlocks'
-import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen, Landmark } from 'lucide-vue-next'
+import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next'
 import { useYangjibaoStore } from '@/stores/yangjibao'
 import YjbQrLogin from '@/components/yangjibao/YjbQrLogin.vue'
 import YjbPanel from '@/components/yangjibao/YjbPanel.vue'
@@ -328,8 +328,10 @@ onUnmounted(() => {
         </div>
         <div class="header-right">
           <div class="yjb-trigger-wrapper">
-            <button class="user-avatar-btn" @click.stop="yjbStore.openPanel()" title="养基宝持仓">
-              <Landmark :size="20" />
+            <button class="yjb-connect-btn" @click.stop="yjbStore.openPanel()">
+              <span v-if="yjbStore.isLoggedIn" class="yjb-status-dot connected"></span>
+              <span v-else class="yjb-status-dot"></span>
+              {{ yjbStore.isLoggedIn ? '已连接养基宝' : '连接养基宝' }}
             </button>
             <YjbQrLogin
               :visible="yjbStore.qrModalVisible"
@@ -445,5 +447,40 @@ onUnmounted(() => {
 <style scoped>
 .yjb-trigger-wrapper {
   position: relative;
+}
+
+.yjb-connect-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 16px;
+  background: var(--surface-2);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  height: 36px;
+  box-sizing: border-box;
+}
+
+.yjb-connect-btn:hover {
+  background: var(--border);
+}
+
+.yjb-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.yjb-status-dot.connected {
+  background: var(--green);
+  box-shadow: 0 0 4px var(--green);
 }
 </style>
