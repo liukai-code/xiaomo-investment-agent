@@ -327,9 +327,16 @@ onUnmounted(() => {
           <span class="title">{{ currentTitle }}</span>
         </div>
         <div class="header-right">
-          <button class="user-avatar-btn" @click.stop="yjbStore.openPanel()" title="养基宝持仓">
-            <Landmark :size="20" />
-          </button>
+          <div class="yjb-trigger-wrapper">
+            <button class="user-avatar-btn" @click.stop="yjbStore.openPanel()" title="养基宝持仓">
+              <Landmark :size="20" />
+            </button>
+            <YjbQrLogin
+              :visible="yjbStore.qrModalVisible"
+              @success="yjbStore.onQrLoginSuccess"
+              @close="yjbStore.qrModalVisible = false"
+            />
+          </div>
           <div class="user-menu-wrapper">
             <button class="user-avatar-btn" @click.stop="showUserMenu = !showUserMenu">
               <User :size="20" />
@@ -432,11 +439,11 @@ onUnmounted(() => {
       </div>
     </div>
   </div>
-  <!-- 养基宝二维码登录弹窗 -->
-  <YjbQrLogin
-    v-if="yjbStore.qrModalVisible"
-    @success="yjbStore.onQrLoginSuccess"
-    @close="yjbStore.qrModalVisible = false"
-  />
   </div>
 </template>
+
+<style scoped>
+.yjb-trigger-wrapper {
+  position: relative;
+}
+</style>
