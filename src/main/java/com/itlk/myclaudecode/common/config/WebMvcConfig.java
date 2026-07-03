@@ -21,6 +21,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/api/auth/**",
                         "/api/admin/**",
+                        "/api/yjb/qr-code",
+                        "/api/yjb/qr-state/**",
                         "/",
                         "/index.html",
                         "/admin.html",

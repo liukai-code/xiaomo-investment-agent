@@ -10,29 +10,13 @@ import org.springframework.ai.tool.annotation.Tool;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-
 @Slf4j
 public class YangJiBaoTool {
-
-    private static final ConcurrentHashMap<String, Long> USER_ID_MAP = new ConcurrentHashMap<>();
 
     private final YjbService yjbService;
 
     public YangJiBaoTool(YjbService yjbService) {
         this.yjbService = yjbService;
-    }
-
-    public static void setUserId(String conversationId, Long userId) {
-        USER_ID_MAP.put(conversationId, userId);
-    }
-
-    public static Long getUserId(String conversationId) {
-        return USER_ID_MAP.get(conversationId);
-    }
-
-    public static void clearUserId(String conversationId) {
-        USER_ID_MAP.remove(conversationId);
     }
 
     // 由 ToolCallbackContextWrapper 在工具执行前线程设置

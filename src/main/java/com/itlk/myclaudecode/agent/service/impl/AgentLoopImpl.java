@@ -153,10 +153,10 @@ public class AgentLoopImpl implements AgentLoop {
         List<Message> context = buildContext(conversation.getId(), userId);
 
         Long convId = conversation.getId();
-        YangJiBaoTool.setUserId(convId.toString(), userId);
 
         Map<String, Object> toolCtx = new HashMap<>();
         toolCtx.put("conversationId", convId.toString());
+        toolCtx.put("userId", userId);
         toolCtx.put(MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0));
         toolCtx.put(MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(toolGuardProperties.infoGainWindow(), toolGuardProperties.infoGainThreshold()));
         toolCtx.put(MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold()));
@@ -197,7 +197,7 @@ public class AgentLoopImpl implements AgentLoop {
             chatMessageService.saveMessage(conversation, MessageRole.ASSISTANT, sanitized, null, null);
             return sanitized;
         } finally {
-            YangJiBaoTool.clearUserId(convId.toString());
+            // userId 已通过 ToolContext 传递，无需清理 ConcurrentHashMap
         }
     }
 
@@ -211,12 +211,12 @@ public class AgentLoopImpl implements AgentLoop {
 
         List<Message> context = buildContext(conversation.getId(), userId);
         Long convId = conversation.getId();
-        YangJiBaoTool.setUserId(convId.toString(), userId);
 
         StringBuilder accumulated = new StringBuilder();
 
         Map<String, Object> streamToolCtx = new HashMap<>();
         streamToolCtx.put("conversationId", convId.toString());
+        streamToolCtx.put("userId", userId);
         streamToolCtx.put(MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0));
         streamToolCtx.put(MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(toolGuardProperties.infoGainWindow(), toolGuardProperties.infoGainThreshold()));
         streamToolCtx.put(MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold()));
@@ -269,7 +269,7 @@ public class AgentLoopImpl implements AgentLoop {
                     }
                     return Flux.just("\n\n[" + errorMsg + "]");
                 })
-                .doFinally(signal -> YangJiBaoTool.clearUserId(convId.toString()));
+                .doFinally(signal -> {});
     }
 
     @Override

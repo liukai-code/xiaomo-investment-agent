@@ -27,14 +27,16 @@ public class ToolCallbackContextWrapper implements ToolCallback {
 
     @Override
     public String call(String toolInput, ToolContext toolContext) {
-        // 从 toolContext 取 conversationId，查 userId 设置到 ThreadLocal
         if (toolContext != null) {
-            Object convId = toolContext.getContext().get("conversationId");
-            if (convId != null) {
-                Long userId = YangJiBaoTool.getUserId(convId.toString());
-                if (userId != null) {
-                    YangJiBaoTool.setCurrentUserId(userId);
-                }
+            Long userId = null;
+            Object uid = toolContext.getContext().get("userId");
+            if (uid instanceof Long l) {
+                userId = l;
+            } else if (uid != null) {
+                userId = Long.valueOf(uid.toString());
+            }
+            if (userId != null) {
+                YangJiBaoTool.setCurrentUserId(userId);
             }
         }
         try {
