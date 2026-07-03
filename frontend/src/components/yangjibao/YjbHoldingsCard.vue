@@ -72,6 +72,7 @@ function handleClose() {
               :data="yjbStore.accountCollect"
               :accounts="yjbStore.accounts"
               :selected-account-id="yjbStore.selectedAccountId"
+              :fund-holdings="yjbStore.fundHoldings"
               @switch-account="yjbStore.switchAccount"
             />
           </div>

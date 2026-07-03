@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { AccountCollect, UserAccount } from '@/types/yangjibao'
+import type { AccountCollect, UserAccount, FundHoldItem } from '@/types/yangjibao'
 
 const props = defineProps<{
   data: AccountCollect | null
   accounts: UserAccount[]
   selectedAccountId: string
+  fundHoldings: FundHoldItem[]
 }>()
 
 const emit = defineEmits<{
   'switch-account': [accountId: string]
 }>()
 
+const totalAssets = computed(() => props.fundHoldings.reduce((sum, f) => sum + f.money, 0))
 const totalCost = computed(() => props.data?.hold_cost ?? 0)
 const todayIncome = computed(() => props.data?.today_income ?? 0)
 const todayRate = computed(() => props.data?.today_income_rate ?? 0)
@@ -38,6 +40,10 @@ function switchAccount(e: Event) {
     </div>
 
     <div v-if="data" class="summary-cards">
+      <div class="summary-card">
+        <div class="card-label">账户资产</div>
+        <div class="card-value">{{ formatMoney(totalAssets) }}</div>
+      </div>
       <div class="summary-card">
         <div class="card-label">持有成本</div>
         <div class="card-value">{{ formatMoney(totalCost) }}</div>
@@ -91,7 +97,7 @@ function switchAccount(e: Event) {
 
 .summary-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 }
 

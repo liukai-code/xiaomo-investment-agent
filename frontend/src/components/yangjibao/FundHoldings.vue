@@ -8,6 +8,13 @@ defineProps<{
 function formatMoney(v: number): string {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+function formatRate(item: FundHoldItem): string {
+  const cost = item.money - item.hold_earn
+  if (!cost) return '0.00%'
+  const rate = (item.hold_earn / cost) * 100
+  return `${rate > 0 ? '+' : ''}${rate.toFixed(2)}%`
+}
 </script>
 
 <template>
@@ -21,6 +28,7 @@ function formatMoney(v: number): string {
             <th>代码</th>
             <th class="num">市值</th>
             <th class="num">盈亏</th>
+            <th class="num">收益率</th>
           </tr>
         </thead>
         <tbody>
@@ -30,6 +38,9 @@ function formatMoney(v: number): string {
             <td class="num">{{ formatMoney(item.money) }}</td>
             <td class="num" :class="{ up: item.hold_earn > 0, down: item.hold_earn < 0 }">
               {{ item.hold_earn > 0 ? '+' : '' }}{{ formatMoney(item.hold_earn) }}
+            </td>
+            <td class="num" :class="{ up: item.hold_earn > 0, down: item.hold_earn < 0 }">
+              {{ formatRate(item) }}
             </td>
           </tr>
         </tbody>

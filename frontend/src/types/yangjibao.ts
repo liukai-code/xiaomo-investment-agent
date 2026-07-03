@@ -30,6 +30,10 @@ export interface FundHoldItem {
   hold_earn: number
   hold_share: number
   hold_cost: number
+  cost_money: number
+  hold_day: string
+  category: string
+  market_type: string
 }
 
 export interface IndexData {
