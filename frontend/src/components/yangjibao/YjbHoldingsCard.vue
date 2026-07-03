@@ -241,7 +241,7 @@ function handleClose() {
 .yjb-card-divider {
   height: 1px;
   background: #F3F4F6;
-  margin: 20px 0;
+  margin: 0 0 20px;
 }
 
 /* Loading */
