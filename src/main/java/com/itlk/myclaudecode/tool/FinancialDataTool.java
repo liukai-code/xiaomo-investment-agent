@@ -3,17 +3,14 @@ package com.itlk.myclaudecode.tool;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
 import okhttp3.Headers;
+import com.itlk.myclaudecode.common.config.HttpClientService;
 import com.itlk.myclaudecode.tool.annotation.ToolBehavior;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -24,14 +21,11 @@ public class FinancialDataTool {
     private static final Pattern CODE_PATTERN = Pattern.compile("^[0-9a-zA-Z]{1,10}$");
     private static final Pattern TENCENT_QUOTE_PATTERN = Pattern.compile("v_\\w+=\"([^\"]+)\"");
 
-    private final OkHttpClient okHttpClient;
+    private final HttpClientService httpClientService;
     private final ObjectMapper objectMapper;
 
-    public FinancialDataTool() {
-        this.okHttpClient = new OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(10, TimeUnit.SECONDS)
-                .build();
+    public FinancialDataTool(HttpClientService httpClientService) {
+        this.httpClientService = httpClientService;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -184,7 +178,7 @@ public class FinancialDataTool {
                 .add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 .build();
 
-        String body = httpGet(url, headers);
+        String body = httpClientService.get(url, headers);
         if (body == null || body.isBlank()) return null;
 
         JsonNode root = objectMapper.readTree(body);
@@ -214,7 +208,7 @@ public class FinancialDataTool {
                 .add("Referer", "https://finance.sina.com.cn")
                 .build();
 
-        String body = httpGet(url, headers);
+        String body = httpClientService.get(url, headers);
         if (body == null || body.isBlank()) return null;
 
         List<String> results = new ArrayList<>();
@@ -251,7 +245,7 @@ public class FinancialDataTool {
                 .build();
 
         try {
-            String body = httpGet(url, headers);
+            String body = httpClientService.get(url, headers);
             log.info("[FinancialDataTool] fetchTencentQuote 响应体: {}", body);
             if (body == null || body.isBlank()) {
                 return "接口返回为空，股票代码: " + stockCode;
@@ -324,7 +318,7 @@ public class FinancialDataTool {
                 .build();
 
         try {
-            String body = httpGet(url, headers);
+            String body = httpClientService.get(url, headers);
             log.info("[FinancialDataTool] fetchFundNav 响应体: {}", body);
 
             if (body == null || body.isBlank()) {
@@ -373,31 +367,6 @@ public class FinancialDataTool {
             return Double.parseDouble(value);
         } catch (NumberFormatException e) {
             return 0.0;
-        }
-    }
-
-    private String httpGet(String url, Headers headers) throws Exception {
-        Request request = new Request.Builder()
-                .url(url)
-                .headers(headers)
-                .get()
-                .build();
-
-        log.info("[FinancialDataTool] httpGet 发起请求: {} {}", request.method(), request.url());
-        log.debug("[FinancialDataTool] httpGet 请求头: {}", request.headers());
-
-        long startTime = System.currentTimeMillis();
-        try (Response response = okHttpClient.newCall(request).execute()) {
-            long costTime = System.currentTimeMillis() - startTime;
-            log.info("[FinancialDataTool] httpGet 响应状态: {}, 耗时: {}ms", response.code(), costTime);
-
-            if (!response.isSuccessful()) {
-                log.error("[FinancialDataTool] httpGet HTTP错误: {}", response.code());
-                throw new RuntimeException("HTTP 请求失败: " + response.code());
-            }
-            String body = response.body() != null ? response.body().string() : null;
-            log.debug("[FinancialDataTool] httpGet 响应体长度: {}", body != null ? body.length() : 0);
-            return body;
         }
     }
 

@@ -11,6 +11,7 @@ import com.itlk.myclaudecode.tool.SqlTool;
 import com.itlk.myclaudecode.tool.WebFetchTool;
 import com.itlk.myclaudecode.tool.YangJiBaoTool;
 import com.itlk.myclaudecode.yjb.service.YjbService;
+import com.itlk.myclaudecode.common.config.HttpClientService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -53,8 +54,8 @@ public class ToolConfig {
     }
 
     @Bean
-    public FinancialDataTool financialDataTool() {
-        return new FinancialDataTool();
+    public FinancialDataTool financialDataTool(HttpClientService httpClientService) {
+        return new FinancialDataTool(httpClientService);
     }
 
     @Bean
@@ -74,7 +75,11 @@ public class ToolConfig {
 
     @Bean
     public WebFetchTool webFetchTool() {
-        return new WebFetchTool(webfetchProxyHost, webfetchProxyPort);
+        HttpClientService.Builder builder = new HttpClientService.Builder();
+        if (webfetchProxyHost != null && !webfetchProxyHost.isBlank()) {
+            builder.proxy(webfetchProxyHost, webfetchProxyPort);
+        }
+        return new WebFetchTool(builder.build());
     }
 
     @Bean
