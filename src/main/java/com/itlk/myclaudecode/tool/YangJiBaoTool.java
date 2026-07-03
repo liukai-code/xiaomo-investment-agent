@@ -63,9 +63,11 @@ public class YangJiBaoTool {
 
         BigDecimal totalMoney = BigDecimal.ZERO;
         BigDecimal totalEarn = BigDecimal.ZERO;
+        BigDecimal totalCost = BigDecimal.ZERO;
         for (YjbHolding h : holdings) {
             totalMoney = totalMoney.add(nullToZero(h.getMoney()));
             totalEarn = totalEarn.add(nullToZero(h.getHoldEarn()));
+            totalCost = totalCost.add(nullToZero(h.getCostMoney()));
         }
 
         StringBuilder sb = new StringBuilder();
@@ -76,8 +78,9 @@ public class YangJiBaoTool {
         for (YjbHolding h : holdings) {
             BigDecimal money = nullToZero(h.getMoney());
             BigDecimal earn = nullToZero(h.getHoldEarn());
-            BigDecimal rate = money.compareTo(BigDecimal.ZERO) > 0
-                    ? earn.divide(money, 4, RoundingMode.HALF_UP).multiply(new BigDecimal("100"))
+            BigDecimal cost = nullToZero(h.getCostMoney());
+            BigDecimal rate = cost.compareTo(BigDecimal.ZERO) > 0
+                    ? earn.divide(cost, 4, RoundingMode.HALF_UP).multiply(new BigDecimal("100"))
                     : BigDecimal.ZERO;
 
             sb.append("| ").append(str(h.getShortName()))
@@ -91,8 +94,8 @@ public class YangJiBaoTool {
 
         sb.append("\n**汇总：** 总市值 ").append(formatMoney(totalMoney))
           .append("，总盈亏 ").append(formatMoney(totalEarn));
-        if (totalMoney.compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal totalRate = totalEarn.divide(totalMoney, 4, RoundingMode.HALF_UP)
+        if (totalCost.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal totalRate = totalEarn.divide(totalCost, 4, RoundingMode.HALF_UP)
                     .multiply(new BigDecimal("100"));
             sb.append("，整体收益率 ").append(totalRate.setScale(2, RoundingMode.HALF_UP)).append("%");
         }
