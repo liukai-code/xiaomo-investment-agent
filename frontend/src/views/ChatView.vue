@@ -537,7 +537,7 @@ watch(() => yjbStore.cardVisible, (visible) => {
 }
 
 .holdings-side-card {
-  width: 500px;
+  width: 560px;
   flex-shrink: 0;
   overflow: hidden;
   overflow-y: auto;

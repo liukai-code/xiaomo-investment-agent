@@ -1,10 +1,18 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-vue-next'
 import type { IndexData } from '@/types/yangjibao'
 
-defineProps<{
+const props = defineProps<{
   data: IndexData[]
 }>()
+
+// Pad to even count (2-col grid needs integer rows) then duplicate for seamless loop
+const loopData = computed(() => {
+  const list = [...props.data]
+  if (list.length % 2 !== 0) list.push(null as any)
+  return [...list, ...list]
+})
 
 function formatValue(v: number): string {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -18,16 +26,19 @@ function formatDir(dir: number): string {
 
 <template>
   <div class="index-quotes">
-    <div class="section-title">指数行情</div>
-    <div class="quotes-grid">
-      <div v-for="item in data" :key="item.name" class="quote-card">
-        <div class="quote-name">{{ item.name }}</div>
-        <div class="quote-value">{{ formatValue(item.v) }}</div>
-        <div class="quote-dir" :class="{ up: item.dir > 0, down: item.dir < 0 }">
-          <TrendingUp v-if="item.dir > 0" :size="14" />
-          <TrendingDown v-else-if="item.dir < 0" :size="14" />
-          <Minus v-else :size="14" />
-          <span>{{ formatDir(item.dir) }}</span>
+    <div class="quotes-viewport">
+      <div class="quotes-track">
+        <div v-for="(item, i) in loopData" :key="`${item?.name ?? 'pad'}-${i}`" class="quote-card">
+          <template v-if="item">
+            <div class="quote-name">{{ item.name }}</div>
+            <div class="quote-value">{{ formatValue(item.v) }}</div>
+            <div class="quote-dir" :class="{ up: item.dir > 0, down: item.dir < 0 }">
+              <TrendingUp v-if="item.dir > 0" :size="14" />
+              <TrendingDown v-else-if="item.dir < 0" :size="14" />
+              <Minus v-else :size="14" />
+              <span>{{ formatDir(item.dir) }}</span>
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -36,22 +47,29 @@ function formatDir(dir: number): string {
 
 <style scoped>
 .index-quotes {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
-.section-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-dim);
-  margin-bottom: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.quotes-viewport {
+  height: 148px;
+  overflow: hidden;
+  border-radius: 10px;
 }
 
-.quotes-grid {
+.quotes-track {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
+  animation: marquee 20s linear infinite;
+}
+
+.quotes-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes marquee {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
 }
 
 .quote-card {

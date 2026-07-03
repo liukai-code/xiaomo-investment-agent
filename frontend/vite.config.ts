@@ -19,6 +19,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/yjb-api/, ''),
       },
+      '/yjb-market-api': {
+        target: 'https://app-api.yangjibao.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/yjb-market-api/, ''),
+      },
     },
   },
   build: {

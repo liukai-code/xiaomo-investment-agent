@@ -14,6 +14,11 @@ const client = axios.create({
   },
 })
 
+const marketClient = axios.create({
+  baseURL: '/yjb-market-api',
+  timeout: 15000,
+})
+
 function getToken(): string {
   return localStorage.getItem(TOKEN_KEY) || ''
 }
@@ -75,8 +80,7 @@ export async function getFundHoldings(accountId: string): Promise<FundHoldItem[]
 }
 
 export async function getIndexData(): Promise<IndexData[]> {
-  const path = '/index_data'
-  const resp = await client.get(path, { headers: buildHeaders(path) })
+  const resp = await marketClient.get('/market/v1/quote/index-data')
   const data = extractData<any>(resp)
   return Array.isArray(data) ? data : []
 }
