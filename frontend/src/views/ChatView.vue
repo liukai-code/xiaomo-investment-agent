@@ -437,9 +437,11 @@ watch(() => yjbStore.cardVisible, (visible) => {
         </div>
 
         <!-- 右侧养基宝卡片 -->
-        <div v-if="yjbStore.cardVisible && yjbStore.isLoggedIn" class="holdings-side-card">
-          <YjbHoldingsCard />
-        </div>
+        <Transition name="holdings-slide">
+          <div v-if="yjbStore.cardVisible && yjbStore.isLoggedIn" class="holdings-side-card">
+            <YjbHoldingsCard />
+          </div>
+        </Transition>
       </div>
     </div>
   </div>
@@ -514,11 +516,23 @@ watch(() => yjbStore.cardVisible, (visible) => {
 }
 
 .holdings-side-card {
-  width: 420px;
+  width: 500px;
   flex-shrink: 0;
-  border-left: 1px solid var(--border);
+  overflow: hidden;
   overflow-y: auto;
   padding: 20px;
   background: var(--bg);
+}
+
+.holdings-slide-enter-active,
+.holdings-slide-leave-active {
+  transition: width 0.3s ease, padding 0.3s ease, opacity 0.25s ease;
+}
+
+.holdings-slide-enter-from,
+.holdings-slide-leave-to {
+  width: 0;
+  padding: 20px 0;
+  opacity: 0;
 }
 </style>
