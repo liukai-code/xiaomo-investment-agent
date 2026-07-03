@@ -7,7 +7,7 @@ import { streamChat, streamDeepAnalysis, type WorkflowEvent } from '@/api/chat'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
 import WorkflowPanel from '@/components/workflow/WorkflowPanel.vue'
 import { useRafThrottle } from '@/composables/useMarkdownBlocks'
-import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next'
+import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen, Bell } from 'lucide-vue-next'
 import { useYangjibaoStore } from '@/stores/yangjibao'
 import YjbQrLogin from '@/components/yangjibao/YjbQrLogin.vue'
 import YjbHoldingsCard from '@/components/yangjibao/YjbHoldingsCard.vue'
@@ -345,6 +345,9 @@ watch(() => yjbStore.cardVisible, (visible) => {
               @close="yjbStore.qrModalVisible = false"
             />
           </div>
+          <button class="notify-btn" title="通知">
+            <Bell :size="18" />
+          </button>
           <div class="user-menu-wrapper">
             <button class="user-avatar-btn" @click.stop="showUserMenu = !showUserMenu">
               <User :size="20" />
@@ -498,6 +501,24 @@ watch(() => yjbStore.cardVisible, (visible) => {
 .yjb-status-dot.connected {
   background: var(--green);
   box-shadow: 0 0 4px var(--green);
+}
+
+.notify-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.notify-btn:hover {
+  background: var(--border);
 }
 
 .chat-main-area {
