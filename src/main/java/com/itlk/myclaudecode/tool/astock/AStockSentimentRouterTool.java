@@ -56,6 +56,7 @@ public class AStockSentimentRouterTool {
         try {
             String url = "https://dq.10jqka.com.cn/fuyao/hot_list_data/out/hot_list/v1/stock"
                     + "?stock_type=a&type=" + period + "&list_type=normal";
+            log.debug("[AStockSentimentRouterTool] 请求同花顺热榜: period={}", period);
             String body = emRateLimiter.get(url, Map.of());
             JsonNode root = objectMapper.readTree(body);
             JsonNode stockList = root.path("data").path("stock_list");
@@ -92,6 +93,7 @@ public class AStockSentimentRouterTool {
             bodyMap.put("pageSize", top);
             String jsonBody = objectMapper.writeValueAsString(bodyMap);
 
+            log.debug("[AStockSentimentRouterTool] 请求东财人气榜: top={}", top);
             String response = emRateLimiter.post("https://emappdata.eastmoney.com/stockrank/getAllCurrentList",
                     jsonBody, Map.of());
             JsonNode root = objectMapper.readTree(response);
@@ -157,6 +159,7 @@ public class AStockSentimentRouterTool {
             bodyMap.put("code", code);
             String jsonBody = objectMapper.writeValueAsString(bodyMap);
 
+            log.debug("[AStockSentimentRouterTool] 请求概念命中: code={}", code);
             String response = emRateLimiter.post("https://emappdata.eastmoney.com/stockrank/getHotStockRankList",
                     jsonBody, Map.of());
             JsonNode root = objectMapper.readTree(response);

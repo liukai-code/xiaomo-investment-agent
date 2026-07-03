@@ -84,6 +84,7 @@ public class AStockReportRouterTool {
                         + "&beginTime=2000-01-01&endTime=2030-01-01"
                         + "&pageNo=" + page + "&fields=&qType=0&orgCode=&code=" + code + "&rcode="
                         + "&p=" + page + "&pageNum=" + page + "&pageNumber=" + page;
+                log.debug("[AStockReportRouterTool] 请求个股研报: code={}, page={}", code, page);
                 String body = emRateLimiter.get(url, Map.of("Referer", "https://data.eastmoney.com/"));
                 JsonNode root = objectMapper.readTree(body);
                 JsonNode data = root.path("data");
@@ -106,6 +107,7 @@ public class AStockReportRouterTool {
                         + "?industryCode=" + industryCode + "&pageSize=100&industry=*&rating=*&ratingChange=*"
                         + "&beginTime=2024-01-01&endTime=2030-01-01"
                         + "&pageNo=" + page + "&fields=&qType=1";
+                log.debug("[AStockReportRouterTool] 请求行业研报: industryCode={}, page={}", industryCode, page);
                 String body = emRateLimiter.get(url, Map.of("Referer", "https://data.eastmoney.com/"));
                 JsonNode root = objectMapper.readTree(body);
                 JsonNode data = root.path("data");
@@ -140,6 +142,7 @@ public class AStockReportRouterTool {
         try {
             String code = AStockUtils.normalizeCode(stockCode);
             String url = "https://basic.10jqka.com.cn/new/" + code + "/worth.html";
+            log.debug("[AStockReportRouterTool] 请求同花顺EPS预期: code={}", code);
             String body = httpClientService.get(url, Headers.of(
                     "User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
                     "Referer", "https://basic.10jqka.com.cn/"
@@ -190,6 +193,7 @@ public class AStockReportRouterTool {
                     "Authorization", "Bearer " + iwencaiApiKey,
                     "Content-Type", "application/json"
             );
+            log.debug("[AStockReportRouterTool] iwencai语义搜索: query={}", query);
             String responseBody = emRateLimiter.post(url, jsonBody, headers);
             JsonNode root = objectMapper.readTree(responseBody);
             int statusCode = root.path("status_code").asInt(-1);
@@ -230,6 +234,7 @@ public class AStockReportRouterTool {
                     "Authorization", "Bearer " + iwencaiApiKey,
                     "Content-Type", "application/json"
             );
+            log.debug("[AStockReportRouterTool] iwencai结构化查询: query={}", query);
             String responseBody = emRateLimiter.post(url, jsonBody, headers);
             JsonNode root = objectMapper.readTree(responseBody);
             int statusCode = root.path("status_code").asInt(-1);

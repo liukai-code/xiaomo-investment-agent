@@ -68,6 +68,7 @@ public class AStockQuoteRouterTool {
                 prefixed.add(AStockUtils.toMarketPrefix(code));
             }
             String url = "https://qt.gtimg.cn/q=" + String.join(",", prefixed);
+            log.debug("[AStockQuoteRouterTool] 请求腾讯行情: codes={}", String.join(",", prefixed));
             String body = httpClientService.get(url, Headers.of("User-Agent", "Mozilla/5.0"));
             // 腾讯返回 GBK 编码
             return parseTencentQuote(body, codes);
@@ -128,6 +129,7 @@ public class AStockQuoteRouterTool {
                     + "&start_time=" + URLEncoder.encode(startTime, StandardCharsets.UTF_8)
                     + "&ktype=1";
 
+            log.debug("[AStockQuoteRouterTool] 请求百度K线: code={}", code);
             String responseStr = httpClientService.get(url, Headers.of(
                     "User-Agent", "Mozilla/5.0",
                     "Accept", "application/vnd.finance-web.v1+json",

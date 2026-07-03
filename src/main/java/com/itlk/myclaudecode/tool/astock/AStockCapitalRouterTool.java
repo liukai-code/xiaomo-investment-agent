@@ -75,6 +75,7 @@ public class AStockCapitalRouterTool {
             String url = DATACENTER_URL + "?reportName=RPTA_WEB_RZRQ_GGMX&columns=ALL"
                     + "&filter=" + filter + "&pageNumber=1&pageSize=" + pageSize
                     + "&sortColumns=DATE&sortTypes=-1&source=WEB&client=WEB";
+            log.debug("[AStockCapitalRouterTool] 请求融资融券: code={}", code);
             String body = emRateLimiter.get(url, Map.of());
             JsonNode data = objectMapper.readTree(body).path("result").path("data");
 
@@ -103,6 +104,7 @@ public class AStockCapitalRouterTool {
             String url = DATACENTER_URL + "?reportName=RPT_DATA_BLOCKTRADE&columns=ALL"
                     + "&filter=" + filter + "&pageNumber=1&pageSize=" + pageSize
                     + "&sortColumns=TRADE_DATE&sortTypes=-1&source=WEB&client=WEB";
+            log.debug("[AStockCapitalRouterTool] 请求大宗交易: code={}", code);
             String body = emRateLimiter.get(url, Map.of());
             JsonNode data = objectMapper.readTree(body).path("result").path("data");
 
@@ -134,6 +136,7 @@ public class AStockCapitalRouterTool {
             String url = DATACENTER_URL + "?reportName=RPT_HOLDERNUMLATEST&columns=ALL"
                     + "&filter=" + filter + "&pageNumber=1&pageSize=" + pageSize
                     + "&sortColumns=END_DATE&sortTypes=-1&source=WEB&client=WEB";
+            log.debug("[AStockCapitalRouterTool] 请求股东户数: code={}", code);
             String body = emRateLimiter.get(url, Map.of());
             JsonNode data = objectMapper.readTree(body).path("result").path("data");
 
@@ -163,6 +166,7 @@ public class AStockCapitalRouterTool {
             String url = DATACENTER_URL + "?reportName=RPT_SHAREBONUS_DET&columns=ALL"
                     + "&filter=" + filter + "&pageNumber=1&pageSize=" + pageSize
                     + "&sortColumns=EX_DIVIDEND_DATE&sortTypes=-1&source=WEB&client=WEB";
+            log.debug("[AStockCapitalRouterTool] 请求分红送转: code={}", code);
             String body = emRateLimiter.get(url, Map.of());
             JsonNode data = objectMapper.readTree(body).path("result").path("data");
 
@@ -192,6 +196,7 @@ public class AStockCapitalRouterTool {
             String url = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get"
                     + "?secid=" + secId + "&lmt=120"
                     + "&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65";
+            log.debug("[AStockCapitalRouterTool] 请求120日资金流: code={}", code);
             String body = emRateLimiter.get(url, Map.of(
                     "Referer", "https://quote.eastmoney.com/",
                     "Origin", "https://quote.eastmoney.com"
@@ -224,6 +229,7 @@ public class AStockCapitalRouterTool {
         try {
             // 1. 拉取实时数据
             String url = "https://data.hexin.cn/market/hsgtApi/method/dayChart/";
+            log.debug("[AStockCapitalRouterTool] 请求北向资金实时数据");
             String body = emRateLimiter.get(url, Map.of());
             JsonNode root = objectMapper.readTree(body);
 

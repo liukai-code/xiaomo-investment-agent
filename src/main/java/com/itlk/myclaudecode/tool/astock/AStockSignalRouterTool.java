@@ -76,6 +76,7 @@ public class AStockSignalRouterTool {
             String url = "https://push2.eastmoney.com/api/qt/slist/get"
                     + "?fltt=2&invt=2&secid=" + secId + "&spt=3&pi=0&pz=200&po=1"
                     + "&fields=f12,f14,f3,f128";
+            log.debug("[AStockSignalRouterTool] 请求板块归属: code={}", code);
             String body = emRateLimiter.get(url, Map.of("Referer", "https://quote.eastmoney.com/"));
             JsonNode root = objectMapper.readTree(body);
             JsonNode data = root.path("data");
@@ -113,6 +114,7 @@ public class AStockSignalRouterTool {
             String url = "https://push2.eastmoney.com/api/qt/stock/fflow/kline/get"
                     + "?secid=" + secId + "&klt=1"
                     + "&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57";
+            log.debug("[AStockSignalRouterTool] 请求分钟资金流: code={}", code);
             String body = emRateLimiter.get(url, Map.of(
                     "Referer", "https://quote.eastmoney.com/",
                     "Origin", "https://quote.eastmoney.com"
@@ -163,6 +165,7 @@ public class AStockSignalRouterTool {
             // 1. 上榜记录
             String url1 = DATACENTER_URL + "?reportName=RPT_DAILYBILLBOARD_DETAILSNEW&columns=ALL"
                     + "&filter=" + filter + "&pageNumber=1&pageSize=50&sortColumns=TRADE_DATE&sortTypes=-1&source=WEB&client=WEB";
+            log.debug("[AStockSignalRouterTool] 请求龙虎榜记录: code={}, date={}", code, tradeDate);
             String body1 = emRateLimiter.get(url1, Map.of());
             JsonNode root1 = objectMapper.readTree(body1);
             JsonNode data1 = root1.path("result").path("data");
@@ -192,6 +195,7 @@ public class AStockSignalRouterTool {
             String buyFilter = String.format("(TRADE_DATE='%s')(SECURITY_CODE=\"%s\")", latestDate, code);
             String urlBuy = DATACENTER_URL + "?reportName=RPT_BILLBOARD_DAILYDETAILSBUY&columns=ALL"
                     + "&filter=" + buyFilter + "&pageNumber=1&pageSize=10&sortColumns=BUY&sortTypes=-1&source=WEB&client=WEB";
+            log.debug("[AStockSignalRouterTool] 请求龙虎榜买席位: code={}, date={}", code, latestDate);
             String bodyBuy = emRateLimiter.get(urlBuy, Map.of());
             JsonNode buyData = objectMapper.readTree(bodyBuy).path("result").path("data");
             sb.append("  买入TOP5:\n");
@@ -209,6 +213,7 @@ public class AStockSignalRouterTool {
 
             String urlSell = DATACENTER_URL + "?reportName=RPT_BILLBOARD_DAILYDETAILSSELL&columns=ALL"
                     + "&filter=" + buyFilter + "&pageNumber=1&pageSize=10&sortColumns=SELL&sortTypes=-1&source=WEB&client=WEB";
+            log.debug("[AStockSignalRouterTool] 请求龙虎榜卖席位: code={}, date={}", code, latestDate);
             String bodySell = emRateLimiter.get(urlSell, Map.of());
             JsonNode sellData = objectMapper.readTree(bodySell).path("result").path("data");
             sb.append("  卖出TOP5:\n");
@@ -237,6 +242,7 @@ public class AStockSignalRouterTool {
             }
             String url = DATACENTER_URL + "?reportName=RPT_DAILYBILLBOARD_DETAILSNEW&columns=ALL"
                     + "&filter=" + filter + "&pageNumber=1&pageSize=50&sortColumns=BILLBOARD_NET_AMT&sortTypes=-1&source=WEB&client=WEB";
+            log.debug("[AStockSignalRouterTool] 请求全市场龙虎榜: date={}", tradeDate);
             String body = emRateLimiter.get(url, Map.of());
             JsonNode root = objectMapper.readTree(body);
             JsonNode data = root.path("result").path("data");
@@ -264,6 +270,7 @@ public class AStockSignalRouterTool {
             String filter = String.format("(SECURITY_CODE=\"%s\")", code);
             String url = DATACENTER_URL + "?reportName=RPT_LIFT_STAGE&columns=ALL"
                     + "&filter=" + filter + "&pageNumber=1&pageSize=50&sortColumns=FREE_DATE&sortTypes=-1&source=WEB&client=WEB";
+            log.debug("[AStockSignalRouterTool] 请求解禁日历: code={}", code);
             String body = emRateLimiter.get(url, Map.of());
             JsonNode root = objectMapper.readTree(body);
             JsonNode data = root.path("result").path("data");
@@ -307,6 +314,7 @@ public class AStockSignalRouterTool {
             String url = "https://push2.eastmoney.com/api/qt/clist/get"
                     + "?pn=1&pz=" + topN + "&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281"
                     + "&fltt=2&invt=2&fid=f3&fs=m:90+t:2&fields=f12,f14,f3,f104,f105,f128";
+            log.debug("[AStockSignalRouterTool] 请求行业排名: topN={}", topN);
             String body = emRateLimiter.get(url, Map.of("Referer", "https://quote.eastmoney.com/"));
             JsonNode root = objectMapper.readTree(body);
             JsonNode diff = root.path("data").path("diff");

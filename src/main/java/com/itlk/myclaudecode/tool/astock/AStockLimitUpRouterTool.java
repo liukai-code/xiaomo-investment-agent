@@ -143,6 +143,7 @@ public class AStockLimitUpRouterTool {
                     + "?page=1&limit=200"
                     + "&field=199112,10,9001,330323,330324,330325,9002,330329,133971,133970,1968584,3475914,9003,9004"
                     + "&filter=HS,GEM2STAR&order_field=330324&order_type=0&date=" + date;
+            log.debug("[AStockLimitUpRouterTool] 请求同花顺涨停揭秘: date={}", date);
             String body = emRateLimiter.get(url, Map.of());
             JsonNode root = objectMapper.readTree(body);
             JsonNode info = root.path("data").path("info");
@@ -211,6 +212,7 @@ public class AStockLimitUpRouterTool {
         try {
             String url = "https://push2ex.eastmoney.com/" + endpoint
                     + "?ut=" + ZTB_UT + "&dpt=wz.ztzt&Pageindex=0&pagesize=10000&sort=" + sort + "&date=" + date;
+            log.debug("[AStockLimitUpRouterTool] 请求push2ex: endpoint={}, date={}", endpoint, date);
             String body = emRateLimiter.get(url, Map.of("Referer", "https://quote.eastmoney.com/"));
             JsonNode root = objectMapper.readTree(body);
             JsonNode pool = root.path("data").path("pool");

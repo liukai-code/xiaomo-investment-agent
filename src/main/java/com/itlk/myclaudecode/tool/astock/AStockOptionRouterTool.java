@@ -65,6 +65,7 @@ public class AStockOptionRouterTool {
             String cate = cateMap.getOrDefault(underlying, "50ETF");
             String url = "https://stock.finance.sina.com.cn/futures/api/openapi.php/"
                     + "StockOptionService.getStockName?exchange=null&cate=" + cate;
+            log.debug("[AStockOptionRouterTool] 请求期权合约清单: underlying={}, cate={}", underlying, cate);
             String body = httpClientService.get(url, Headers.of("User-Agent", "Mozilla/5.0"));
             JsonNode root = objectMapper.readTree(body);
             JsonNode months = root.path("result").path("data").path("contractMonth");
@@ -77,6 +78,7 @@ public class AStockOptionRouterTool {
                 for (int i = 1; i < months.size(); i++) {
                     String month = months.get(i).asText().replace("-", "").substring(2);
                     String listUrl = "https://hq.sinajs.cn/list=" + flag + underlying + month;
+                    log.debug("[AStockOptionRouterTool] 请求期权月份合约: flag={}, underlying={}, month={}", flag, underlying, month);
                     String listBody = httpClientService.get(listUrl, Headers.of(
                             "User-Agent", "Mozilla/5.0",
                             "Referer", "https://finance.sina.com.cn/"
@@ -104,6 +106,7 @@ public class AStockOptionRouterTool {
     private String optionTQuote(String contractCode) {
         try {
             String url = "https://hq.sinajs.cn/list=CON_OP_" + contractCode;
+            log.debug("[AStockOptionRouterTool] 请求期权T型报价: contractCode={}", contractCode);
             String body = httpClientService.get(url, Headers.of(
                     "User-Agent", "Mozilla/5.0",
                     "Referer", "https://finance.sina.com.cn/"
@@ -131,6 +134,7 @@ public class AStockOptionRouterTool {
     private String optionGreeks(String contractCode) {
         try {
             String url = "https://hq.sinajs.cn/list=CON_SO_" + contractCode;
+            log.debug("[AStockOptionRouterTool] 请求期权Greeks: contractCode={}", contractCode);
             String body = httpClientService.get(url, Headers.of(
                     "User-Agent", "Mozilla/5.0",
                     "Referer", "https://finance.sina.com.cn/"

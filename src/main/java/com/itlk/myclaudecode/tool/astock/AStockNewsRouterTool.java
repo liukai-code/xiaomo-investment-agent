@@ -89,6 +89,7 @@ public class AStockNewsRouterTool {
             ));
             String url = "https://search-api-web.eastmoney.com/search/jsonp?cb=jQuery_news&param="
                     + URLEncoder.encode(innerParams, StandardCharsets.UTF_8);
+            log.debug("[AStockNewsRouterTool] 请求个股新闻: code={}", code);
             String body = emRateLimiter.get(url, Map.of("Referer", "https://so.eastmoney.com/"));
 
             // 解析 JSONP
@@ -121,6 +122,7 @@ public class AStockNewsRouterTool {
             String url = "https://np-weblist.eastmoney.com/comm/web/getFastNewsList"
                     + "?client=web&biz=web_724&fastColumn=102&sortEnd=&pageSize=" + pageSize
                     + "&req_trace=" + UUID.randomUUID();
+            log.debug("[AStockNewsRouterTool] 请求全球资讯: pageSize={}", pageSize);
             String body = emRateLimiter.get(url, Map.of("Referer", "https://kuaixun.eastmoney.com/"));
             JsonNode root = objectMapper.readTree(body);
             JsonNode items = root.path("data").path("fastNewsList");
@@ -165,6 +167,7 @@ public class AStockNewsRouterTool {
                     .build();
 
             // cninfo 不走东财限流器，需要直接用 emRateLimiter 的 post 方法
+            log.debug("[AStockNewsRouterTool] 请求巨潮公告: code={}", code);
             String responseBody = emRateLimiter.post(url, formBody, Map.of(
                     "Content-Type", "application/x-www-form-urlencoded",
                     "Referer", "https://www.cninfo.com.cn/new/disclosure"
@@ -215,6 +218,7 @@ public class AStockNewsRouterTool {
             String code = AStockUtils.normalizeCode(stockCode);
             // 第一步：查询 orgId
             String url1 = "https://irm.cninfo.com.cn/newircs/index/queryKeyboardInfo";
+            log.debug("[AStockNewsRouterTool] 互动易-查询orgId: code={}", code);
             String body1 = emRateLimiter.post(url1, "keyWord=" + code, Map.of());
             JsonNode d1 = objectMapper.readTree(body1).path("data");
             if (!d1.isArray() || d1.isEmpty()) {
@@ -226,6 +230,7 @@ public class AStockNewsRouterTool {
             String url2 = "https://irm.cninfo.com.cn/newircs/company/question"
                     + "?_t=1&stockcode=" + code + "&orgId=" + orgId
                     + "&pageSize=" + pageSize + "&pageNum=1&keyWord=&startDay=&endDay=";
+            log.debug("[AStockNewsRouterTool] 互动易-查询问答: code={}, orgId={}", code, orgId);
             String body2 = emRateLimiter.post(url2, "", Map.of());
             JsonNode rows = objectMapper.readTree(body2).path("rows");
 
@@ -255,6 +260,7 @@ public class AStockNewsRouterTool {
             String paperCode = prefix + code;
             String url = "https://quotes.sina.cn/cn/api/openapi.php/CompanyFinanceService.getFinanceReport2022"
                     + "?paperCode=" + paperCode + "&source=" + reportType + "&type=0&page=1&num=" + num;
+            log.debug("[AStockNewsRouterTool] 请求新浪财报: code={}, type={}", code, reportType);
             String body = emRateLimiter.get(url, Map.of());
             JsonNode root = objectMapper.readTree(body);
             JsonNode reportList = root.path("result").path("data").path("report_list");
