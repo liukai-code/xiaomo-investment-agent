@@ -19,7 +19,7 @@ const todayIncome = computed(() => props.data?.today_income ?? 0)
 const todayRate = computed(() => props.data?.today_income_rate ?? 0)
 
 function formatMoney(v: number): string {
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return (v ?? 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function switchAccount(e: Event) {

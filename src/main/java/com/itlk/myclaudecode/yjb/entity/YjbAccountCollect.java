@@ -1,5 +1,6 @@
 package com.itlk.myclaudecode.yjb.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -21,12 +22,15 @@ public class YjbAccountCollect {
     @Column(name = "account_id", nullable = false, length = 50)
     private String accountId;
 
+    @JsonProperty("hold_cost")
     @Column(name = "hold_cost", precision = 15, scale = 2)
     private BigDecimal holdCost;
 
+    @JsonProperty("today_income")
     @Column(name = "today_income", precision = 15, scale = 2)
     private BigDecimal todayIncome;
 
+    @JsonProperty("today_income_rate")
     @Column(name = "today_income_rate", precision = 8, scale = 4)
     private BigDecimal todayIncomeRate;
 

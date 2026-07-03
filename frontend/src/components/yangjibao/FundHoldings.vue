@@ -6,7 +6,7 @@ defineProps<{
 }>()
 
 function formatMoney(v: number): string {
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return (v ?? 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function formatRate(item: FundHoldItem): string {

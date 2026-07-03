@@ -14,11 +14,6 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:4545',
       '/agent': 'http://localhost:4545',
-      '/yjb-api': {
-        target: 'http://browser-plug-api.yangjibao.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/yjb-api/, ''),
-      },
       '/yjb-market-api': {
         target: 'https://app-api.yangjibao.com',
         changeOrigin: true,

@@ -1,103 +1,76 @@
 import axios from 'axios'
-import CryptoJS from 'crypto-js'
 import request from './request'
 import type { QrCode, QrCodeState, UserAccount, AccountCollect, FundHoldItem, IndexData } from '@/types/yangjibao'
-
-const BASE_URL = '/yjb-api'
-const SECRET = 'YxmKSrQR4uoJ5lOoWIhcbd7SlUEh9OOc'
-const TOKEN_KEY = 'yjb_token'
-
-const client = axios.create({
-  baseURL: BASE_URL,
-  timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
 
 const marketClient = axios.create({
   baseURL: '/yjb-market-api',
   timeout: 15000,
 })
 
-function getToken(): string {
-  return localStorage.getItem(TOKEN_KEY) || ''
-}
-
-function buildHeaders(path: string): Record<string, string> {
-  const token = getToken()
-  const timestamp = Math.floor(Date.now() / 1000).toString()
-  const signPath = path.split('?')[0]
-  const sign = CryptoJS.MD5('' + signPath + token + timestamp + SECRET).toString()
-  return {
-    'Request-Time': timestamp,
-    'Request-Sign': sign,
-    'Authorization': token,
-  }
-}
-
 function extractData<T>(resp: any): T {
   const body = resp.data
-  if (body.code !== 200) {
-    throw new Error(body.message || '请求失败')
+  if (!body || body.code !== 1) {
+    const detail = body ? JSON.stringify(body) : '响应为空'
+    console.error('[YJB] extractData 失败:', detail)
+    throw new Error(body?.msg || body?.message || `请求失败: ${detail}`)
   }
   return body.data
 }
 
+// ==================== QR 登录（后端代理） ====================
+
 export async function getQrCode(): Promise<QrCode> {
-  const path = '/qr_code'
-  const resp = await client.get(path, { headers: buildHeaders(path) })
+  const resp = await request.get('/api/yjb/qr-code')
   return extractData<QrCode>(resp)
 }
 
 export async function getQrCodeState(qrId: string): Promise<QrCodeState> {
-  const path = `/qr_code_state/${qrId}`
-  const resp = await client.get(path, { headers: buildHeaders(path) })
+  const resp = await request.get(`/api/yjb/qr-state/${qrId}`)
   return extractData<QrCodeState>(resp)
 }
 
-export async function getUserAccounts(): Promise<UserAccount[]> {
-  const path = '/user_account'
-  const resp = await client.get(path, { headers: buildHeaders(path) })
-  const data = extractData<any>(resp)
-  return data.list || data
+// ==================== Token 管理 ====================
+
+export async function saveYjbToken(token: string): Promise<void> {
+  await request.post('/api/yjb/token', { token })
 }
 
-export async function getAccountCollect(): Promise<AccountCollect> {
-  const path = '/account_collect'
-  const resp = await client.get(path, { headers: buildHeaders(path) })
-  const data = extractData<any>(resp)
-  return data.account_data?.[0] || data
+export async function checkYjbStatus(): Promise<{ loggedIn: boolean }> {
+  const resp = await request.get('/api/yjb/status')
+  return extractData(resp)
 }
 
-export async function getFundHoldings(accountId: string): Promise<FundHoldItem[]> {
-  const path = '/fund_hold'
-  const resp = await client.get(path, {
-    headers: buildHeaders(path),
-    params: { account_id: accountId },
+// ==================== 数据同步 ====================
+
+export interface SyncResult {
+  accounts: UserAccount[]
+  accountCollect: AccountCollect
+  holdings: FundHoldItem[]
+  selectedAccountId: string
+}
+
+export async function syncHoldings(accountId?: string): Promise<SyncResult> {
+  const resp = await request.post('/api/yjb/sync', null, {
+    params: accountId ? { accountId } : {},
   })
-  const data = extractData<any>(resp)
-  return Array.isArray(data) ? data : []
+  return extractData<SyncResult>(resp)
 }
+
+// ==================== 读取已同步数据 ====================
+
+export async function getHoldings(): Promise<{ holdings: FundHoldItem[]; accountCollect: AccountCollect | null }> {
+  const resp = await request.get('/api/yjb/holdings')
+  return extractData(resp)
+}
+
+// ==================== 行情数据（公开 API，前端直连） ====================
 
 export async function getIndexData(): Promise<IndexData[]> {
   const resp = await marketClient.get('/market/v1/quote/index-data')
-  const data = extractData<any>(resp)
-  return Array.isArray(data) ? data : []
-}
-
-export async function syncHoldingsToBackend(
-  accountId: string,
-  accountCollect: AccountCollect,
-  holdings: FundHoldItem[],
-): Promise<void> {
-  try {
-    await request.post('/api/yjb/sync', {
-      accountId,
-      accountCollect,
-      holdings,
-    })
-  } catch (err) {
-    console.warn('[YJB] 同步持仓到后端失败（不影响前端展示）', err)
+  const body = resp.data
+  if (body.code !== 200) {
+    throw new Error(body.message || '请求失败')
   }
+  const data = body.data
+  return Array.isArray(data) ? data : []
 }

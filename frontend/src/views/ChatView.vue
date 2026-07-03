@@ -335,9 +335,9 @@ watch(() => yjbStore.cardVisible, (visible) => {
         <div class="header-right">
           <div class="yjb-trigger-wrapper">
             <button class="yjb-connect-btn" @click.stop="yjbStore.openCard()">
-              <span v-if="yjbStore.isLoggedIn" class="yjb-status-dot connected"></span>
+              <span v-if="yjbStore.yjbLoggedIn" class="yjb-status-dot connected"></span>
               <span v-else class="yjb-status-dot"></span>
-              {{ yjbStore.isLoggedIn ? '已连接养基宝' : '连接养基宝' }}
+              {{ yjbStore.yjbLoggedIn ? '已连接养基宝' : '连接养基宝' }}
             </button>
             <YjbQrLogin
               :visible="yjbStore.qrModalVisible"
@@ -441,7 +441,7 @@ watch(() => yjbStore.cardVisible, (visible) => {
 
         <!-- 右侧养基宝卡片 -->
         <Transition name="holdings-slide">
-          <div v-if="yjbStore.cardVisible && yjbStore.isLoggedIn" class="holdings-side-card">
+          <div v-if="yjbStore.cardVisible && yjbStore.yjbLoggedIn" class="holdings-side-card">
             <YjbHoldingsCard />
           </div>
         </Transition>
