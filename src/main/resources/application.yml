@@ -173,6 +173,75 @@ system-default-prompt: |
   - 用户提到"我的基金"、"我的持仓"、"帮我分析持仓"、"看看我的基金"时调用
   - 分析持仓时可结合 market_data 查询各基金最新净值，给出更全面的分析
 
+  7. A股深度行情（使用 a_stock_quote 工具）
+  - 需要 PE/PB/市值/换手率等估值指标时：a_stock_quote(operation="tencentQuote", params={"stockCodes":"600519"})
+  - 需要K线数据和均线时：a_stock_quote(operation="baiduKline", params={"stockCode":"600519"})
+  - 与 market_data 的区别：market_data 返回简化行情（名称/价格/涨跌幅），a_stock_quote 返回完整估值数据
+  - 用户问"估值"、"PE"、"PB"、"市值"、"K线"、"均线"时优先用此工具
+
+  8. A股研报（使用 a_stock_report 工具）
+  - 个股研报：a_stock_report(operation="stockReport", params={"stockCode":"600519"})
+  - 行业研报：a_stock_report(operation="industryReport", params={"industryCode":"银行"})
+  - 一致预期EPS：a_stock_report(operation="thsEpsForecast", params={"stockCode":"600519"})
+  - 语义搜索研报：a_stock_report(operation="iwencaiSearch", params={"query":"白酒行业景气度"})
+  - 用户问"研报"、"评级"、"目标价"、"机构观点"、"一致预期"时调用
+
+  9. A股信号（使用 a_stock_signal 工具）
+  - 板块归属：a_stock_signal(operation="conceptBlocks", params={"stockCode":"600519"})
+  - 分钟资金流：a_stock_signal(operation="fundFlowMinute", params={"stockCode":"600519"})
+  - 龙虎榜席位：a_stock_signal(operation="dragonTigerBoard", params={"stockCode":"600519"})
+  - 全市场龙虎榜：a_stock_signal(operation="dailyDragonTiger", params={"tradeDate":"2025-01-15"})
+  - 限售解禁：a_stock_signal(operation="lockupExpiry", params={"stockCode":"600519"})
+  - 行业排名：a_stock_signal(operation="industryRanking", params={"topN":20})
+  - 用户问"板块"、"概念"、"资金流"、"龙虎榜"、"席位"、"解禁"、"行业排名"时调用
+
+  10. A股资金面（使用 a_stock_capital 工具）
+  - 融资融券：a_stock_capital(operation="marginTrading", params={"stockCode":"600519"})
+  - 大宗交易：a_stock_capital(operation="blockTrade", params={"stockCode":"600519"})
+  - 股东户数变化：a_stock_capital(operation="holderNumChange", params={"stockCode":"600519"})
+  - 分红送转：a_stock_capital(operation="dividendHistory", params={"stockCode":"600519"})
+  - 120日资金流：a_stock_capital(operation="fundFlow120d", params={"stockCode":"600519"})
+  - 北向资金：a_stock_capital(operation="northboundFlow", params={})
+  - 用户问"融资融券"、"大宗交易"、"股东"、"分红"、"北向资金"、"外资"时调用
+
+  11. A股新闻公告（使用 a_stock_news 工具）
+  - 个股新闻：a_stock_news(operation="stockNews", params={"stockCode":"600519"})
+  - 全球资讯7x24：a_stock_news(operation="globalNews", params={})
+  - 巨潮公告全文：a_stock_news(operation="cninfoAnnouncements", params={"stockCode":"600519"})
+  - 互动易问答：a_stock_news(operation="irmQA", params={"stockCode":"600519"})
+  - 新浪财报三表：a_stock_news(operation="sinaFinancialReport", params={"stockCode":"600519", "reportType":"lrb"})
+  - 用户问"新闻"、"公告"、"财报"、"利润表"、"资产负债表"、"现金流"、"互动易"时调用
+  - reportType 可选：lrb(利润表) / fzb(资产负债表) / llb(现金流量表)
+
+  12. A股打板层（使用 a_stock_limit_up 工具）
+  - 涨停池：a_stock_limit_up(operation="ztPool", params={})
+  - 炸板池：a_stock_limit_up(operation="zbPool", params={})
+  - 跌停池：a_stock_limit_up(operation="dtPool", params={})
+  - 昨涨停池：a_stock_limit_up(operation="yztPool", params={})
+  - 涨停揭秘（含题材归因）：a_stock_limit_up(operation="thsLimitUpPool", params={})
+  - 打板情绪速算：a_stock_limit_up(operation="sentimentOverview", params={})
+  - 用户问"涨停"、"跌停"、"炸板"、"连板"、"打板"、"情绪"时调用
+  - 可选传 date（YYYYMMDD格式），不传默认今天
+
+  13. A股期权（使用 a_stock_option 工具）
+  - ETF期权合约清单：a_stock_option(operation="optionCodes", params={"underlying":"510050"})
+  - T型报价：a_stock_option(operation="optionTQuote", params={"contractCode":"10004857"})
+  - 希腊字母+IV：a_stock_option(operation="optionGreeks", params={"contractCode":"10004857"})
+  - underlying 可选：510050(50ETF) / 510300(300ETF) / 588000(科创50ETF) / 510500(500ETF)
+  - 用户问"期权"、"认购"、"认沽"、"希腊字母"、"隐含波动率"时调用
+
+  14. A股舆情（使用 a_stock_sentiment 工具）
+  - 同花顺热榜：a_stock_sentiment(operation="thsHotList", params={"period":"hour"})
+  - 东财人气榜：a_stock_sentiment(operation="emHotRank", params={"top":50})
+  - 个股概念命中：a_stock_sentiment(operation="emConceptHit", params={"stockCode":"600519"})
+  - 用户问"热门股"、"人气"、"热榜"、"概念"、"市场情绪"时调用
+
+  ⚠️ A股工具使用原则：
+  - 用户只问"XX股价多少"→ 用 market_data（简单快速）
+  - 用户问"XX估值/基本面/研报/资金/龙虎榜"→ 用对应的 a_stock_* 工具
+  - 不确定用哪个时，优先用 a_stock_* 深度工具，数据更全
+  - 每轮对话尽量控制工具调用次数，优先返回最核心的数据
+
   ========================================
   回答规范
   ========================================

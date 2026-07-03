@@ -478,6 +478,81 @@
         .toast.error { border-color: rgba(239, 68, 68, 0.3); }
         .toast.error svg { color: #F87171; }
 
+        /* Filter bar */
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 180px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 12px 8px 34px;
+            color: var(--text-primary);
+            font-size: 13px;
+            font-family: var(--font-sans);
+            outline: none;
+            transition: border-color 0.2s;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: 10px center;
+        }
+        .search-input::placeholder { color: var(--text-muted); }
+        .search-input:focus { border-color: var(--accent); }
+
+        .filter-tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 3px;
+        }
+        .filter-tab {
+            font-size: 12px;
+            font-weight: 500;
+            padding: 5px 12px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font-sans);
+            white-space: nowrap;
+        }
+        .filter-tab:hover { color: var(--text-secondary); }
+        .filter-tab.active {
+            background: rgba(34, 197, 94, 0.12);
+            color: var(--accent);
+        }
+
+        .group-label {
+            grid-column: 1 / -1;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            padding: 12px 0 4px;
+            border-top: 1px solid var(--border);
+            margin-top: 4px;
+        }
+        .group-label:first-child { border-top: none; margin-top: 0; }
+
+        .no-results {
+            text-align: center;
+            padding: 48px 24px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .header { padding: 16px 20px; }
@@ -564,6 +639,14 @@
                 <div class="section-title">工具列表</div>
                 <div class="section-count" id="sectionCount"></div>
             </div>
+            <div class="filter-bar" id="filterBar" style="display:none">
+                <input class="search-input" id="searchInput" type="text" placeholder="搜索工具名称...">
+                <div class="filter-tabs" id="filterTabs">
+                    <button class="filter-tab active" data-filter="all">全部</button>
+                    <button class="filter-tab" data-filter="enabled">已启用</button>
+                    <button class="filter-tab" data-filter="disabled">已禁用</button>
+                </div>
+            </div>
             <div id="content">
                 <div class="skeleton-grid">
                     <div class="skeleton-card"><div class="skeleton-info"><div class="skeleton-icon"></div><div><div class="skeleton-text w-32"></div><div class="skeleton-text w-20"></div></div></div><div class="skeleton-toggle"></div></div>
@@ -582,7 +665,14 @@
         const content = document.getElementById('content');
         const statsBar = document.getElementById('statsBar');
         const sectionHeader = document.getElementById('sectionHeader');
+        const filterBar = document.getElementById('filterBar');
+        const searchInput = document.getElementById('searchInput');
+        const filterTabs = document.getElementById('filterTabs');
         const toastContainer = document.getElementById('toastContainer');
+
+        let allTools = {};
+        let currentFilter = 'all';
+        let searchQuery = '';
 
         const TOOL_META = {
             'financial_calculator':   { desc: '金融计算器', group: 'calc', router: true, operations: [
@@ -624,6 +714,59 @@
             'readFile':               { desc: '读取服务器文件', group: 'file' },
             'writeFile':              { desc: '写入服务器文件', group: 'file' },
             'listFiles':              { desc: '列出目录文件', group: 'file' },
+            'a_stock_quote':          { desc: 'A股深度行情', group: 'market', router: true, operations: [
+                { name: 'tencentQuote',         desc: '批量实时行情(PE/PB/市值/换手率)' },
+                { name: 'baiduKline',           desc: 'K线+MA5/10/20均线' },
+            ]},
+            'a_stock_report':         { desc: 'A股研报查询', group: 'market', router: true, operations: [
+                { name: 'stockReport',          desc: '个股研报列表' },
+                { name: 'industryReport',       desc: '行业研报列表' },
+                { name: 'downloadReportPdf',    desc: '研报PDF下载链接' },
+                { name: 'thsEpsForecast',       desc: '同花顺一致预期EPS' },
+                { name: 'iwencaiSearch',        desc: 'i问财语义搜索研报' },
+                { name: 'iwencaiQuery',         desc: 'i问财结构化查询' },
+            ]},
+            'a_stock_signal':         { desc: 'A股信号查询', group: 'market', router: true, operations: [
+                { name: 'conceptBlocks',        desc: '个股板块/概念归属' },
+                { name: 'fundFlowMinute',       desc: '分钟级资金流向' },
+                { name: 'dragonTigerBoard',     desc: '龙虎榜席位明细' },
+                { name: 'dailyDragonTiger',     desc: '全市场龙虎榜' },
+                { name: 'lockupExpiry',         desc: '限售解禁日历' },
+                { name: 'industryRanking',      desc: '行业板块排名' },
+            ]},
+            'a_stock_capital':        { desc: 'A股资金面', group: 'market', router: true, operations: [
+                { name: 'marginTrading',        desc: '融资融券明细' },
+                { name: 'blockTrade',           desc: '大宗交易记录' },
+                { name: 'holderNumChange',      desc: '股东户数变化' },
+                { name: 'dividendHistory',      desc: '分红送转历史' },
+                { name: 'fundFlow120d',         desc: '120日资金流向' },
+                { name: 'northboundFlow',       desc: '北向资金(实时+历史)' },
+            ]},
+            'a_stock_news':           { desc: 'A股新闻公告', group: 'market', router: true, operations: [
+                { name: 'stockNews',            desc: '个股新闻' },
+                { name: 'globalNews',           desc: '全球财经资讯7x24' },
+                { name: 'cninfoAnnouncements',  desc: '巨潮公告全文' },
+                { name: 'irmQA',                desc: '互动易问答' },
+                { name: 'sinaFinancialReport',  desc: '新浪财报三表' },
+            ]},
+            'a_stock_limit_up':       { desc: 'A股打板层', group: 'market', router: true, operations: [
+                { name: 'ztPool',               desc: '涨停池' },
+                { name: 'zbPool',               desc: '炸板池' },
+                { name: 'dtPool',               desc: '跌停池' },
+                { name: 'yztPool',              desc: '昨日涨停池' },
+                { name: 'thsLimitUpPool',       desc: '同花顺涨停揭秘' },
+                { name: 'sentimentOverview',    desc: '打板情绪速算' },
+            ]},
+            'a_stock_option':         { desc: 'ETF期权查询', group: 'market', router: true, operations: [
+                { name: 'optionCodes',          desc: 'ETF期权合约清单' },
+                { name: 'optionTQuote',         desc: '期权T型报价' },
+                { name: 'optionGreeks',         desc: '希腊字母+隐含波动率' },
+            ]},
+            'a_stock_sentiment':      { desc: 'A股舆情互动', group: 'market', router: true, operations: [
+                { name: 'thsHotList',           desc: '同花顺热榜' },
+                { name: 'emHotRank',            desc: '东财人气榜' },
+                { name: 'emConceptHit',         desc: '个股概念命中' },
+            ]},
         };
 
         const ICONS = {
@@ -660,71 +803,59 @@
             sectionHeader.style.display = 'flex';
         }
 
+        const GROUP_LABELS = {
+            calc: '金融计算', market: '行情数据', data: '数据查询',
+            web: '网络抓取', file: '文件操作'
+        };
+        const GROUP_ORDER = ['calc', 'market', 'data', 'web', 'file'];
+
         function renderTools(tools) {
-            const names = Object.keys(tools);
+            allTools = tools;
             updateStats(tools);
+            filterBar.style.display = 'flex';
+            applyFilter();
+        }
+
+        function applyFilter() {
+            const names = Object.keys(allTools);
+            const q = searchQuery.toLowerCase();
+            const filtered = names.filter(name => {
+                const enabled = allTools[name];
+                if (currentFilter === 'enabled' && !enabled) return false;
+                if (currentFilter === 'disabled' && enabled) return false;
+                if (q) {
+                    const meta = TOOL_META[name] || {};
+                    const desc = (meta.desc || '').toLowerCase();
+                    if (!name.toLowerCase().includes(q) && !desc.includes(q)) return false;
+                }
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                content.innerHTML = '<div class="no-results">没有匹配的工具</div>';
+                return;
+            }
+
+            // Group by group
+            const grouped = {};
+            for (const name of filtered) {
+                const meta = TOOL_META[name] || { group: 'file' };
+                const g = meta.group || 'file';
+                if (!grouped[g]) grouped[g] = [];
+                grouped[g].push(name);
+            }
 
             let html = '<div class="tool-grid">';
-            for (const name of names) {
-                const enabled = tools[name];
-                const meta = TOOL_META[name] || { desc: '', group: 'file' };
-                const icon = ICONS[meta.group] || ICONS.file;
-
-                if (meta.router) {
-                    const opsHtml = meta.operations.map(op =>
-                        `<div class="router-op-item">
-                            <span class="router-op-name">${op.name}</span>
-                            <span class="router-op-desc">${op.desc}</span>
-                        </div>`
-                    ).join('');
-                    html += `
-                        <div class="tool-card router-card ${enabled ? 'enabled' : ''}" id="card-${name}">
-                            <div class="tool-header">
-                                <div class="tool-info">
-                                    <div class="tool-name-row">
-                                        <div class="tool-icon">${icon}</div>
-                                        <div class="tool-name">${name}</div>
-                                        <span class="router-badge">Router</span>
-                                    </div>
-                                    ${meta.desc ? `<div class="tool-desc">${meta.desc}（${meta.operations.length} 种 operation）</div>` : ''}
-                                    <div class="tool-status ${enabled ? 'on' : 'off'}" id="status-${name}">${enabled ? '运行中' : '已停用'}</div>
-                                </div>
-                                <label class="toggle">
-                                    <input type="checkbox" ${enabled ? 'checked' : ''}
-                                        aria-label="切换 ${name}"
-                                        onchange="toggleTool('${name}', this.checked)">
-                                    <span class="toggle-track"></span>
-                                </label>
-                                <svg class="expand-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                            </div>
-                            <div class="router-ops">
-                                <div class="router-ops-grid">${opsHtml}</div>
-                            </div>
-                        </div>`;
-                } else {
-                    html += `
-                        <div class="tool-card ${enabled ? 'enabled' : ''}" id="card-${name}">
-                            <div class="tool-info">
-                                <div class="tool-name-row">
-                                    <div class="tool-icon">${icon}</div>
-                                    <div class="tool-name">${name}</div>
-                                </div>
-                                ${meta.desc ? `<div class="tool-desc">${meta.desc}</div>` : ''}
-                                <div class="tool-status ${enabled ? 'on' : 'off'}" id="status-${name}">${enabled ? '运行中' : '已停用'}</div>
-                            </div>
-                            <label class="toggle">
-                                <input type="checkbox" ${enabled ? 'checked' : ''}
-                                    aria-label="切换 ${name}"
-                                    onchange="toggleTool('${name}', this.checked)">
-                                <span class="toggle-track"></span>
-                            </label>
-                        </div>`;
+            for (const g of GROUP_ORDER) {
+                if (!grouped[g]) continue;
+                html += `<div class="group-label">${GROUP_LABELS[g] || g}</div>`;
+                for (const name of grouped[g]) {
+                    html += renderToolCard(name, allTools[name]);
                 }
             }
             html += '</div>';
             content.innerHTML = html;
 
-            // Bind expand/collapse on router cards
             document.querySelectorAll('.tool-card.router-card').forEach(card => {
                 card.addEventListener('click', (e) => {
                     if (e.target.closest('.toggle')) return;
@@ -733,7 +864,63 @@
             });
         }
 
+        function renderToolCard(name, enabled) {
+            const meta = TOOL_META[name] || { desc: '', group: 'file' };
+            const icon = ICONS[meta.group] || ICONS.file;
+
+            if (meta.router) {
+                const opsHtml = meta.operations.map(op =>
+                    `<div class="router-op-item">
+                        <span class="router-op-name">${op.name}</span>
+                        <span class="router-op-desc">${op.desc}</span>
+                    </div>`
+                ).join('');
+                return `
+                    <div class="tool-card router-card ${enabled ? 'enabled' : ''}" id="card-${name}">
+                        <div class="tool-header">
+                            <div class="tool-info">
+                                <div class="tool-name-row">
+                                    <div class="tool-icon">${icon}</div>
+                                    <div class="tool-name">${name}</div>
+                                    <span class="router-badge">Router</span>
+                                </div>
+                                ${meta.desc ? `<div class="tool-desc">${meta.desc}（${meta.operations.length} 种 operation）</div>` : ''}
+                                <div class="tool-status ${enabled ? 'on' : 'off'}" id="status-${name}">${enabled ? '运行中' : '已停用'}</div>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" ${enabled ? 'checked' : ''}
+                                    aria-label="切换 ${name}"
+                                    onchange="toggleTool('${name}', this.checked)">
+                                <span class="toggle-track"></span>
+                            </label>
+                            <svg class="expand-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                        </div>
+                        <div class="router-ops">
+                            <div class="router-ops-grid">${opsHtml}</div>
+                        </div>
+                    </div>`;
+            }
+            return `
+                <div class="tool-card ${enabled ? 'enabled' : ''}" id="card-${name}">
+                    <div class="tool-info">
+                        <div class="tool-name-row">
+                            <div class="tool-icon">${icon}</div>
+                            <div class="tool-name">${name}</div>
+                        </div>
+                        ${meta.desc ? `<div class="tool-desc">${meta.desc}</div>` : ''}
+                        <div class="tool-status ${enabled ? 'on' : 'off'}" id="status-${name}">${enabled ? '运行中' : '已停用'}</div>
+                    </div>
+                    <label class="toggle">
+                        <input type="checkbox" ${enabled ? 'checked' : ''}
+                            aria-label="切换 ${name}"
+                            onchange="toggleTool('${name}', this.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>`;
+        }
+
         function renderError(msg) {
+            filterBar.style.display = 'none';
             content.innerHTML = `
                 <div class="error-state">
                     <div class="error-icon">
@@ -754,6 +941,7 @@
                 </div>`;
             statsBar.style.display = 'none';
             sectionHeader.style.display = 'none';
+            filterBar.style.display = 'none';
 
             try {
                 const resp = await fetch(API);
@@ -793,6 +981,21 @@
                 showToast(`操作失败：${e.message}`, 'error');
             }
         }
+
+        // Search & filter
+        searchInput.addEventListener('input', (e) => {
+            searchQuery = e.target.value;
+            applyFilter();
+        });
+
+        filterTabs.addEventListener('click', (e) => {
+            const tab = e.target.closest('.filter-tab');
+            if (!tab) return;
+            filterTabs.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentFilter = tab.dataset.filter;
+            applyFilter();
+        });
 
         loadTools();
     </script>
