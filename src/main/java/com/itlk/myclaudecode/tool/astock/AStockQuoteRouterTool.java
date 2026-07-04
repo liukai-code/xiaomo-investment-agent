@@ -137,7 +137,7 @@ public class AStockQuoteRouterTool {
                     + "&ktype=1";
 
             log.debug("[AStockQuoteRouterTool] 请求百度K线: code={}", code);
-            String responseStr = httpClientService.get(url, Headers.of(
+            String responseStr = httpClientService.getWithJdkClient(url, java.util.Map.of(
                     "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                     "Accept", "application/json, text/plain, */*",
                     "Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8",

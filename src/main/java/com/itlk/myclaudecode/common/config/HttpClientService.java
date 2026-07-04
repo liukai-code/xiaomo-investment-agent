@@ -10,6 +10,11 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -67,6 +72,27 @@ public class HttpClientService {
     public String get(String url, Headers headers) throws Exception {
         Request request = new Request.Builder().url(url).headers(headers).get().build();
         return execute(request);
+    }
+
+    /**
+     * 使用JDK HttpClient发送GET请求，绕过OkHttp的TLS指纹检测。
+     * 适用于对反爬严格的API（如百度金融）。
+     */
+    public String getWithJdkClient(String url, java.util.Map<String, String> headers) throws Exception {
+        HttpClient jdkClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
+        HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(15))
+                .GET();
+        headers.forEach(reqBuilder::header);
+        HttpResponse<String> resp = jdkClient.send(reqBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        if (resp.statusCode() != 200) {
+            throw new RuntimeException("HTTP请求失败: " + resp.statusCode());
+        }
+        return resp.body();
     }
 
     public String execute(Request request) throws Exception {
