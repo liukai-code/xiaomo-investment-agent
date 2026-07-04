@@ -67,14 +67,14 @@ function switchAccount(e: Event) {
 
 <style scoped>
 .account-summary {
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
 
 .summary-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .section-title {

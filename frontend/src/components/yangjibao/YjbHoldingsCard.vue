@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useYangjibaoStore } from '@/stores/yangjibao'
 import IndexQuotes from './IndexQuotes.vue'
+import MarketRanking from './MarketRanking.vue'
 import AccountSummary from './AccountSummary.vue'
 import FundHoldings from './FundHoldings.vue'
 import { TrendingUp, RefreshCw, X, Loader2 } from 'lucide-vue-next'
@@ -80,14 +81,23 @@ function handleClose() {
           <div class="yjb-card-divider"></div>
 
           <div class="yjb-card-section">
-            <FundHoldings :data="yjbStore.fundHoldings" />
+            <FundHoldings :data="yjbStore.fundHoldings" :valuations="yjbStore.fundValuations" />
           </div>
         </div>
 
         <!-- Tab: 行情中心 -->
         <div v-else key="market">
+          <div v-if="yjbStore.dayInfo" class="market-day-info">
+            <span :class="{ 'is-market-day': yjbStore.dayInfo.is_market_day }">
+              {{ yjbStore.dayInfo.is_market_day ? '交易日' : '非交易日' }}
+            </span>
+            <span class="day-date">{{ yjbStore.dayInfo.day }}</span>
+          </div>
           <div class="yjb-card-section">
             <IndexQuotes :data="yjbStore.indexData" />
+          </div>
+          <div class="yjb-card-section">
+            <MarketRanking :data="yjbStore.marketRanking" />
           </div>
         </div>
       </Transition>
@@ -238,10 +248,29 @@ function handleClose() {
   margin-bottom: 0;
 }
 
+/* Market day info */
+.market-day-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.market-day-info .is-market-day {
+  color: #10b981;
+  font-weight: 500;
+}
+
+.day-date {
+  color: #6b7280;
+}
+
 .yjb-card-divider {
   height: 1px;
   background: #F3F4F6;
-  margin: 0 0 20px;
+  margin: 0 0 8px;
 }
 
 /* Loading */
@@ -302,6 +331,6 @@ function handleClose() {
   color: #6b7280;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 </style>

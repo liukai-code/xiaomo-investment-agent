@@ -5,8 +5,11 @@ import {
   syncHoldings,
   saveYjbToken,
   checkYjbStatus,
+  getFundValuations,
+  getMarketRanking,
+  getDayInfo,
 } from '@/api/yangjibao'
-import type { UserAccount, AccountCollect, FundHoldItem, IndexData } from '@/types/yangjibao'
+import type { UserAccount, AccountCollect, FundHoldItem, IndexData, FundValuation, MarketRankingItem, DayInfo } from '@/types/yangjibao'
 
 export const useYangjibaoStore = defineStore('yangjibao', () => {
   const yjbLoggedIn = ref(false)
@@ -15,7 +18,10 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
   const selectedAccountId = ref('')
   const accountCollect = ref<AccountCollect | null>(null)
   const fundHoldings = ref<FundHoldItem[]>([])
+  const fundValuations = ref<FundValuation[]>([])
   const indexData = ref<IndexData[]>([])
+  const marketRanking = ref<MarketRankingItem[]>([])
+  const dayInfo = ref<DayInfo | null>(null)
 
   const loading = ref(false)
   const cardVisible = ref(false)
@@ -27,7 +33,10 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
     selectedAccountId.value = ''
     accountCollect.value = null
     fundHoldings.value = []
+    fundValuations.value = []
     indexData.value = []
+    marketRanking.value = []
+    dayInfo.value = null
   }
 
   function logout() {
@@ -78,7 +87,10 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
     accounts.value = []
     accountCollect.value = null
     fundHoldings.value = []
+    fundValuations.value = []
     indexData.value = []
+    marketRanking.value = []
+    dayInfo.value = null
     try {
       const [idxData, syncResult] = await Promise.all([
         getIndexData(),
@@ -91,6 +103,15 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
       if (syncResult.accounts.length > 0 && !selectedAccountId.value) {
         selectedAccountId.value = syncResult.selectedAccountId || syncResult.accounts[0].id
       }
+      // 持仓加载后，异步获取基金估值（不阻塞主流程）
+      const fundIds = syncResult.holdings.map(h => h.fund_id)
+      getFundValuations(fundIds).then(v => { fundValuations.value = v })
+
+      // 行情中心数据（并行请求，不阻塞主流程）
+      Promise.all([getMarketRanking(), getDayInfo()]).then(([ranking, info]) => {
+        marketRanking.value = ranking
+        dayInfo.value = info
+      })
     } catch (err) {
       console.error('养基宝数据加载失败', err)
     } finally {
@@ -104,6 +125,9 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
       const syncResult = await syncHoldings(selectedAccountId.value)
       accountCollect.value = syncResult.accountCollect
       fundHoldings.value = syncResult.holdings
+      // 异步获取基金估值
+      const fundIds = syncResult.holdings.map(h => h.fund_id)
+      getFundValuations(fundIds).then(v => { fundValuations.value = v })
     } catch (err) {
       console.error('持仓数据加载失败', err)
     }
@@ -116,7 +140,7 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
 
   return {
     yjbLoggedIn, accounts, selectedAccountId,
-    accountCollect, fundHoldings, indexData,
+    accountCollect, fundHoldings, fundValuations, indexData, marketRanking, dayInfo,
     loading, cardVisible, qrModalVisible,
     openCard, onQrLoginSuccess, logout,
     loadAllData, loadAccountData, switchAccount, clearYjbAuth, checkLogin,

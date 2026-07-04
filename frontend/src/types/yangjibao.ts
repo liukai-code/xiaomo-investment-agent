@@ -41,3 +41,23 @@ export interface IndexData {
   v: number
   dir: number
 }
+
+export interface FundValuation {
+  fund_id: string
+  dwjz: number       // 单位净值
+  rzzl: number       // 日涨幅 (%)
+  vgszzl: number     // 估值涨幅 (%)
+  jzrq: string       // 净值日期
+}
+
+export interface MarketRankingItem {
+  name: string       // 板块名称
+  change_rate: number // 涨跌幅 (%)
+}
+
+export interface DayInfo {
+  day: string
+  is_market_day: boolean
+  is_hk_market_day: boolean
+  last_marketday: string
+}

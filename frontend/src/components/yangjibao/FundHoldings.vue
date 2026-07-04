@@ -1,9 +1,19 @@
 <script setup lang="ts">
-import type { FundHoldItem } from '@/types/yangjibao'
+import { computed } from 'vue'
+import type { FundHoldItem, FundValuation } from '@/types/yangjibao'
 
-defineProps<{
+const props = defineProps<{
   data: FundHoldItem[]
+  valuations: FundValuation[]
 }>()
+
+const valuationMap = computed(() => {
+  const map = new Map<string, FundValuation>()
+  for (const v of props.valuations) {
+    map.set(v.fund_id, v)
+  }
+  return map
+})
 
 function formatMoney(v: number): string {
   return (v ?? 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -15,6 +25,11 @@ function formatRate(item: FundHoldItem): string {
   const rate = (item.hold_earn / cost) * 100
   return `${rate > 0 ? '+' : ''}${rate.toFixed(2)}%`
 }
+
+function formatValuation(val: number | undefined): string {
+  if (val == null) return '--'
+  return `${val > 0 ? '+' : ''}${val.toFixed(2)}%`
+}
 </script>
 
 <template>
@@ -25,16 +40,21 @@ function formatRate(item: FundHoldItem): string {
         <thead>
           <tr>
             <th>基金名称</th>
-            <th>代码</th>
             <th class="num">市值</th>
             <th class="num">盈亏</th>
             <th class="num">收益率</th>
+            <th class="num">估值涨幅</th>
+            <th>代码</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="item in data" :key="item.fund_id">
-            <td class="name-cell">{{ item.short_name }}</td>
-            <td class="code-cell">{{ item.code }}</td>
+            <td class="name-cell">
+              <div class="fund-name">{{ item.short_name }}</div>
+              <div v-if="valuationMap.get(item.fund_id)" class="fund-nav">
+                净值 {{ valuationMap.get(item.fund_id)!.dwjz.toFixed(4) }}
+              </div>
+            </td>
             <td class="num">{{ formatMoney(item.money) }}</td>
             <td class="num" :class="{ up: item.hold_earn > 0, down: item.hold_earn < 0 }">
               {{ item.hold_earn > 0 ? '+' : '' }}{{ formatMoney(item.hold_earn) }}
@@ -42,6 +62,14 @@ function formatRate(item: FundHoldItem): string {
             <td class="num" :class="{ up: item.hold_earn > 0, down: item.hold_earn < 0 }">
               {{ formatRate(item) }}
             </td>
+            <td class="num" :class="{
+              up: (valuationMap.get(item.fund_id)?.vgszzl ?? 0) > 0,
+              down: (valuationMap.get(item.fund_id)?.vgszzl ?? 0) < 0,
+              dim: !valuationMap.has(item.fund_id)
+            }">
+              {{ formatValuation(valuationMap.get(item.fund_id)?.vgszzl) }}
+            </td>
+            <td class="code-cell">{{ item.code }}</td>
           </tr>
         </tbody>
       </table>
@@ -52,14 +80,14 @@ function formatRate(item: FundHoldItem): string {
 
 <style scoped>
 .fund-holdings {
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
 
 .section-title {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-dim);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -69,14 +97,14 @@ function formatRate(item: FundHoldItem): string {
 }
 
 .holdings-table {
-  width: 100%;
+  min-width: 440px;
   border-collapse: collapse;
   font-size: 13px;
 }
 
 .holdings-table th {
   text-align: left;
-  padding: 8px 10px;
+  padding: 8px 12px;
   font-weight: 600;
   color: var(--text-dim);
   border-bottom: 1px solid var(--border);
@@ -89,7 +117,7 @@ function formatRate(item: FundHoldItem): string {
 }
 
 .holdings-table td {
-  padding: 10px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--border);
   color: var(--text);
 }
@@ -101,10 +129,23 @@ function formatRate(item: FundHoldItem): string {
 }
 
 .holdings-table td.name-cell {
-  max-width: 140px;
+  max-width: 160px;
+}
+
+.fund-name {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.fund-nav {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.dim {
+  color: var(--text-dim);
 }
 
 .holdings-table td.code-cell {

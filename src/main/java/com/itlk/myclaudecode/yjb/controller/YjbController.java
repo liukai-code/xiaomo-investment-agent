@@ -194,4 +194,41 @@ public class YjbController {
         data.put("accountCollect", collectList.isEmpty() ? null : collectList.get(0));
         return Result.success(data);
     }
+
+    // ==================== 基金估值 ====================
+
+    @PostMapping("/valuations")
+    public Result<?> getFundValuations(@RequestBody Map<String, List<String>> body,
+                                       HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.error("未登录");
+        }
+
+        List<String> fundIds = body.get("fundIds");
+        if (fundIds == null || fundIds.isEmpty()) {
+            return Result.success(List.of());
+        }
+
+        try {
+            List<YjbApiClient.FundValuationResponse> valuations = yjbApiClient.getFundValuations(fundIds);
+            List<Map<String, Object>> result = valuations.stream().map(v -> {
+                Map<String, Object> item = new HashMap<>();
+                item.put("fund_id", String.valueOf(v.fundId));
+                item.put("code", v.code);
+                item.put("short_name", v.shortName);
+                if (v.nvInfo != null) {
+                    item.put("dwjz", v.nvInfo.dwjz);
+                    item.put("rzzl", v.nvInfo.rzzl);
+                    item.put("vgszzl", v.nvInfo.vgszzl);
+                    item.put("jzrq", v.nvInfo.jzrq);
+                }
+                return item;
+            }).toList();
+            return Result.success(result);
+        } catch (Exception e) {
+            log.warn("[YJB] 获取基金估值失败: userId={}, fundIds={}", userId, fundIds, e);
+            return Result.error("获取估值失败: " + e.getMessage());
+        }
+    }
 }

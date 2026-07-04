@@ -26,6 +26,7 @@ function formatDir(dir: number): string {
 
 <template>
   <div class="index-quotes">
+    <div class="section-title">大盘指数</div>
     <div class="quotes-viewport">
       <div class="quotes-track">
         <div v-for="(item, i) in loopData" :key="`${item?.name ?? 'pad'}-${i}`" class="quote-card">
@@ -48,6 +49,15 @@ function formatDir(dir: number): string {
 <style scoped>
 .index-quotes {
   margin-bottom: 16px;
+}
+
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .quotes-viewport {

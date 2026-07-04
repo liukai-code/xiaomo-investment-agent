@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.Headers;
 import okhttp3.HttpUrl;
@@ -95,6 +97,58 @@ public class YjbApiClient {
             result.add(objectMapper.treeToValue(item, FundHoldResponse.class));
         }
         return result;
+    }
+
+    // ==================== 公网行情 API ====================
+
+    private static final String PUBLIC_BASE_URL = "https://app-api.yangjibao.com";
+
+    public List<FundValuationResponse> getFundValuations(List<String> fundIds) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        ArrayNode fundsArray = mapper.createArrayNode();
+        for (String id : fundIds) {
+            ObjectNode fund = mapper.createObjectNode();
+            fund.put("fund_id", Integer.parseInt(id));
+            fund.put("data_source", "1");
+            fundsArray.add(fund);
+        }
+        ObjectNode body = mapper.createObjectNode();
+        body.set("funds", fundsArray);
+
+        Request request = new Request.Builder()
+                .url(PUBLIC_BASE_URL + "/market/v1/fund/batch")
+                .headers(new Headers.Builder()
+                        .add("Content-Type", "application/json")
+                        .add("User-Agent", "YJB/2.0.4")
+                        .build())
+                .post(okhttp3.RequestBody.create(
+                        body.toString(),
+                        okhttp3.MediaType.parse("application/json")))
+                .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("批量估值请求失败: HTTP " + response.code());
+            }
+            String respBody = response.body() != null ? response.body().string() : "";
+            JsonNode root = objectMapper.readTree(respBody);
+
+            int code = root.has("code") ? root.get("code").asInt() : 0;
+            if (code != 200) {
+                String message = root.has("message") ? root.get("message").asText() : "未知错误";
+                throw new IOException("批量估值返回错误: code=" + code + ", message=" + message);
+            }
+
+            JsonNode data = root.get("data");
+            if (data == null || !data.isArray()) {
+                return Collections.emptyList();
+            }
+            List<FundValuationResponse> result = new ArrayList<>();
+            for (JsonNode item : data) {
+                result.add(objectMapper.treeToValue(item, FundValuationResponse.class));
+            }
+            return result;
+        }
     }
 
     // ==================== 内部方法 ====================
@@ -209,5 +263,24 @@ public class YjbApiClient {
         public String category;
         @JsonProperty("market_type")
         public String marketType;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class FundValuationResponse {
+        @JsonProperty("fund_id")
+        public int fundId;
+        public String code;
+        @JsonProperty("short_name")
+        public String shortName;
+        @JsonProperty("nv_info")
+        public NvInfo nvInfo;
+
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        public static class NvInfo {
+            public String dwjz;
+            public String rzzl;
+            public String vgszzl;
+            public String jzrq;
+        }
     }
 }
