@@ -414,12 +414,14 @@ watch(() => yjbStore.cardVisible, (visible) => {
             <button class="user-avatar-btn" @click.stop="showUserMenu = !showUserMenu">
               <User :size="20" />
             </button>
-            <div v-if="showUserMenu" class="user-dropdown" @click.stop>
-              <div class="user-dropdown-header">
-                <div class="user-dropdown-name">{{ authStore.accountId }}</div>
-                <div class="user-dropdown-id">{{ authStore.email }}</div>
+            <Transition name="user-fade">
+              <div v-if="showUserMenu" class="user-dropdown" @click.stop>
+                <div class="user-dropdown-header">
+                  <div class="user-dropdown-name">{{ authStore.accountId }}</div>
+                  <div class="user-dropdown-id">{{ authStore.email }}</div>
+                </div>
               </div>
-            </div>
+            </Transition>
           </div>
         </div>
       </div>
