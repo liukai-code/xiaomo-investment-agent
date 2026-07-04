@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import QRCode from 'qrcode'
 import { getQrCode, getQrCodeState } from '@/api/yangjibao'
 import { X, Loader2 } from 'lucide-vue-next'
 
@@ -13,12 +14,8 @@ const qrUrl = ref('')
 const qrId = ref('')
 const loading = ref(true)
 const error = ref('')
+const qrCanvas = ref<HTMLCanvasElement | null>(null)
 let timer: ReturnType<typeof setInterval> | null = null
-
-const qrImgSrc = computed(() => {
-  if (!qrUrl.value) return ''
-  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUrl.value)}`
-})
 
 async function fetchQr() {
   loading.value = true
@@ -30,6 +27,10 @@ async function fetchQr() {
     qrUrl.value = qr.url
     qrId.value = qr.id
     loading.value = false
+    await nextTick()
+    if (qrCanvas.value) {
+      await QRCode.toCanvas(qrCanvas.value, qr.url, { width: 180, margin: 2 })
+    }
 
     timer = setInterval(async () => {
       try {
@@ -92,7 +93,7 @@ function handleClose() {
         </div>
         <div v-else-if="error" class="qr-error">{{ error }}</div>
         <template v-else>
-          <img :src="qrImgSrc" alt="登录二维码" class="qr-img" />
+          <canvas ref="qrCanvas" class="qr-canvas"></canvas>
           <div class="qr-tip">请使用微信扫码登录</div>
         </template>
       </div>
@@ -149,9 +150,7 @@ function handleClose() {
   padding: 20px 16px;
 }
 
-.qr-img {
-  width: 180px;
-  height: 180px;
+.qr-canvas {
   border-radius: 8px;
 }
 
