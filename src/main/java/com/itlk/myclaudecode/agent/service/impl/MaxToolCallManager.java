@@ -104,6 +104,28 @@ public class MaxToolCallManager implements ToolCallingManager {
         log.info("[MaxToolCallManager] 工具调用轮次: {}/{}, 工具: [{}]", step, properties.maxIterations(), toolNames);
         ToolExecutionResult result;
 
+        // 硬限制检查：如果已超过最大轮次或 fetch 上限，直接阻止所有工具调用
+        boolean overMaxIterations = step > properties.maxIterations();
+        boolean overMaxFetch = fetchTracker != null && fetchTracker.isOverMaxFetches();
+        if (overMaxIterations || overMaxFetch) {
+            String blockMsg;
+            if (overMaxFetch) {
+                blockMsg = "已达到最大抓取次数限制。请立即停止所有工具调用，基于已获取的数据完成分析报告。不要再尝试调用任何工具。";
+                log.warn("[MaxToolCallManager] 已超过 fetch 硬上限, 阻止工具调用");
+            } else {
+                blockMsg = "已达到最大工具调用轮次限制。请立即停止所有工具调用，基于已获取的数据完成分析报告。不要再尝试调用任何工具。";
+                log.warn("[MaxToolCallManager] 已超过迭代硬上限 ({}/{}), 阻止工具调用", step, properties.maxIterations());
+            }
+            List<Message> blockHistory = new ArrayList<>();
+            blockHistory.add(assistantWithTools);
+            List<ToolResponseMessage.ToolResponse> blockResponses = new ArrayList<>();
+            for (AssistantMessage.ToolCall tc : toolCalls) {
+                blockResponses.add(new ToolResponseMessage.ToolResponse(tc.id(), tc.name(), blockMsg));
+            }
+            blockHistory.add(new ToolResponseMessage(blockResponses));
+            return new CachedToolExecutionResult(blockHistory);
+        }
+
         if (toolCalls.size() == 1) {
             AssistantMessage.ToolCall tc = toolCalls.get(0);
             boolean cacheable = behaviorRegistry.getBehavior(tc.name()).cacheable();
