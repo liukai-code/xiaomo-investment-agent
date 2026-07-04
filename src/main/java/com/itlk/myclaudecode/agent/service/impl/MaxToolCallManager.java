@@ -355,10 +355,8 @@ public class MaxToolCallManager implements ToolCallingManager {
     private static class GuardedToolExecutionResult implements ToolExecutionResult {
 
         private final List<Message> guardedHistory;
-        private final boolean hardLimit;
 
         GuardedToolExecutionResult(ToolExecutionResult delegate, GuardSignal signal) {
-            this.hardLimit = signal.isHardLimit();
             List<Message> original = delegate.conversationHistory();
             this.guardedHistory = injectAsSeparateMessage(original, signal);
         }
@@ -381,7 +379,8 @@ public class MaxToolCallManager implements ToolCallingManager {
 
         @Override
         public boolean returnDirect() {
-            return hardLimit;
+            // 不再强制返回，让 AI 模型有机会基于工具数据生成完整报告
+            return false;
         }
     }
 }
