@@ -109,11 +109,11 @@ public class AnalystNode implements WorkflowNode {
                 .options(options)
                 .stream()
                 .content()
+                .filter(chunk -> !isGuardTag(chunk))
                 .map(chunk -> {
                     report.append(chunk);
                     completenessChecker.appendChunk(chunk);
-                    String sanitized = sanitizeOutput(report.toString());
-                    return WorkflowEvent.agentChunk(roleName, sanitized);
+                    return WorkflowEvent.agentChunk(roleName, chunk);
                 })
                 .doOnComplete(() -> {
                     String fullReport = sanitizeOutput(report.toString());
@@ -131,5 +131,12 @@ public class AnalystNode implements WorkflowNode {
                 .replaceAll("\\n*\\[GUARD:[\\s\\S]*?\\[/GUARD]\\n*", "")
                 .replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "")
                 .trim();
+    }
+
+    private static boolean isGuardTag(String chunk) {
+        if (chunk == null) return false;
+        String trimmed = chunk.trim();
+        return trimmed.startsWith("[GUARD:") || trimmed.startsWith("[GUARD_SIGNAL]")
+                || trimmed.equals("[/GUARD]") || trimmed.equals("[/GUARD_SIGNAL]");
     }
 }

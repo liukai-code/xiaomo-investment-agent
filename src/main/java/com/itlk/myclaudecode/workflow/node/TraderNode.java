@@ -82,10 +82,10 @@ public class TraderNode implements WorkflowNode {
                         .build())
                 .stream()
                 .content()
+                .filter(chunk -> !isGuardTag(chunk))
                 .map(chunk -> {
                     proposal.append(chunk);
-                    String sanitized = sanitizeOutput(proposal.toString());
-                    return WorkflowEvent.agentChunk(roleName, sanitized);
+                    return WorkflowEvent.agentChunk(roleName, chunk);
                 })
                 .doOnComplete(() -> {
                     String fullProposal = sanitizeOutput(proposal.toString());
@@ -101,6 +101,13 @@ public class TraderNode implements WorkflowNode {
                 .replaceAll("\\n*\\[GUARD:[\\s\\S]*?\\[/GUARD]\\n*", "")
                 .replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "")
                 .trim();
+    }
+
+    private static boolean isGuardTag(String chunk) {
+        if (chunk == null) return false;
+        String trimmed = chunk.trim();
+        return trimmed.startsWith("[GUARD:") || trimmed.startsWith("[GUARD_SIGNAL]")
+                || trimmed.equals("[/GUARD]") || trimmed.equals("[/GUARD_SIGNAL]");
     }
 
     private String buildTraderPrompt(WorkflowState state) {

@@ -65,10 +65,10 @@ public class DebateNode implements WorkflowNode {
                         .build())
                 .stream()
                 .content()
+                .filter(chunk -> !isGuardTag(chunk))
                 .map(chunk -> {
                     argument.append(chunk);
-                    String sanitized = sanitizeOutput(argument.toString());
-                    return WorkflowEvent.debateChunk(roleName, sanitized);
+                    return WorkflowEvent.debateChunk(roleName, chunk);
                 })
                 .doOnComplete(() -> {
                     String fullArgument = sanitizeOutput(argument.toString());
@@ -85,6 +85,13 @@ public class DebateNode implements WorkflowNode {
                 .replaceAll("\\n*\\[GUARD:[\\s\\S]*?\\[/GUARD]\\n*", "")
                 .replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "")
                 .trim();
+    }
+
+    private static boolean isGuardTag(String chunk) {
+        if (chunk == null) return false;
+        String trimmed = chunk.trim();
+        return trimmed.startsWith("[GUARD:") || trimmed.startsWith("[GUARD_SIGNAL]")
+                || trimmed.equals("[/GUARD]") || trimmed.equals("[/GUARD_SIGNAL]");
     }
 
     private String buildDebatePrompt(WorkflowState state, List<DebateMessage> history, int round) {
