@@ -8,6 +8,7 @@ import com.itlk.myclaudecode.tool.FinancialCalcRouterTool;
 import com.itlk.myclaudecode.tool.FinancialDataRouterTool;
 import com.itlk.myclaudecode.tool.SqlTool;
 import com.itlk.myclaudecode.tool.WebFetchTool;
+import com.itlk.myclaudecode.tool.astock.*;
 import com.itlk.myclaudecode.tool.config.ToolConfigService;
 import com.itlk.myclaudecode.tool.config.ToolEnabledCheckWrapper;
 import com.itlk.myclaudecode.workflow.node.AnalystNode;
@@ -45,6 +46,14 @@ public class WorkflowAgentFactory {
             FinancialDataRouterTool financialDataRouterTool,
             SqlTool sqlTool,
             WebFetchTool webFetchTool,
+            AStockQuoteRouterTool aStockQuoteRouterTool,
+            AStockReportRouterTool aStockReportRouterTool,
+            AStockSignalRouterTool aStockSignalRouterTool,
+            AStockCapitalRouterTool aStockCapitalRouterTool,
+            AStockNewsRouterTool aStockNewsRouterTool,
+            AStockLimitUpRouterTool aStockLimitUpRouterTool,
+            AStockOptionRouterTool aStockOptionRouterTool,
+            AStockSentimentRouterTool aStockSentimentRouterTool,
             ToolCallbackProvider mcpProvider,
             ToolConfigService toolConfigService,
             ToolGuardProperties guardProperties) {
@@ -56,7 +65,10 @@ public class WorkflowAgentFactory {
         // 复用 AgentLoopImpl 相同的工具注册模式
         ToolCallbackProvider provider = MethodToolCallbackProvider.builder()
                 .toolObjects(fileReadTool, fileWriteTool, fileListTool,
-                        financialCalcRouterTool, financialDataRouterTool, sqlTool, webFetchTool)
+                        financialCalcRouterTool, financialDataRouterTool, sqlTool, webFetchTool,
+                        aStockQuoteRouterTool, aStockReportRouterTool, aStockSignalRouterTool,
+                        aStockCapitalRouterTool, aStockNewsRouterTool, aStockLimitUpRouterTool,
+                        aStockOptionRouterTool, aStockSentimentRouterTool)
                 .build();
 
         List<ToolCallback> callbacks = new ArrayList<>();
