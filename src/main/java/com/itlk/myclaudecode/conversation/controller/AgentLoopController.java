@@ -92,6 +92,16 @@ public class AgentLoopController {
         return Result.success(title);
     }
 
+    @PostMapping("/conversation/{id}/message")
+    public Result<Void> saveMessage(
+            @PathVariable Long id,
+            @RequestBody String content,
+            HttpServletRequest request) {
+        getUserId(request);
+        chatMessageService.saveAssistantMessage(id, content);
+        return Result.success(null);
+    }
+
     // ========== 聊天 ==========
 
     @GetMapping("/chat")

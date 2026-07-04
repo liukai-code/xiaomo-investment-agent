@@ -4,10 +4,11 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { streamChat, streamDeepAnalysis, type WorkflowEvent } from '@/api/chat'
+import { saveMessage } from '@/api/conversation'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
 import WorkflowPanel from '@/components/workflow/WorkflowPanel.vue'
 import { useRafThrottle } from '@/composables/useMarkdownBlocks'
-import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen, Bell } from 'lucide-vue-next'
+import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen, Bell, Square } from 'lucide-vue-next'
 import { useYangjibaoStore } from '@/stores/yangjibao'
 import YjbQrLogin from '@/components/yangjibao/YjbQrLogin.vue'
 import YjbHoldingsCard from '@/components/yangjibao/YjbHoldingsCard.vue'
@@ -192,6 +193,55 @@ async function handleSend() {
       abortController = null
     },
   })
+}
+
+function handleStop() {
+  if (abortController) {
+    abortController.abort()
+    abortController = null
+  }
+
+  // 保存已生成的部分内容到数据库
+  const lastMsg = chatStore.messages[chatStore.messages.length - 1]
+  if (lastMsg && lastMsg.role === 'ASSISTANT' && chatStore.currentConvId) {
+    let content = lastMsg.content
+    if (isWorkflowMode.value && workflowEvents.value.length > 0) {
+      content = buildPartialWorkflowSummary()
+    }
+    if (content) {
+      lastMsg.content = content + '\n\n> *已手动终止*'
+      saveMessage(chatStore.currentConvId, lastMsg.content)
+    }
+  }
+
+  chatStore.isGenerating = false
+  isWorkflowRunning.value = false
+  isWorkflowMode.value = false
+  statusText.value = 'READY'
+}
+
+function buildPartialWorkflowSummary(): string {
+  const completedPhases = workflowEvents.value
+    .filter((e) => e.type === 'PHASE_COMPLETE')
+    .map((e) => e.phase)
+  const runningPhase = workflowEvents.value
+    .filter((e) => e.type === 'PHASE_START')
+    .map((e) => e.phase)
+    .pop()
+  const finalEvent = workflowEvents.value.find((e) => e.type === 'FINAL_DECISION')
+
+  let summary = '## 深度分析（已终止）\n\n'
+  if (completedPhases.length > 0) {
+    summary += `已完成阶段：${completedPhases.join(' → ')}\n`
+  }
+  if (runningPhase && !completedPhases.includes(runningPhase)) {
+    summary += `中断阶段：${runningPhase}\n`
+  }
+  if (finalEvent?.content) {
+    summary += `\n### 已生成的决策\n\n${finalEvent.content}\n`
+  }
+  summary += '\n---\n*以上由多智能体工作流部分生成，仅供参考*'
+  return summary
 }
 
 function handleDeepAnalysis(text: string) {
@@ -379,7 +429,10 @@ watch(() => yjbStore.cardVisible, (visible) => {
                 @input="handleInput"
                 @keydown="handleKeydown"
               ></textarea>
-              <button class="send-btn" :disabled="chatStore.isGenerating" @click="handleSend()" title="发送">
+              <button v-if="chatStore.isGenerating" class="stop-btn" @click="handleStop()" title="停止">
+                <Square :size="18" />
+              </button>
+              <button v-else class="send-btn" @click="handleSend()" title="发送">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="22" y1="2" x2="11" y2="13"></line>
                   <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
@@ -428,7 +481,10 @@ watch(() => yjbStore.cardVisible, (visible) => {
                   @input="handleInput"
                   @keydown="handleKeydown"
                 ></textarea>
-                <button class="send-btn" :disabled="chatStore.isGenerating" @click="handleSend()" title="发送">
+                <button v-if="chatStore.isGenerating" class="stop-btn" @click="handleStop()" title="停止">
+                  <Square :size="18" />
+                </button>
+                <button v-else class="send-btn" @click="handleSend()" title="发送">
                   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="22" y1="2" x2="11" y2="13"></line>
                     <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
@@ -498,9 +554,15 @@ watch(() => yjbStore.cardVisible, (visible) => {
   flex-shrink: 0;
 }
 
+@keyframes breathe {
+  0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--green); }
+  50% { opacity: 0.4; box-shadow: 0 0 1px var(--green); }
+}
+
 .yjb-status-dot.connected {
   background: var(--green);
   box-shadow: 0 0 4px var(--green);
+  animation: breathe 2s ease-in-out infinite;
 }
 
 .notify-btn {

@@ -53,3 +53,10 @@ export async function deleteConversation(convId: number) {
   const { data } = await request.delete<Result<void>>(`/agent/conversation/${convId}`)
   return data
 }
+
+export async function saveMessage(convId: number, content: string) {
+  const { data } = await request.post<Result<void>>(`/agent/conversation/${convId}/message`, content, {
+    headers: { 'Content-Type': 'text/plain' },
+  })
+  return data
+}
