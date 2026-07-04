@@ -204,7 +204,7 @@ public class FinancialDataTool {
         log.info("[FinancialDataTool] searchSinaFallback 请求URL: {}", url);
 
         Headers headers = new Headers.Builder()
-                .add("User-Agent", "Mozilla/5.0")
+                .add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                 .add("Referer", "https://finance.sina.com.cn")
                 .build();
 

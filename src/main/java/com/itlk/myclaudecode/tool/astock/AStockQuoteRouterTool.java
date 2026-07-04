@@ -69,7 +69,9 @@ public class AStockQuoteRouterTool {
             }
             String url = "https://qt.gtimg.cn/q=" + String.join(",", prefixed);
             log.debug("[AStockQuoteRouterTool] 请求腾讯行情: codes={}", String.join(",", prefixed));
-            String body = httpClientService.get(url, Headers.of("User-Agent", "Mozilla/5.0"));
+            String body = httpClientService.get(url, Headers.of(
+                    "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ));
             // 腾讯返回 GBK 编码
             return parseTencentQuote(body, codes);
         } catch (Exception e) {
@@ -136,21 +138,25 @@ public class AStockQuoteRouterTool {
 
             log.debug("[AStockQuoteRouterTool] 请求百度K线: code={}", code);
             String responseStr = httpClientService.get(url, Headers.of(
-                    "User-Agent", "Mozilla/5.0",
-                    "Accept", "application/vnd.finance-web.v1+json",
+                    "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Accept", "application/json, text/plain, */*",
+                    "Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8",
                     "Origin", "https://gushitong.baidu.com",
                     "Referer", "https://gushitong.baidu.com/"
             ));
 
             JsonNode root = objectMapper.readTree(responseStr);
+            String resultCode = root.path("ResultCode").asText("");
             JsonNode result = root.path("Result");
             JsonNode md = result.path("newMarketData");
             String rows = md.path("marketData").asText("");
-            log.info("[AStockQuoteRouterTool] baiduKline 响应: code={}, responseSize={}, rows={}",
-                    code, responseStr.length(), rows.isEmpty() ? 0 : rows.split(";").length);
+            log.info("[AStockQuoteRouterTool] baiduKline 响应: code={}, resultCode={}, responseSize={}, rows={}",
+                    code, resultCode, responseStr.length(), rows.isEmpty() ? 0 : rows.split(";").length);
 
             if (rows.isEmpty()) {
-                return "未找到 " + code + " 的K线数据";
+                log.warn("[AStockQuoteRouterTool] baiduKline 数据为空: code={}, 响应前200字符: {}",
+                        code, responseStr.substring(0, Math.min(200, responseStr.length())));
+                return "未找到 " + code + " 的K线数据（百度API返回 resultCode=" + resultCode + "）";
             }
 
             StringBuilder sb = new StringBuilder();

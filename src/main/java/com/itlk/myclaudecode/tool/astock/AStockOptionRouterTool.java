@@ -66,7 +66,9 @@ public class AStockOptionRouterTool {
             String url = "https://stock.finance.sina.com.cn/futures/api/openapi.php/"
                     + "StockOptionService.getStockName?exchange=null&cate=" + cate;
             log.debug("[AStockOptionRouterTool] 请求期权合约清单: underlying={}, cate={}", underlying, cate);
-            String body = httpClientService.get(url, Headers.of("User-Agent", "Mozilla/5.0"));
+            String body = httpClientService.get(url, Headers.of(
+                    "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ));
             JsonNode root = objectMapper.readTree(body);
             JsonNode months = root.path("result").path("data").path("contractMonth");
 
@@ -80,7 +82,7 @@ public class AStockOptionRouterTool {
                     String listUrl = "https://hq.sinajs.cn/list=" + flag + underlying + month;
                     log.debug("[AStockOptionRouterTool] 请求期权月份合约: flag={}, underlying={}, month={}", flag, underlying, month);
                     String listBody = httpClientService.get(listUrl, Headers.of(
-                            "User-Agent", "Mozilla/5.0",
+                            "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                             "Referer", "https://finance.sina.com.cn/"
                     ));
                     // GBK 解码
@@ -108,7 +110,7 @@ public class AStockOptionRouterTool {
             String url = "https://hq.sinajs.cn/list=CON_OP_" + contractCode;
             log.debug("[AStockOptionRouterTool] 请求期权T型报价: contractCode={}", contractCode);
             String body = httpClientService.get(url, Headers.of(
-                    "User-Agent", "Mozilla/5.0",
+                    "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                     "Referer", "https://finance.sina.com.cn/"
             ));
             String decoded = new String(body.getBytes(StandardCharsets.ISO_8859_1), Charset.forName("GBK"));
@@ -136,7 +138,7 @@ public class AStockOptionRouterTool {
             String url = "https://hq.sinajs.cn/list=CON_SO_" + contractCode;
             log.debug("[AStockOptionRouterTool] 请求期权Greeks: contractCode={}", contractCode);
             String body = httpClientService.get(url, Headers.of(
-                    "User-Agent", "Mozilla/5.0",
+                    "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                     "Referer", "https://finance.sina.com.cn/"
             ));
             String decoded = new String(body.getBytes(StandardCharsets.ISO_8859_1), Charset.forName("GBK"));
