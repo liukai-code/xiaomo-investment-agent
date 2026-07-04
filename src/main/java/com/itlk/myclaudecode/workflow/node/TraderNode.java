@@ -84,13 +84,23 @@ public class TraderNode implements WorkflowNode {
                 .content()
                 .map(chunk -> {
                     proposal.append(chunk);
-                    return WorkflowEvent.agentChunk(roleName, chunk);
+                    String sanitized = sanitizeOutput(proposal.toString());
+                    return WorkflowEvent.agentChunk(roleName, sanitized);
                 })
                 .doOnComplete(() -> {
-                    state.setTradingProposal(proposal.toString());
-                    sink.tryEmitNext(WorkflowEvent.agentComplete(roleName, proposal.toString()));
+                    String fullProposal = sanitizeOutput(proposal.toString());
+                    state.setTradingProposal(fullProposal);
+                    sink.tryEmitNext(WorkflowEvent.agentComplete(roleName, fullProposal));
                     log.info("[{}] 交易方案制定完成", roleName);
                 });
+    }
+
+    private static String sanitizeOutput(String text) {
+        if (text == null) return "";
+        return text
+                .replaceAll("\\n*\\[GUARD:[\\s\\S]*?\\[/GUARD]\\n*", "")
+                .replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "")
+                .trim();
     }
 
     private String buildTraderPrompt(WorkflowState state) {

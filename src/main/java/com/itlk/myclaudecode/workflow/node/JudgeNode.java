@@ -65,12 +65,22 @@ public class JudgeNode implements WorkflowNode {
                 .content()
                 .map(chunk -> {
                     result.append(chunk);
-                    return WorkflowEvent.agentChunk(roleName, chunk);
+                    String sanitized = sanitizeOutput(result.toString());
+                    return WorkflowEvent.agentChunk(roleName, sanitized);
                 })
                 .doOnComplete(() -> {
-                    sink.tryEmitNext(WorkflowEvent.agentComplete(roleName, result.toString()));
+                    String fullResult = sanitizeOutput(result.toString());
+                    sink.tryEmitNext(WorkflowEvent.agentComplete(roleName, fullResult));
                     log.info("[{}] 裁决完成", roleName);
                 });
+    }
+
+    private static String sanitizeOutput(String text) {
+        if (text == null) return "";
+        return text
+                .replaceAll("\\n*\\[GUARD:[\\s\\S]*?\\[/GUARD]\\n*", "")
+                .replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "")
+                .trim();
     }
 
     private String buildJudgmentPrompt(WorkflowState state, List<DebateMessage> debateHistory) {

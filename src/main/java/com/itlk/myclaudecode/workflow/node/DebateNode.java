@@ -67,14 +67,24 @@ public class DebateNode implements WorkflowNode {
                 .content()
                 .map(chunk -> {
                     argument.append(chunk);
-                    return WorkflowEvent.debateChunk(roleName, chunk);
+                    String sanitized = sanitizeOutput(argument.toString());
+                    return WorkflowEvent.debateChunk(roleName, sanitized);
                 })
                 .doOnComplete(() -> {
-                    DebateMessage msg = new DebateMessage(roleName, argument.toString(), Instant.now());
+                    String fullArgument = sanitizeOutput(argument.toString());
+                    DebateMessage msg = new DebateMessage(roleName, fullArgument, Instant.now());
                     debateHistory.add(msg);
-                    sink.tryEmitNext(WorkflowEvent.debateComplete(roleName, argument.toString()));
+                    sink.tryEmitNext(WorkflowEvent.debateComplete(roleName, fullArgument));
                     log.info("[{}] 第 {} 轮辩论完成", roleName, round);
                 });
+    }
+
+    private static String sanitizeOutput(String text) {
+        if (text == null) return "";
+        return text
+                .replaceAll("\\n*\\[GUARD:[\\s\\S]*?\\[/GUARD]\\n*", "")
+                .replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "")
+                .trim();
     }
 
     private String buildDebatePrompt(WorkflowState state, List<DebateMessage> history, int round) {

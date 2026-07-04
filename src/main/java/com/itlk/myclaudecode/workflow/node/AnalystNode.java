@@ -112,15 +112,24 @@ public class AnalystNode implements WorkflowNode {
                 .map(chunk -> {
                     report.append(chunk);
                     completenessChecker.appendChunk(chunk);
-                    return WorkflowEvent.agentChunk(roleName, chunk);
+                    String sanitized = sanitizeOutput(report.toString());
+                    return WorkflowEvent.agentChunk(roleName, sanitized);
                 })
                 .doOnComplete(() -> {
-                    String fullReport = report.toString();
+                    String fullReport = sanitizeOutput(report.toString());
                     state.getAnalystReports().put(roleName,
                             new AgentReport(roleName, fullReport, Instant.now()));
                     sink.tryEmitNext(WorkflowEvent.agentComplete(roleName, fullReport));
                     log.info("[{}] 数据采集完成，报告长度: {}", roleName, fullReport.length());
                 })
                 .doOnError(e -> log.error("[{}] 数据采集错误: {}", roleName, e.getMessage()));
+    }
+
+    private static String sanitizeOutput(String text) {
+        if (text == null) return "";
+        return text
+                .replaceAll("\\n*\\[GUARD:[\\s\\S]*?\\[/GUARD]\\n*", "")
+                .replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "")
+                .trim();
     }
 }
