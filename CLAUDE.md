@@ -124,3 +124,26 @@ Response: `{ code: 1|0, msg, data }`
 - 前端密码传输: 客户端 SHA-256 → 服务端 BCrypt
 - 流式输出: 后端 Flux 累积全文，前端 SSE 解析替换
 - 前端图标统一使用 `lucide-vue-next`，不使用其他图标库
+
+## 测试规范
+
+### 禁止糊弄式测试
+
+写测试用例必须验证真实行为，禁止以下做法：
+
+1. **禁止 `assertNotNull` 反模式** — `assertNotNull(result)` 不能证明功能正确，工具返回的错误字符串也是非null的。必须断言返回内容包含预期的业务数据（如股票名称、价格、板块名等）。
+2. **禁止无 stub 的 Mock** — 使用 `@Mock HttpClientService` 或 `@Mock EastMoneyRateLimiter` 时，必须用 `when(...).thenReturn(...)` 注入真实的 JSON 响应，验证工具的解析逻辑。Mock 返回 null 时工具会吞掉异常返回错误字符串，`assertNotNull` 永远通过。
+3. **禁止只测 happy path** — 必须覆盖：API返回403、空数据、网络异常、缺少参数等错误场景。
+
+### 测试断言标准
+
+- 数据查询类测试：断言返回内容包含具体的业务字段（股票名称、价格、板块、日期等）
+- 错误处理类测试：断言返回内容包含明确的错误提示关键词
+- 路由/参数类测试：断言返回内容包含"操作类型不能为空"、"缺少参数"等提示
+
+### Mock 策略
+
+- `HttpClientService`：mock `get()` 和 `getWithJdkClient()`，注入真实 JSON 响应
+- `EastMoneyRateLimiter`：mock `get()` 和 `post()`，注入真实 JSON 响应
+- 对于可能不被调用的 stub，使用 `lenient().when(...)` 避免 UnnecessaryStubbingException
+- 每个工具类必须有对应的测试文件，覆盖所有 operation 路由

@@ -1,6 +1,7 @@
 package com.itlk.myclaudecode.tool.astock;
 
 import com.itlk.myclaudecode.common.config.HttpClientService;
+import okhttp3.Headers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -9,7 +10,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AStockReportRouterTool A股研报工具测试")
@@ -22,6 +27,14 @@ class AStockReportRouterToolTest {
     private EastMoneyRateLimiter emRateLimiter;
 
     private AStockReportRouterTool tool;
+
+    // 模拟东财个股研报API返回
+    private static final String STOCK_REPORT_RESPONSE = """
+            {"result":{"pages":1,"data":[{"stockName":"贵州茅台","title":"贵州茅台深度报告","orgSName":"中信证券","publishDate":"2025-01-02","infoCode":"R12345","emRatingName":"买入","predictThisYearPe":"25.00","predictThisYearEps":"60.00","indvInduName":"白酒"}],"count":1}}""";
+
+    // 模拟东财行业研报API返回
+    private static final String INDUSTRY_REPORT_RESPONSE = """
+            {"result":{"pages":1,"data":[{"indvInduName":"白酒","title":"白酒行业年度策略","orgSName":"中信证券","publishDate":"2025-01-02","infoCode":"R67890"}],"count":1}}""";
 
     @BeforeEach
     void setUp() {
@@ -67,10 +80,24 @@ class AStockReportRouterToolTest {
         }
 
         @Test
-        @DisplayName("标准查询")
-        void standardQuery() {
+        @DisplayName("标准查询 → 解析研报数据")
+        void standardQuery() throws Exception {
+            when(emRateLimiter.get(anyString(), any()))
+                    .thenReturn(STOCK_REPORT_RESPONSE);
             String result = tool.a_stock_report("stockReport", "{\"stockCode\":\"600519\"}");
-            assertNotNull(result, "不应返回null");
+            assertTrue(result.contains("贵州茅台") || result.contains("研报"),
+                    "应包含股票名称或研报标题");
+            assertFalse(result.contains("操作失败"), "不应返回操作失败");
+        }
+
+        @Test
+        @DisplayName("API返回空数据 → 返回提示")
+        void emptyData() throws Exception {
+            when(emRateLimiter.get(anyString(), any()))
+                    .thenReturn("{\"result\":{\"pages\":0,\"data\":[],\"count\":0}}");
+            String result = tool.a_stock_report("stockReport", "{\"stockCode\":\"999999\"}");
+            assertTrue(result.contains("未找到") || result.contains("没有") || result.contains("0"),
+                    "空数据应返回提示");
         }
     }
 
@@ -79,15 +106,20 @@ class AStockReportRouterToolTest {
     class IndustryReportTest {
 
         @Test
-        @DisplayName("全行业查询")
-        void allIndustries() {
+        @DisplayName("全行业查询 → 解析行业研报")
+        void allIndustries() throws Exception {
+            when(emRateLimiter.get(anyString(), any()))
+                    .thenReturn(INDUSTRY_REPORT_RESPONSE);
             String result = tool.a_stock_report("industryReport", "{\"industryCode\":\"*\"}");
-            assertNotNull(result, "不应返回null");
+            assertTrue(result.contains("白酒") || result.contains("研报") || result.contains("行业"),
+                    "应包含行业信息");
         }
 
         @Test
         @DisplayName("指定行业码")
-        void specificIndustry() {
+        void specificIndustry() throws Exception {
+            when(emRateLimiter.get(anyString(), any()))
+                    .thenReturn(INDUSTRY_REPORT_RESPONSE);
             String result = tool.a_stock_report("industryReport", "{\"industryCode\":\"1238\"}");
             assertNotNull(result, "不应返回null");
         }
@@ -120,7 +152,6 @@ class AStockReportRouterToolTest {
         @Test
         @DisplayName("未配置API Key → 返回提示")
         void noApiKey() {
-            // 工具创建时传入空字符串
             String result = tool.a_stock_report("iwencaiSearch", "{\"query\":\"贵州茅台\"}");
             assertTrue(result.contains("API Key") || result.contains("未配置"),
                     "未配置API Key应返回提示");

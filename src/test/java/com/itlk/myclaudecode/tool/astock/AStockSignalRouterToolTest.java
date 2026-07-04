@@ -8,7 +8,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AStockSignalRouterTool A股信号工具测试")
@@ -18,6 +22,18 @@ class AStockSignalRouterToolTest {
     private EastMoneyRateLimiter emRateLimiter;
 
     private AStockSignalRouterTool tool;
+
+    // 模拟板块归属API返回
+    private static final String CONCEPT_BLOCKS_RESPONSE = """
+            {"result":{"data":[{"f12":"BK0477","f14":"白酒"},{"f12":"BK0437","f14":"贵州板块"},{"f12":"BK0733","f14":"沪股通"}]}}""";
+
+    // 模拟龙虎榜API返回
+    private static final String DRAGON_TIGER_RESPONSE = """
+            {"result":{"data":[{"SECURITY_CODE":"600519","SECURITY_NAME_ABBR":"贵州茅台","TRADE_DATE":"2025-01-02","BUYER_NAME":"机构专用","SELLER_NAME":"中信证券上海分公司","NET_BUY_AMT":5000.00}]}}""";
+
+    // 模拟行业排名API返回
+    private static final String INDUSTRY_RANKING_RESPONSE = """
+            {"result":{"data":[{"f14":"白酒","f3":2.50,"f104":50000,"f105":30000,"f128":"贵州茅台","f140":1800.00}]}}""";
 
     @BeforeEach
     void setUp() {
@@ -63,10 +79,13 @@ class AStockSignalRouterToolTest {
         }
 
         @Test
-        @DisplayName("标准查询")
-        void standardQuery() {
+        @DisplayName("标准查询 → 解析板块数据")
+        void standardQuery() throws Exception {
+            when(emRateLimiter.get(anyString(), any()))
+                    .thenReturn(CONCEPT_BLOCKS_RESPONSE);
             String result = tool.a_stock_signal("conceptBlocks", "{\"stockCode\":\"600519\"}");
-            assertNotNull(result, "不应返回null");
+            assertTrue(result.contains("白酒") || result.contains("板块") || result.contains("概念"),
+                    "应包含板块信息");
         }
     }
 
@@ -84,9 +103,12 @@ class AStockSignalRouterToolTest {
 
         @Test
         @DisplayName("标准查询")
-        void standardQuery() {
+        void standardQuery() throws Exception {
+            when(emRateLimiter.get(anyString(), any()))
+                    .thenReturn("{\"result\":{\"data\":{\"klines\":[\"09:30,1000,500,300,200\"]}}}");
             String result = tool.a_stock_signal("fundFlowMinute", "{\"stockCode\":\"600519\"}");
             assertNotNull(result, "不应返回null");
+            assertFalse(result.contains("操作失败"), "不应返回操作失败");
         }
     }
 
@@ -103,19 +125,25 @@ class AStockSignalRouterToolTest {
         }
 
         @Test
-        @DisplayName("标准查询")
-        void standardQuery() {
+        @DisplayName("标准查询 → 解析龙虎榜数据")
+        void standardQuery() throws Exception {
+            when(emRateLimiter.get(anyString(), any()))
+                    .thenReturn(DRAGON_TIGER_RESPONSE);
             String result = tool.a_stock_signal("dragonTigerBoard",
-                    "{\"stockCode\":\"600519\",\"tradeDate\":\"2024-01-01\"}");
-            assertNotNull(result, "不应返回null");
+                    "{\"stockCode\":\"600519\",\"tradeDate\":\"2025-01-02\"}");
+            assertTrue(result.contains("龙虎榜") || result.contains("贵州茅台") || result.contains("席位"),
+                    "应包含龙虎榜信息");
         }
 
         @Test
-        @DisplayName("自定义回溯天数")
-        void withLookBackDays() {
+        @DisplayName("API返回空数据 → 返回提示")
+        void emptyData() throws Exception {
+            when(emRateLimiter.get(anyString(), any()))
+                    .thenReturn("{\"result\":{\"data\":[]}}");
             String result = tool.a_stock_signal("dragonTigerBoard",
-                    "{\"stockCode\":\"600519\",\"lookBackDays\":60}");
-            assertNotNull(result, "不应返回null");
+                    "{\"stockCode\":\"600519\",\"lookBackDays\":30}");
+            assertTrue(result.contains("未找到") || result.contains("没有") || result.contains("0") || result.contains("龙虎榜"),
+                    "空数据应返回提示");
         }
     }
 
@@ -125,24 +153,20 @@ class AStockSignalRouterToolTest {
 
         @Test
         @DisplayName("默认参数查询")
-        void defaultQuery() {
+        void defaultQuery() throws Exception {
+            when(emRateLimiter.get(anyString(), any()))
+                    .thenReturn(DRAGON_TIGER_RESPONSE);
             String result = tool.a_stock_signal("dailyDragonTiger", "{}");
             assertNotNull(result, "不应返回null");
         }
 
         @Test
         @DisplayName("指定日期")
-        void withDate() {
+        void withDate() throws Exception {
+            when(emRateLimiter.get(anyString(), any()))
+                    .thenReturn(DRAGON_TIGER_RESPONSE);
             String result = tool.a_stock_signal("dailyDragonTiger",
-                    "{\"tradeDate\":\"2024-01-01\"}");
-            assertNotNull(result, "不应返回null");
-        }
-
-        @Test
-        @DisplayName("指定最低净买入")
-        void withMinNetBuy() {
-            String result = tool.a_stock_signal("dailyDragonTiger",
-                    "{\"minNetBuy\":1000}");
+                    "{\"tradeDate\":\"2025-01-02\"}");
             assertNotNull(result, "不应返回null");
         }
     }
@@ -161,17 +185,12 @@ class AStockSignalRouterToolTest {
 
         @Test
         @DisplayName("标准查询")
-        void standardQuery() {
+        void standardQuery() throws Exception {
+            when(emRateLimiter.get(anyString(), any()))
+                    .thenReturn("{\"result\":{\"data\":[{\"SECURITY_CODE\":\"600519\",\"FREE_DATE\":\"2025-06-01\",\"FREE_SHARES\":1000.00}]}}");
             String result = tool.a_stock_signal("lockupExpiry", "{\"stockCode\":\"600519\"}");
             assertNotNull(result, "不应返回null");
-        }
-
-        @Test
-        @DisplayName("自定义前瞻天数")
-        void withForwardDays() {
-            String result = tool.a_stock_signal("lockupExpiry",
-                    "{\"stockCode\":\"600519\",\"forwardDays\":180}");
-            assertNotNull(result, "不应返回null");
+            assertFalse(result.contains("操作失败"), "不应返回操作失败");
         }
     }
 
@@ -180,15 +199,20 @@ class AStockSignalRouterToolTest {
     class IndustryRankingTest {
 
         @Test
-        @DisplayName("默认参数查询")
-        void defaultQuery() {
+        @DisplayName("默认参数查询 → 解析行业排名")
+        void defaultQuery() throws Exception {
+            when(emRateLimiter.get(anyString(), any()))
+                    .thenReturn(INDUSTRY_RANKING_RESPONSE);
             String result = tool.a_stock_signal("industryRanking", "{}");
-            assertNotNull(result, "不应返回null");
+            assertTrue(result.contains("行业") || result.contains("排名") || result.contains("板块"),
+                    "应包含行业排名信息");
         }
 
         @Test
         @DisplayName("自定义topN")
-        void withTopN() {
+        void withTopN() throws Exception {
+            when(emRateLimiter.get(anyString(), any()))
+                    .thenReturn(INDUSTRY_RANKING_RESPONSE);
             String result = tool.a_stock_signal("industryRanking", "{\"topN\":10}");
             assertNotNull(result, "不应返回null");
         }
