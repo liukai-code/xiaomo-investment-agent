@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { streamChat, streamDeepAnalysis, type WorkflowEvent } from '@/api/chat'
-import { saveMessage } from '@/api/conversation'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
 import WorkflowPanel from '@/components/workflow/WorkflowPanel.vue'
 import { useRafThrottle } from '@/composables/useMarkdownBlocks'
@@ -196,21 +195,34 @@ async function handleSend() {
 }
 
 function handleStop() {
+  // 先取快照，再 abort
+  const convId = chatStore.currentConvId
+  const lastMsg = chatStore.messages[chatStore.messages.length - 1]
+
   if (abortController) {
     abortController.abort()
     abortController = null
   }
 
-  // 保存已生成的部分内容到数据库
-  const lastMsg = chatStore.messages[chatStore.messages.length - 1]
-  if (lastMsg && lastMsg.role === 'ASSISTANT' && chatStore.currentConvId) {
+  // 用独立请求保存部分内容（不走共享 axios 实例，避免被 abortController 连带取消）
+  if (lastMsg && lastMsg.role === 'ASSISTANT' && convId) {
     let content = lastMsg.content
     if (isWorkflowMode.value && workflowEvents.value.length > 0) {
       content = buildPartialWorkflowSummary()
     }
     if (content) {
-      lastMsg.content = content + '\n\n> *已手动终止*'
-      saveMessage(chatStore.currentConvId, lastMsg.content)
+      const finalContent = content + '\n\n> *已手动终止*'
+      lastMsg.content = finalContent
+      // fire-and-forget 但用独立实例，切会话不会被取消
+      const token = authStore.token
+      fetch(`/agent/conversation/${convId}/message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: finalContent,
+      }).catch(() => {})
     }
   }
 
