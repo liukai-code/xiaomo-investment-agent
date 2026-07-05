@@ -20,14 +20,18 @@ public class EncryptionService {
 
     private final SecretKeySpec secretKey;
 
-    public EncryptionService(@Value("${CONFIG_ENCRYPTION_KEY:}") String encryptionKey) {
+    public EncryptionService(@Value("${config.encryption.key:}") String encryptionKey) {
         if (encryptionKey == null || encryptionKey.isEmpty()) {
-            throw new IllegalStateException("CONFIG_ENCRYPTION_KEY environment variable is not set");
+            throw new IllegalStateException("config.encryption.key is not set in application config");
         }
-        // 使用SHA-256哈希确保密钥长度为256位
-        byte[] keyBytes = encryptionKey.getBytes(StandardCharsets.UTF_8);
-        byte[] hashedKey = java.security.MessageDigest.getInstance("SHA-256").digest(keyBytes);
-        this.secretKey = new SecretKeySpec(hashedKey, "AES");
+        try {
+            // 使用SHA-256哈希确保密钥长度为256位
+            byte[] keyBytes = encryptionKey.getBytes(StandardCharsets.UTF_8);
+            byte[] hashedKey = java.security.MessageDigest.getInstance("SHA-256").digest(keyBytes);
+            this.secretKey = new SecretKeySpec(hashedKey, "AES");
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 algorithm not available", e);
+        }
     }
 
     public String encrypt(String plaintext) {

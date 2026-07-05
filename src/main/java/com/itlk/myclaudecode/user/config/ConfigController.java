@@ -1,7 +1,7 @@
 package com.itlk.myclaudecode.user.config;
 
-import com.itlk.myclaudecode.common.Result;
-import com.itlk.myclaudecode.user.service.UserService;
+import com.itlk.myclaudecode.common.entity.Result;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -9,16 +9,14 @@ import org.springframework.web.bind.annotation.*;
 public class ConfigController {
 
     private final UserConfigService userConfigService;
-    private final UserService userService;
 
-    public ConfigController(UserConfigService userConfigService, UserService userService) {
+    public ConfigController(UserConfigService userConfigService) {
         this.userConfigService = userConfigService;
-        this.userService = userService;
     }
 
     @GetMapping
-    public Result<UserConfigDTO> getConfig(@RequestHeader("Authorization") String token) {
-        Long userId = userService.getCurrentUserId(token);
+    public Result<UserConfigDTO> getConfig(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
         if (userId == null) {
             return Result.error("用户未登录");
         }
@@ -28,9 +26,9 @@ public class ConfigController {
     }
 
     @PostMapping
-    public Result<Void> saveConfig(@RequestHeader("Authorization") String token,
+    public Result<Void> saveConfig(HttpServletRequest request,
                                   @RequestBody UserConfigDTO dto) {
-        Long userId = userService.getCurrentUserId(token);
+        Long userId = (Long) request.getAttribute("userId");
         if (userId == null) {
             return Result.error("用户未登录");
         }
@@ -47,8 +45,8 @@ public class ConfigController {
     }
 
     @DeleteMapping
-    public Result<Void> deleteConfig(@RequestHeader("Authorization") String token) {
-        Long userId = userService.getCurrentUserId(token);
+    public Result<Void> deleteConfig(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
         if (userId == null) {
             return Result.error("用户未登录");
         }
