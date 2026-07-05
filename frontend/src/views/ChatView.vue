@@ -253,13 +253,12 @@ async function handleSend() {
 
   abortController = streamChat(chatStore.currentConvId!, text, authStore.token, {
     onStatus(event: StatusEvent) {
-      currentStatus.value = event
+      // TOOL_RESULT 没有有用信息，跳过，保持显示 TOOL_CALL 标签
+      if (event.type !== 'TOOL_RESULT') {
+        currentStatus.value = event
+      }
     },
     onChunk(fullText: string) {
-      // 第一个 chunk 到达后清除状态指示（已有文本内容）
-      if (currentStatus.value) {
-        currentStatus.value = null
-      }
       schedule(() => {
         chatStore.updateLastAiMessage(fullText)
         scrollToBottomIfNear()
@@ -566,9 +565,9 @@ watch(() => yjbStore.cardVisible, (visible) => {
                 <div class="bubble">
                   <template v-if="msg.role === 'USER'">{{ msg.content }}</template>
                   <template v-else>
-                    <!-- 工具调用状态指示器 -->
+                    <!-- 工具调用状态指示器：只要正在生成且有状态事件就显示 -->
                     <div
-                      v-if="currentStatus && !msg.content && msg === chatStore.messages[chatStore.messages.length - 1]"
+                      v-if="currentStatus && chatStore.isGenerating && msg === chatStore.messages[chatStore.messages.length - 1]"
                       class="status-indicator"
                     >
                       <Loader2 :size="14" class="status-spinner" />

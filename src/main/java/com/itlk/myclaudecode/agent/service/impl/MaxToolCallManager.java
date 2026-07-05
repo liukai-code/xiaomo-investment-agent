@@ -118,9 +118,12 @@ public class MaxToolCallManager implements ToolCallingManager {
         // 发射工具调用状态事件到前端
         @SuppressWarnings("unchecked")
         Sinks.Many<ChatStreamEvent> statusSink = extractFromContext(prompt, STATUS_SINK_KEY, Sinks.Many.class);
+        log.info("[MaxToolCallManager] statusSink={}, sinkPresent={}", statusSink != null ? "存在" : "null", statusSink != null);
         if (statusSink != null) {
             for (AssistantMessage.ToolCall tc : toolCalls) {
-                statusSink.tryEmitNext(ChatStreamEvent.toolCall(tc.name(), step, effectiveMaxIterations));
+                ChatStreamEvent event = ChatStreamEvent.toolCall(tc.name(), step, effectiveMaxIterations);
+                log.info("[MaxToolCallManager] 发射 TOOL_CALL 事件: toolName={}, step={}", tc.name(), step);
+                statusSink.tryEmitNext(event);
             }
         }
         ToolExecutionResult result;
