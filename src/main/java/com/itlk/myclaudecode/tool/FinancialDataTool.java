@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import okhttp3.Headers;
 import com.itlk.myclaudecode.common.config.HttpClientService;
 import com.itlk.myclaudecode.tool.annotation.ToolBehavior;
+import com.itlk.myclaudecode.workflow.util.StockResolver;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 
@@ -50,48 +51,22 @@ public class FinancialDataTool {
                 log.info("[FinancialDataTool] getAShareQuote 出参: {}", result);
                 return result;
             } else {
-                // 非纯数字，当作名称搜索
-                log.info("[FinancialDataTool] 输入非代码格式，自动搜索: {}", input);
-                String searchResult = searchEastMoney(input);
-                if (searchResult == null || searchResult.isBlank()) {
-                    searchResult = searchSinaFallback(input);
-                }
-                if (searchResult == null || searchResult.isBlank()) {
+                // 非纯数字，委托 StockResolver 解析
+                log.info("[FinancialDataTool] 输入非代码格式，委托 StockResolver 解析: {}", input);
+                try {
+                    StockResolver.ResolvedStock resolved = StockResolver.resolve(input, httpClientService);
+                    String symbol = buildAShareSymbol(resolved.code());
+                    String quoteResult = fetchTencentQuote(symbol, resolved.code(), "A股");
+                    log.info("[FinancialDataTool] getAShareQuote 出参: {}", quoteResult);
+                    return quoteResult;
+                } catch (IllegalArgumentException e) {
                     return "未找到与「" + input + "」相关的A股股票，请确认名称是否正确。";
                 }
-
-                // 从搜索结果中提取第一个代码
-                String firstCode = extractFirstCode(searchResult);
-                if (firstCode == null) {
-                    return "搜索到结果但无法提取代码，请尝试输入更精确的名称。\n搜索结果：\n" + searchResult;
-                }
-
-                // 用提取到的代码查行情
-                log.info("[FinancialDataTool] 搜索到代码: {}，查询行情", firstCode);
-                String symbol = buildAShareSymbol(firstCode);
-                String quoteResult = fetchTencentQuote(symbol, firstCode, "A股");
-                log.info("[FinancialDataTool] getAShareQuote 出参: {}", quoteResult);
-                return quoteResult;
             }
         } catch (Exception e) {
             log.error("[FinancialDataTool] getAShareQuote 异常: {}", e.getMessage(), e);
             return "查询A股行情失败: " + e.getMessage();
         }
-    }
-
-    private String extractFirstCode(String searchResult) {
-        // searchResult 格式: "600519 贵州茅台（沪市）\n000858 五粮液（深市）"
-        String[] lines = searchResult.split("\n");
-        for (String line : lines) {
-            String trimmed = line.trim();
-            if (trimmed.length() >= 6) {
-                String candidate = trimmed.substring(0, 6);
-                if (PURE_DIGITS.matcher(candidate).matches()) {
-                    return candidate;
-                }
-            }
-        }
-        return null;
     }
 
     @ToolBehavior(deterministic = false, cacheable = false)

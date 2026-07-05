@@ -48,7 +48,7 @@ public class DebateNode implements WorkflowNode {
         String now = java.time.LocalDateTime.now()
                 .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm:ss"));
         String enrichedSystemPrompt = "【当前时间】" + now + "\n\n"
-                + "【分析标的】" + state.getOriginalQuery() + "\n\n"
+                + AnalystNode.buildStockTargetLine(state) + "\n\n"
                 + "⚠️ 关键约束：\n"
                 + "1. 你只能围绕上述标的进行辩论，禁止引入其他股票的数据\n"
                 + "2. 所有数据必须来自上游分析师的报告，禁止使用训练知识\n\n"

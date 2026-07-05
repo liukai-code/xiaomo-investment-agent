@@ -49,7 +49,7 @@ public class JudgeNode implements WorkflowNode {
         String now = java.time.LocalDateTime.now()
                 .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm:ss"));
         String enrichedSystemPrompt = "【当前时间】" + now + "\n\n"
-                + "【分析标的】" + state.getOriginalQuery() + "\n\n"
+                + AnalystNode.buildStockTargetLine(state) + "\n\n"
                 + "⚠️ 关键约束：\n"
                 + "1. 你只能对上述标的做出裁决，禁止引入其他股票的数据\n"
                 + "2. 裁决必须基于上游分析师和辩论的数据，禁止使用训练知识\n\n"

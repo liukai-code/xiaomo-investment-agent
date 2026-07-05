@@ -72,12 +72,13 @@ public class AnalystNode implements WorkflowNode {
         String now = java.time.LocalDateTime.now()
                 .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm:ss"));
         String enrichedSystemPrompt = "【当前时间】" + now + "\n\n"
-                + "【分析标的】" + state.getOriginalQuery() + "\n\n"
+                + buildStockTargetLine(state) + "\n\n"
                 + "⚠️ 关键约束：\n"
                 + "1. 你只能分析上述标的，禁止分析其他股票\n"
-                + "2. 所有工具调用和数据获取必须针对该标的\n"
+                + "2. 所有工具调用和数据获取必须针对该标的，stockCode 参数必须使用上述代码\n"
                 + "3. 报告中的数据必须来自工具返回，禁止使用训练知识\n"
-                + "4. 如果工具调用失败，如实报告，禁止用旧数据填充\n\n"
+                + "4. 如果工具调用失败，如实报告，禁止用旧数据填充\n"
+                + "5. 禁止重新查询或猜测股票代码，标的已锁定\n\n"
                 + systemPrompt;
 
         ChatClient agentClient = ChatClient.builder(chatModel)
@@ -85,7 +86,11 @@ public class AnalystNode implements WorkflowNode {
                 .defaultSystem(enrichedSystemPrompt)
                 .build();
 
-        String userPrompt = "请使用可用工具获取" + state.getOriginalQuery() + "的数据，产出一份结构化的分析报告。";
+        String stockDesc = state.getResolvedStockName() != null
+                ? state.getResolvedStockName() + "（" + state.getResolvedStockCode() + "）"
+                : state.getResolvedStockCode();
+        String userPrompt = "请使用可用工具获取" + stockDesc + "的数据，产出一份结构化的分析报告。"
+                + "所有 stockCode 参数必须使用 " + state.getResolvedStockCode() + "。";
 
         sink.tryEmitNext(WorkflowEvent.agentStart(roleName));
 
@@ -168,6 +173,21 @@ public class AnalystNode implements WorkflowNode {
         String trimmed = chunk.trim();
         return trimmed.startsWith("[GUARD:") || trimmed.startsWith("[GUARD_SIGNAL]")
                 || trimmed.equals("[/GUARD]") || trimmed.equals("[/GUARD_SIGNAL]");
+    }
+
+    /**
+     * 构建标的锁定行，优先使用 resolvedStockCode/Name，fallback 到 originalQuery
+     */
+    static String buildStockTargetLine(WorkflowState state) {
+        if (state.getResolvedStockCode() != null) {
+            String name = state.getResolvedStockName() != null ? state.getResolvedStockName() : "";
+            return "【分析标的】" + name + "（" + state.getResolvedStockCode() + "）\n"
+                    + "⚠️ 标的已锁定为 " + state.getResolvedStockCode()
+                    + "，禁止分析其他股票，禁止重新查询或猜测股票代码。"
+                    + "所有工具调用必须使用 stockCode=\"" + state.getResolvedStockCode() + "\"。";
+        }
+        // fallback：只有 originalQuery 的情况（理论上不应发生）
+        return "【分析标的】" + state.getOriginalQuery();
     }
 
     private static java.util.Optional<String> extractStructuredData(String report) {

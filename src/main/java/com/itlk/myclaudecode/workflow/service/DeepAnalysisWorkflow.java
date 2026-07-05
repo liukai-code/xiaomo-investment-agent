@@ -14,6 +14,8 @@ import com.itlk.myclaudecode.workflow.persist.WorkflowAnalysis;
 import com.itlk.myclaudecode.workflow.persist.WorkflowAnalysisRepository;
 import com.itlk.myclaudecode.workflow.state.WorkflowState;
 import com.itlk.myclaudecode.workflow.util.StockCodeExtractor;
+import com.itlk.myclaudecode.workflow.util.StockResolver;
+import com.itlk.myclaudecode.common.config.HttpClientService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -32,19 +34,22 @@ public class DeepAnalysisWorkflow {
     private final WorkflowProperties properties;
     private final RiskOverrideProperties riskOverrideProperties;
     private final ObjectMapper objectMapper;
+    private final HttpClientService httpClientService;
 
     public DeepAnalysisWorkflow(WorkflowAgentFactory agentFactory,
                                  WorkflowEngine engine,
                                  WorkflowAnalysisRepository analysisRepository,
                                  WorkflowProperties properties,
                                  RiskOverrideProperties riskOverrideProperties,
-                                 ObjectMapper objectMapper) {
+                                 ObjectMapper objectMapper,
+                                 HttpClientService httpClientService) {
         this.agentFactory = agentFactory;
         this.engine = engine;
         this.analysisRepository = analysisRepository;
         this.properties = properties;
         this.riskOverrideProperties = riskOverrideProperties;
         this.objectMapper = objectMapper;
+        this.httpClientService = httpClientService;
     }
 
     /**
@@ -60,9 +65,24 @@ public class DeepAnalysisWorkflow {
 
         // 提取股票代码用于范围守卫
         var stockCodes = StockCodeExtractor.extract(query);
-        state.setAllowedStockCodes(stockCodes);
         if (!stockCodes.isEmpty()) {
-            log.info("提取到股票代码: {}", stockCodes);
+            // 数字代码直接锁定
+            String code = stockCodes.iterator().next();
+            state.setResolvedStockCode(code);
+            state.setAllowedStockCodes(stockCodes);
+            log.info("从查询中提取到数字代码: {}", code);
+        } else {
+            // 无数字代码，走名称解析器
+            try {
+                var resolved = StockResolver.resolve(query, httpClientService);
+                state.setResolvedStockCode(resolved.code());
+                state.setResolvedStockName(resolved.name());
+                state.setAllowedStockCodes(java.util.Set.of(resolved.code()));
+                log.info("标的解析成功: {}({})", resolved.name(), resolved.code());
+            } catch (IllegalArgumentException e) {
+                log.warn("标的解析失败: {}", e.getMessage());
+                return Flux.just(WorkflowEvent.error("标的解析失败: " + e.getMessage()));
+            }
         }
 
         WorkflowGraph graph = buildGraph();

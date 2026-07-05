@@ -20,6 +20,10 @@ public class WorkflowState {
     private String originalQuery;
     private Set<String> allowedStockCodes;
 
+    // 标的锁定（由 StockResolver 在工作流启动时写入，之后只读）
+    private String resolvedStockCode;   // 锁定的6位代码，如 "430510"
+    private String resolvedStockName;   // 锁定的名称，如 "丰光精密"
+
     // Layer 1 输出（并行写入）
     private Map<String, AgentReport> analystReports = new ConcurrentHashMap<>();
 
