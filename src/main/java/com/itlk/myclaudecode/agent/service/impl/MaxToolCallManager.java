@@ -49,6 +49,9 @@ public class MaxToolCallManager implements ToolCallingManager {
     public static final String DUPLICATE_CACHE_KEY = "duplicateCache";
     public static final String REPORT_COMPLETENESS_KEY = "reportCompleteness";
     public static final String MAX_FETCHES_KEY = "maxFetches";
+    public static final String NON_RETRIABLE_CACHE_KEY = "nonRetriableCache";
+    public static final String MAX_STEPS_KEY = "maxSteps";
+    public static final String ALLOWED_STOCK_CODES_KEY = "allowedStockCodes";
 
     private static final Set<String> FETCH_TOOL_NAMES = Set.of(
             "fetchArticleContent", "fetchWebpage"
@@ -96,25 +99,29 @@ public class MaxToolCallManager implements ToolCallingManager {
         ReportCompletenessChecker completenessChecker = extractFromContext(prompt, REPORT_COMPLETENESS_KEY, ReportCompletenessChecker.class);
         Integer maxFetchesCtx = extractFromContext(prompt, MAX_FETCHES_KEY, Integer.class);
         int maxFetches = maxFetchesCtx != null ? maxFetchesCtx : properties.maxFetches();
+        Map<String, String> nonRetriableCache = extractFromContext(prompt, NON_RETRIABLE_CACHE_KEY, Map.class);
+        Integer maxStepsCtx = extractFromContext(prompt, MAX_STEPS_KEY, Integer.class);
+        java.util.Set<String> allowedStockCodes = extractFromContext(prompt, ALLOWED_STOCK_CODES_KEY, java.util.Set.class);
+        int effectiveMaxIterations = maxStepsCtx != null ? Math.min(maxStepsCtx, properties.maxIterations()) : properties.maxIterations();
 
         int step = counter.incrementAndGet();
         AssistantMessage assistantWithTools = findAssistantWithToolCalls(chatResponse);
         List<AssistantMessage.ToolCall> toolCalls = assistantWithTools.getToolCalls();
         String toolNames = toolCalls.stream().map(AssistantMessage.ToolCall::name).collect(java.util.stream.Collectors.joining(", "));
-        log.info("[MaxToolCallManager] 工具调用轮次: {}/{}, 工具: [{}]", step, properties.maxIterations(), toolNames);
+        log.info("[MaxToolCallManager] 工具调用轮次: {}/{}, 工具: [{}]", step, effectiveMaxIterations, toolNames);
         ToolExecutionResult result;
 
         // 硬限制检查：如果已超过最大轮次或 fetch 上限，直接阻止所有工具调用
-        boolean overMaxIterations = step > properties.maxIterations();
+        boolean overMaxIterations = step > effectiveMaxIterations;
         boolean overMaxFetch = fetchTracker != null && fetchTracker.isOverMaxFetches();
         if (overMaxIterations || overMaxFetch) {
             String blockMsg;
             if (overMaxFetch) {
-                blockMsg = "已达到最大抓取次数限制。请立即停止所有工具调用，基于已获取的数据完成分析报告。不要再尝试调用任何工具。";
+                blockMsg = "[GUARD: FORCE]\nAction: 已达到最大抓取次数限制，必须立即停止所有工具调用。\nContext: step=" + step + "/" + effectiveMaxIterations + ", fetch=over\n[/GUARD]\n\n你已经没有可用的工具调用次数了。请直接基于已获取的数据完成分析报告，输出完整内容。不要再请求任何工具。";
                 log.warn("[MaxToolCallManager] 已超过 fetch 硬上限, 阻止工具调用");
             } else {
-                blockMsg = "已达到最大工具调用轮次限制。请立即停止所有工具调用，基于已获取的数据完成分析报告。不要再尝试调用任何工具。";
-                log.warn("[MaxToolCallManager] 已超过迭代硬上限 ({}/{}), 阻止工具调用", step, properties.maxIterations());
+                blockMsg = "[GUARD: FORCE]\nAction: 已达到最大工具调用轮次限制，必须立即停止所有工具调用。\nContext: step=" + step + "/" + effectiveMaxIterations + "\n[/GUARD]\n\n你已经没有可用的工具调用次数了。请直接基于已获取的数据完成分析报告，输出完整内容。不要再请求任何工具。";
+                log.warn("[MaxToolCallManager] 已超过迭代硬上限 ({}/{}), 阻止工具调用", step, effectiveMaxIterations);
             }
             List<Message> blockHistory = new ArrayList<>();
             blockHistory.add(assistantWithTools);
@@ -139,7 +146,7 @@ public class MaxToolCallManager implements ToolCallingManager {
                         + "字符)，请基于已有数据完成报告，无需继续调用工具。";
                 List<Message> skipHistory = buildSkipResult(tc, msg);
                 GuardSignal signal = new GuardSignal(
-                        step, properties.softLimit(), properties.maxIterations(),
+                        step, properties.softLimit(), effectiveMaxIterations,
                         properties.escalationWarning(), properties.escalationFinal(),
                         InfoGainLevel.UNKNOWN, 0.0, RepetitionResult.NONE, tc.name(),
                         false, 0, maxFetches, false, 0, false, false);
@@ -157,13 +164,37 @@ public class MaxToolCallManager implements ToolCallingManager {
                     RepetitionResult repetition = repetitionDetector.recordAndDetect(tc.name(), tc.arguments());
 
                     GuardSignal signal = new GuardSignal(
-                            step, properties.softLimit(), properties.maxIterations(),
+                            step, properties.softLimit(), effectiveMaxIterations,
                             properties.escalationWarning(), properties.escalationFinal(),
                             infoGain, infoGainTracker.getLastSimilarity(),
                             repetition, tc.name(),
                             true, fetchTracker.getFetchCount(), maxFetches, true,
                             0, false, false);
                     return new GuardedToolExecutionResult(new CachedToolExecutionResult(skipHistory), signal);
+                }
+            }
+
+            // Non-retriable error cache check
+            if (nonRetriableCache != null) {
+                String nrKey = tc.name() + ":" + tc.arguments().hashCode();
+                String cachedError = nonRetriableCache.get(nrKey);
+                if (cachedError != null) {
+                    log.info("[MaxToolCallManager] 检测到不可重试错误缓存，跳过工具调用: {}", tc.name());
+                    List<Message> skipHistory = buildSkipResult(tc, cachedError);
+                    return new CachedToolExecutionResult(skipHistory);
+                }
+            }
+
+            // Stock scope guard check
+            if (allowedStockCodes != null && !allowedStockCodes.isEmpty() && isAStockTool(tc.name())) {
+                java.util.Set<String> requestedCodes = extractStockCodesFromArgs(tc.arguments());
+                if (!requestedCodes.isEmpty() && !allowedStockCodes.containsAll(requestedCodes)) {
+                    java.util.Set<String> disallowed = new java.util.HashSet<>(requestedCodes);
+                    disallowed.removeAll(allowedStockCodes);
+                    String scopeMsg = "股票代码 " + disallowed + " 不在分析范围内。请只查询目标股票: " + allowedStockCodes;
+                    log.info("[MaxToolCallManager] 股票范围守卫拦截: 请求={}, 允许={}", requestedCodes, allowedStockCodes);
+                    List<Message> skipHistory = buildSkipResult(tc, scopeMsg);
+                    return new CachedToolExecutionResult(skipHistory);
                 }
             }
 
@@ -184,6 +215,13 @@ public class MaxToolCallManager implements ToolCallingManager {
             // Info gain and repetition detection
             String resultText = extractResultText(result);
             InfoGainLevel infoGain = infoGainTracker.recordAndGetLevel(resultText);
+
+            // Cache non-retriable errors
+            if (nonRetriableCache != null && isNonRetriableError(resultText)) {
+                String nrKey = tc.name() + ":" + tc.arguments().hashCode();
+                nonRetriableCache.put(nrKey, resultText);
+                log.info("[MaxToolCallManager] 缓存不可重试错误: {}", tc.name());
+            }
             RepetitionResult repetition = repetitionDetector.recordAndDetect(tc.name(), tc.arguments());
 
             // Search tool: limit search rounds
@@ -194,7 +232,7 @@ public class MaxToolCallManager implements ToolCallingManager {
                     String limitMsg = "本次会话搜索次数已达上限。请立即停止所有工具调用，基于已有的搜索结果直接回答用户。不要再调用搜索或抓取工具。";
                     List<Message> limitHistory = buildSkipResult(tc, limitMsg);
                     GuardSignal signal = new GuardSignal(
-                            step, properties.softLimit(), properties.maxIterations(),
+                            step, properties.softLimit(), effectiveMaxIterations,
                             properties.escalationWarning(), properties.escalationFinal(),
                             infoGain, infoGainTracker.getLastSimilarity(),
                             repetition, tc.name(),
@@ -224,7 +262,7 @@ public class MaxToolCallManager implements ToolCallingManager {
             }
 
             GuardSignal signal = new GuardSignal(
-                    step, properties.softLimit(), properties.maxIterations(),
+                    step, properties.softLimit(), effectiveMaxIterations,
                     properties.escalationWarning(), properties.escalationFinal(),
                     infoGain, infoGainTracker.getLastSimilarity(),
                     repetition, tc.name(),
@@ -238,7 +276,7 @@ public class MaxToolCallManager implements ToolCallingManager {
                 if (overMaxFetches) {
                     log.warn("[MaxToolCallManager] 达到 fetch 硬上限 (fetchCount={}), 强制停止", fetchCount);
                 } else {
-                    log.warn("[MaxToolCallManager] 达到迭代硬上限 ({}/{}), 强制停止", step, properties.maxIterations());
+                    log.warn("[MaxToolCallManager] 达到迭代硬上限 ({}/{}), 强制停止", step, effectiveMaxIterations);
                 }
                 return new GuardedToolExecutionResult(result, signal);
             }
@@ -342,6 +380,45 @@ public class MaxToolCallManager implements ToolCallingManager {
 
     private boolean isSearchTool(String toolName) {
         return SEARCH_TOOL_NAMES.contains(toolName);
+    }
+
+    private boolean isNonRetriableError(String resultText) {
+        if (resultText == null) return false;
+        return resultText.contains("\"retriable\":false")
+                || resultText.contains("\"retriable\": false")
+                || resultText.contains("\"retriable\":  false");
+    }
+
+    private boolean isAStockTool(String toolName) {
+        return toolName.startsWith("a_stock_") || toolName.equals("market_data");
+    }
+
+    private java.util.Set<String> extractStockCodesFromArgs(String args) {
+        java.util.Set<String> codes = new java.util.HashSet<>();
+        if (args == null || args.isBlank()) return codes;
+
+        // 提取 JSON 中的 stockCode 和 codes 字段值
+        try {
+            // 匹配 "stockCode":"600519" 或 "codes":"600519,000858" 格式
+            java.util.regex.Pattern stockCodePattern = java.util.regex.Pattern.compile(
+                    "\"(?:stockCode|codes|stockCodes)\"\\s*:\\s*\"([^\"]+)\"");
+            java.util.regex.Matcher matcher = stockCodePattern.matcher(args);
+            while (matcher.find()) {
+                String value = matcher.group(1);
+                // 处理逗号分隔的多个代码
+                for (String part : value.split(",")) {
+                    String trimmed = part.trim();
+                    if (trimmed.matches("\\d{6}")) {
+                        codes.add(trimmed);
+                    } else if (trimmed.matches("(?i)(sh|sz|bj)\\d{6}")) {
+                        codes.add(trimmed.substring(2));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("[MaxToolCallManager] 无法从参数中提取股票代码: {}", args);
+        }
+        return codes;
     }
 
     private String extractUrlFromArgs(String args) {

@@ -11,7 +11,8 @@ public record WorkflowProperties(
         double analystTemperature,
         int debateMaxTokens,
         double debateTemperature,
-        int timeoutSeconds
+        int timeoutSeconds,
+        int stageMinSeconds
 ) {
     public WorkflowProperties {
         // 默认值
@@ -22,5 +23,6 @@ public record WorkflowProperties(
         if (debateMaxTokens == 0) debateMaxTokens = 4096;
         if (debateTemperature == 0) debateTemperature = 0.5;
         if (timeoutSeconds == 0) timeoutSeconds = 600;
+        if (stageMinSeconds == 0) stageMinSeconds = 15;
     }
 }

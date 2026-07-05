@@ -92,6 +92,15 @@ public class JudgeNode implements WorkflowNode {
 
     private String buildJudgmentPrompt(WorkflowState state, List<DebateMessage> debateHistory) {
         StringBuilder sb = new StringBuilder();
+
+        // 预注入缓存数据
+        if (!state.getCachedData().isEmpty()) {
+            sb.append("## 已有数据（无需重新获取）\n\n");
+            state.getCachedData().forEach((key, value) ->
+                    sb.append("### ").append(key).append("\n").append(value).append("\n\n"));
+            sb.append("⚠️ 以上数据已由上游分析师获取，无需重复调用工具获取相同数据。\n\n");
+        }
+
         sb.append("## 分析报告\n\n");
         state.getAnalystReports().forEach((name, report) ->
                 sb.append("### ").append(name).append("\n").append(report.reportContent()).append("\n\n"));

@@ -9,6 +9,8 @@ public enum WorkflowEventType {
     DEBATE_COMPLETE,
     PHASE_START,
     PHASE_COMPLETE,
+    PHASE_SKIPPED,
     FINAL_DECISION,
+    RISK_OVERRIDE,
     ERROR
 }

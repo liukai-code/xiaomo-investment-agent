@@ -7,6 +7,7 @@ import reactor.core.publisher.Sinks;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -17,9 +18,13 @@ public class WorkflowState {
     private Long userId;
     private Long conversationId;
     private String originalQuery;
+    private Set<String> allowedStockCodes;
 
     // Layer 1 输出（并行写入）
     private Map<String, AgentReport> analystReports = new ConcurrentHashMap<>();
+
+    // 缓存数据（供下游 Agent 复用，避免重复调用工具）
+    private Map<String, String> cachedData = new ConcurrentHashMap<>();
 
     // Layer 2 输出
     private List<DebateMessage> bullBearDebate = new CopyOnWriteArrayList<>();

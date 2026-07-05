@@ -137,6 +137,6 @@ public class WorkflowAgentFactory {
                 .collect(Collectors.toList());
         log.info("创建交易员，绑定 {} 个工具", scoped.size());
         return new TraderNode(chatModel, AgentRole.TRADER.roleName(),
-                AgentRole.TRADER.systemPrompt(), scoped);
+                AgentRole.TRADER.systemPrompt(), scoped, guardProperties, AgentRole.TRADER.guardConfig());
     }
 }

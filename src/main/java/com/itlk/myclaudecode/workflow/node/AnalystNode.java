@@ -22,15 +22,23 @@ import org.springframework.ai.tool.ToolCallback;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 public class AnalystNode implements WorkflowNode {
+
+    private static final Pattern JSON_PATTERN = Pattern.compile("```json\\s*(\\{[\\s\\S]*?})\\s*```|\\{[\\s\\S]*?}");
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private final ChatModel chatModel;
     private final String roleName;
@@ -81,6 +89,7 @@ public class AnalystNode implements WorkflowNode {
         int maxFetches = rc != null ? rc.maxFetches() : guardProperties.maxFetches();
         int maxConsecutiveNoNewInfo = rc != null ? rc.maxConsecutiveNoNewInfo() : guardProperties.maxConsecutiveNoNewInfo();
         int maxSearchRounds = rc != null ? rc.maxSearchRounds() : guardProperties.maxSearchRounds();
+        int maxSteps = rc != null && rc.maxSteps() > 0 ? rc.maxSteps() : guardProperties.maxIterations();
 
         Map<String, Object> toolCtx = new HashMap<>();
         toolCtx.put(MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0));
@@ -95,6 +104,11 @@ public class AnalystNode implements WorkflowNode {
                 return size() > 50;
             }
         });
+        toolCtx.put(MaxToolCallManager.NON_RETRIABLE_CACHE_KEY, new ConcurrentHashMap<String, String>());
+        toolCtx.put(MaxToolCallManager.MAX_STEPS_KEY, maxSteps);
+        if (state.getAllowedStockCodes() != null && !state.getAllowedStockCodes().isEmpty()) {
+            toolCtx.put(MaxToolCallManager.ALLOWED_STOCK_CODES_KEY, state.getAllowedStockCodes());
+        }
         toolCtx.put(MaxToolCallManager.REPORT_COMPLETENESS_KEY, completenessChecker);
 
         AnthropicChatOptions options = AnthropicChatOptions.builder()
@@ -119,6 +133,11 @@ public class AnalystNode implements WorkflowNode {
                     String fullReport = sanitizeOutput(report.toString());
                     state.getAnalystReports().put(roleName,
                             new AgentReport(roleName, fullReport, Instant.now()));
+                    // 缓存报告内容供下游 Agent 复用
+                    state.getCachedData().put(roleName + "_opinion", fullReport);
+                    // 尝试提取结构化 JSON 数据
+                    extractStructuredData(fullReport).ifPresent(json ->
+                            state.getCachedData().put(roleName + "_structured", json));
                     sink.tryEmitNext(WorkflowEvent.agentComplete(roleName, fullReport));
                     log.info("[{}] 数据采集完成，报告长度: {}", roleName, fullReport.length());
                 })
@@ -138,5 +157,20 @@ public class AnalystNode implements WorkflowNode {
         String trimmed = chunk.trim();
         return trimmed.startsWith("[GUARD:") || trimmed.startsWith("[GUARD_SIGNAL]")
                 || trimmed.equals("[/GUARD]") || trimmed.equals("[/GUARD_SIGNAL]");
+    }
+
+    private static java.util.Optional<String> extractStructuredData(String report) {
+        try {
+            Matcher matcher = JSON_PATTERN.matcher(report);
+            if (matcher.find()) {
+                String json = matcher.group(1) != null ? matcher.group(1) : matcher.group(0);
+                // 验证是有效 JSON
+                objectMapper.readTree(json);
+                return java.util.Optional.of(json);
+            }
+        } catch (Exception e) {
+            log.debug("[{}] 报告不包含有效JSON，使用纯文本", "AnalystNode");
+        }
+        return java.util.Optional.empty();
     }
 }

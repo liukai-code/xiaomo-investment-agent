@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itlk.myclaudecode.workflow.agent.AgentRole;
 import com.itlk.myclaudecode.workflow.agent.WorkflowAgentFactory;
+import com.itlk.myclaudecode.workflow.config.RiskOverrideProperties;
 import com.itlk.myclaudecode.workflow.config.WorkflowProperties;
 import com.itlk.myclaudecode.workflow.engine.WorkflowEngine;
 import com.itlk.myclaudecode.workflow.engine.WorkflowGraph;
@@ -12,6 +13,7 @@ import com.itlk.myclaudecode.workflow.node.*;
 import com.itlk.myclaudecode.workflow.persist.WorkflowAnalysis;
 import com.itlk.myclaudecode.workflow.persist.WorkflowAnalysisRepository;
 import com.itlk.myclaudecode.workflow.state.WorkflowState;
+import com.itlk.myclaudecode.workflow.util.StockCodeExtractor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -28,17 +30,20 @@ public class DeepAnalysisWorkflow {
     private final WorkflowEngine engine;
     private final WorkflowAnalysisRepository analysisRepository;
     private final WorkflowProperties properties;
+    private final RiskOverrideProperties riskOverrideProperties;
     private final ObjectMapper objectMapper;
 
     public DeepAnalysisWorkflow(WorkflowAgentFactory agentFactory,
                                  WorkflowEngine engine,
                                  WorkflowAnalysisRepository analysisRepository,
                                  WorkflowProperties properties,
+                                 RiskOverrideProperties riskOverrideProperties,
                                  ObjectMapper objectMapper) {
         this.agentFactory = agentFactory;
         this.engine = engine;
         this.analysisRepository = analysisRepository;
         this.properties = properties;
+        this.riskOverrideProperties = riskOverrideProperties;
         this.objectMapper = objectMapper;
     }
 
@@ -52,6 +57,13 @@ public class DeepAnalysisWorkflow {
         state.setUserId(userId);
         state.setConversationId(conversationId);
         state.setOriginalQuery(query);
+
+        // 提取股票代码用于范围守卫
+        var stockCodes = StockCodeExtractor.extract(query);
+        state.setAllowedStockCodes(stockCodes);
+        if (!stockCodes.isEmpty()) {
+            log.info("提取到股票代码: {}", stockCodes);
+        }
 
         WorkflowGraph graph = buildGraph();
 
@@ -91,14 +103,19 @@ public class DeepAnalysisWorkflow {
                 agentFactory.createJudgeNode(AgentRole.RISK_JUDGE),
                 properties.riskRounds());
 
+        // Layer 5: 风险覆盖（可选）
+        RiskOverrideNode layer5 = new RiskOverrideNode(riskOverrideProperties);
+
         WorkflowGraph graph = new WorkflowGraph();
         graph.addNode(layer1)
                 .addNode(layer2)
                 .addNode(layer3)
                 .addNode(layer4)
+                .addNode(layer5)
                 .addEdge("Layer1_DataCollection", "BullBearDebate")
                 .addEdge("BullBearDebate", "Trader")
                 .addEdge("Trader", "RiskDebate")
+                .addEdge("RiskDebate", "RiskOverride")
                 .setStart("Layer1_DataCollection");
 
         return graph;

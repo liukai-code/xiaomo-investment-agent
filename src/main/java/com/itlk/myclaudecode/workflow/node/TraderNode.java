@@ -1,10 +1,12 @@
 package com.itlk.myclaudecode.workflow.node;
 
+import com.itlk.myclaudecode.agent.config.ToolGuardProperties;
 import com.itlk.myclaudecode.agent.service.impl.MaxToolCallManager;
 import com.itlk.myclaudecode.tool.guard.FetchSessionTracker;
 import com.itlk.myclaudecode.tool.guard.InfoGainTracker;
 import com.itlk.myclaudecode.tool.guard.RepetitionDetector;
 import com.itlk.myclaudecode.tool.guard.SearchSessionTracker;
+import com.itlk.myclaudecode.workflow.agent.AgentRole;
 import com.itlk.myclaudecode.workflow.engine.WorkflowNode;
 import com.itlk.myclaudecode.workflow.event.WorkflowEvent;
 import com.itlk.myclaudecode.workflow.state.WorkflowState;
@@ -22,6 +24,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
@@ -31,13 +34,19 @@ public class TraderNode implements WorkflowNode {
     private final String roleName;
     private final String systemPrompt;
     private final List<ToolCallback> toolCallbacks;
+    private final ToolGuardProperties guardProperties;
+    private final AgentRole.RoleGuardConfig roleGuardConfig;
 
     public TraderNode(ChatModel chatModel, String roleName,
-                      String systemPrompt, List<ToolCallback> toolCallbacks) {
+                      String systemPrompt, List<ToolCallback> toolCallbacks,
+                      ToolGuardProperties guardProperties,
+                      AgentRole.RoleGuardConfig roleGuardConfig) {
         this.chatModel = chatModel;
         this.roleName = roleName;
         this.systemPrompt = systemPrompt;
         this.toolCallbacks = toolCallbacks;
+        this.guardProperties = guardProperties;
+        this.roleGuardConfig = roleGuardConfig;
     }
 
     @Override
@@ -59,18 +68,33 @@ public class TraderNode implements WorkflowNode {
 
         StringBuilder proposal = new StringBuilder();
 
+        // Use role-specific config when available, fall back to global
+        AgentRole.RoleGuardConfig rc = roleGuardConfig;
+        double infoGainThreshold = rc != null ? rc.infoGainThreshold() : guardProperties.infoGainThreshold();
+        int repetitionThreshold = rc != null ? rc.repetitionThreshold() : guardProperties.repetitionThreshold();
+        int maxFetches = rc != null ? rc.maxFetches() : guardProperties.maxFetches();
+        int maxConsecutiveNoNewInfo = rc != null ? rc.maxConsecutiveNoNewInfo() : guardProperties.maxConsecutiveNoNewInfo();
+        int maxSearchRounds = rc != null ? rc.maxSearchRounds() : guardProperties.maxSearchRounds();
+        int maxSteps = rc != null && rc.maxSteps() > 0 ? rc.maxSteps() : guardProperties.maxIterations();
+
         Map<String, Object> toolCtx = new HashMap<>();
         toolCtx.put(MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0));
-        toolCtx.put(MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(3, 0.8));
-        toolCtx.put(MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(3));
-        toolCtx.put(MaxToolCallManager.FETCH_SESSION_TRACKER_KEY, new FetchSessionTracker(3, 2));
-        toolCtx.put(MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY, new SearchSessionTracker(1));
+        toolCtx.put(MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(3, infoGainThreshold));
+        toolCtx.put(MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(repetitionThreshold));
+        toolCtx.put(MaxToolCallManager.FETCH_SESSION_TRACKER_KEY, new FetchSessionTracker(maxFetches, maxConsecutiveNoNewInfo));
+        toolCtx.put(MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY, new SearchSessionTracker(maxSearchRounds));
+        toolCtx.put(MaxToolCallManager.MAX_FETCHES_KEY, maxFetches);
         toolCtx.put(MaxToolCallManager.DUPLICATE_CACHE_KEY, new LinkedHashMap<String, List<Message>>(16, 0.75f, true) {
             @Override
             protected boolean removeEldestEntry(Map.Entry<String, List<Message>> eldest) {
                 return size() > 50;
             }
         });
+        toolCtx.put(MaxToolCallManager.NON_RETRIABLE_CACHE_KEY, new ConcurrentHashMap<String, String>());
+        toolCtx.put(MaxToolCallManager.MAX_STEPS_KEY, maxSteps);
+        if (state.getAllowedStockCodes() != null && !state.getAllowedStockCodes().isEmpty()) {
+            toolCtx.put(MaxToolCallManager.ALLOWED_STOCK_CODES_KEY, state.getAllowedStockCodes());
+        }
 
         return client.prompt()
                 .user(prompt)
@@ -112,6 +136,15 @@ public class TraderNode implements WorkflowNode {
 
     private String buildTraderPrompt(WorkflowState state) {
         StringBuilder sb = new StringBuilder();
+
+        // 预注入缓存数据
+        if (!state.getCachedData().isEmpty()) {
+            sb.append("## 已有数据（无需重新获取）\n\n");
+            state.getCachedData().forEach((key, value) ->
+                    sb.append("### ").append(key).append("\n").append(value).append("\n\n"));
+            sb.append("⚠️ 以上数据已由上游分析师获取，无需重复调用工具获取相同数据。\n\n");
+        }
+
         sb.append("## 投资计划\n\n").append(state.getInvestmentPlan()).append("\n\n");
 
         sb.append("## 分析报告\n\n");

@@ -45,6 +45,10 @@ public record WorkflowEvent(
         return new WorkflowEvent(WorkflowEventType.PHASE_COMPLETE, null, null, phase, Instant.now());
     }
 
+    public static WorkflowEvent phaseSkipped(String phase, String reason) {
+        return new WorkflowEvent(WorkflowEventType.PHASE_SKIPPED, null, reason, phase, Instant.now());
+    }
+
     public static WorkflowEvent finalDecision(FinalDecision decision) {
         return new WorkflowEvent(WorkflowEventType.FINAL_DECISION, "RiskJudge",
                 decision.summary(), "layer4", Instant.now());
@@ -52,5 +56,9 @@ public record WorkflowEvent(
 
     public static WorkflowEvent error(String message) {
         return new WorkflowEvent(WorkflowEventType.ERROR, null, message, null, Instant.now());
+    }
+
+    public static WorkflowEvent riskOverride(String action, String reason) {
+        return new WorkflowEvent(WorkflowEventType.RISK_OVERRIDE, "RiskOverride", reason, "RiskOverride", Instant.now());
     }
 }

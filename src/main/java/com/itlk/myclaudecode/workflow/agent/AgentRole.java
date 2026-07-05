@@ -31,10 +31,15 @@ public enum AgentRole {
                     + "4. 调用 a_stock_signal(operation=\"industryRanking\") 了解所在行业表现\n"
                     + "5. 调用 a_stock_limit_up(operation=\"sentimentOverview\") 获取市场整体情绪\n"
                     + "6. 综合分析输出技术面报告\n\n"
-                    + "⚠️ 禁止直接编造任何股价、涨跌幅等数据，必须通过工具获取",
+                    + "⚠️ 禁止直接编造任何股价、涨跌幅等数据，必须通过工具获取\n\n"
+                    + "【输出格式】\n先输出分析正文，最后附一个 ```json 代码块，包含以下字段：\n"
+                    + "- signal: \"BULLISH\" | \"BEARISH\" | \"NEUTRAL\"\n"
+                    + "- confidence: 0.0-1.0\n"
+                    + "- reasoning: 分析理由（200字以内）\n"
+                    + "- key_levels: {support: 价格, resistance: 价格}",
             List.of("a_stock_quote", "a_stock_signal", "a_stock_limit_up",
                     "market_data", "fetchWebpage", "fetchArticleContent"),
-            new RoleGuardConfig(0.8, 3, 5, 2, 1)
+            new RoleGuardConfig(0.8, 3, 5, 2, 1, 8)
     ),
 
     FUNDAMENTALS_ANALYST(
@@ -69,11 +74,17 @@ public enum AgentRole {
                     + "7. 调用 a_stock_capital(operation=\"dividendHistory\") 了解分红政策\n"
                     + "8. 用获取到的数据调用 financial_calculator 进行估值计算\n"
                     + "9. 综合分析输出基本面报告\n\n"
-                    + "⚠️ 禁止编造任何财务数据，必须通过工具获取",
+                    + "⚠️ 禁止编造任何财务数据，必须通过工具获取\n\n"
+                    + "【输出格式】\n先输出分析正文，最后附一个 ```json 代码块，包含以下字段：\n"
+                    + "- signal: \"BULLISH\" | \"BEARISH\" | \"NEUTRAL\"\n"
+                    + "- confidence: 0.0-1.0\n"
+                    + "- reasoning: 分析理由（200字以内）\n"
+                    + "- valuation: {pe: 数字, pb: 数字, target_price: 数字}\n"
+                    + "- financial_health: \"HEALTHY\" | \"CAUTION\" | \"RISKY\"",
             List.of("a_stock_quote", "a_stock_report", "a_stock_news", "a_stock_capital",
                     "market_data", "financial_calculator", "getDatabaseSchema", "executeQuery",
                     "fetchWebpage", "fetchArticleContent"),
-            new RoleGuardConfig(0.8, 3, 5, 2, 1)
+            new RoleGuardConfig(0.8, 3, 5, 2, 1, 8)
     ),
 
     NEWS_ANALYST(
@@ -109,10 +120,16 @@ public enum AgentRole {
                     + "6. 仅在上述工具无法满足需求时，才调用 bailian_web_search 补充搜索\n"
                     + "7. 分析新闻对股价的影响（利好/利空/中性）\n"
                     + "8. 输出新闻分析报告\n\n"
-                    + "⚠️ 禁止直接编造任何新闻内容，必须通过工具获取",
+                    + "⚠️ 禁止直接编造任何新闻内容，必须通过工具获取\n\n"
+                    + "【输出格式】\n先输出分析正文，最后附一个 ```json 代码块，包含以下字段：\n"
+                    + "- signal: \"BULLISH\" | \"BEARISH\" | \"NEUTRAL\"\n"
+                    + "- confidence: 0.0-1.0\n"
+                    + "- reasoning: 分析理由（200字以内）\n"
+                    + "- key_news: [{title: 标题, impact: \"positive\"|\"negative\"|\"neutral\"}]\n"
+                    + "- risk_alerts: [风险提示列表]",
             List.of("a_stock_news", "a_stock_report", "a_stock_signal",
                     "fetchWebpage", "fetchArticleContent", "bailian_web_search"),
-            new RoleGuardConfig(0.8, 3, 5, 2, 3)
+            new RoleGuardConfig(0.8, 3, 5, 2, 3, 6)
     ),
 
     SOCIAL_ANALYST(
@@ -148,10 +165,16 @@ public enum AgentRole {
                     + "6. 仅在需要社交媒体、论坛等非官方信息时，才调用 bailian_web_search\n"
                     + "7. 分析投资者情绪和市场关注度\n"
                     + "8. 输出舆情分析报告\n\n"
-                    + "⚠️ 禁止编造任何舆情数据，必须通过工具获取",
+                    + "⚠️ 禁止编造任何舆情数据，必须通过工具获取\n\n"
+                    + "【输出格式】\n先输出分析正文，最后附一个 ```json 代码块，包含以下字段：\n"
+                    + "- signal: \"BULLISH\" | \"BEARISH\" | \"NEUTRAL\"\n"
+                    + "- confidence: 0.0-1.0\n"
+                    + "- reasoning: 分析理由（200字以内）\n"
+                    + "- sentiment_label: \"very_positive\"|\"positive\"|\"neutral\"|\"negative\"|\"very_negative\"\n"
+                    + "- hot_rank: 人气排名（数字或null）",
             List.of("a_stock_sentiment", "a_stock_limit_up", "a_stock_news", "a_stock_signal",
                     "fetchWebpage", "fetchArticleContent", "bailian_web_search"),
-            new RoleGuardConfig(0.8, 3, 5, 2, 2)
+            new RoleGuardConfig(0.8, 3, 5, 2, 2, 6)
     ),
 
     // ===== Layer 2: 多空辩论 =====
@@ -162,7 +185,11 @@ public enum AgentRole {
                     + "1. 引用报告中的具体数据和观点\n"
                     + "2. 逻辑清晰地阐述3-5个核心看多论据\n"
                     + "3. 指出市场低估的机会\n"
-                    + "4. 每轮辩论需要提出新的论据或反驳对方观点",
+                    + "4. 每轮辩论需要提出新的论据或反驳对方观点\n\n"
+                    + "【输出格式】\n先输出论证正文，最后附一个 ```json 代码块，包含：\n"
+                    + "- arguments: [{point: \"论点\", evidence: \"证据\", strength: 0.0-1.0}]\n"
+                    + "- rebuttal: \"对对方上轮观点的反驳\"\n"
+                    + "- overall_score: 0.0-1.0",
             List.of(),
             null
     ),
@@ -174,7 +201,11 @@ public enum AgentRole {
                     + "1. 引用报告中的具体数据和观点\n"
                     + "2. 逻辑清晰地阐述3-5个核心风险因素\n"
                     + "3. 指出市场高估的风险\n"
-                    + "4. 每轮辩论需要提出新的论据或反驳对方观点",
+                    + "4. 每轮辩论需要提出新的论据或反驳对方观点\n\n"
+                    + "【输出格式】\n先输出论证正文，最后附一个 ```json 代码块，包含：\n"
+                    + "- arguments: [{point: \"论点\", evidence: \"证据\", strength: 0.0-1.0}]\n"
+                    + "- rebuttal: \"对对方上轮观点的反驳\"\n"
+                    + "- overall_score: 0.0-1.0",
             List.of(),
             null
     ),
@@ -185,7 +216,15 @@ public enum AgentRole {
                     + "1. 综合评估双方论据的说服力\n"
                     + "2. 给出平衡的投资建议（买入/持有/卖出）\n"
                     + "3. 制定投资计划，包含：目标价位、仓位建议、时间框架\n"
-                    + "4. 明确指出主要风险点和应对策略",
+                    + "4. 明确指出主要风险点和应对策略\n\n"
+                    + "【输出格式】\n先输出裁决正文，最后附一个 ```json 代码块，包含：\n"
+                    + "- investment_plan: \"投资计划摘要\"\n"
+                    + "- action: \"BUY\" | \"SELL\" | \"HOLD\"\n"
+                    + "- target_price: 数字\n"
+                    + "- position_pct: 建议仓位百分比\n"
+                    + "- time_horizon: \"时间框架\"\n"
+                    + "- bull_score: 0.0-1.0\n"
+                    + "- bear_score: 0.0-1.0",
             List.of(),
             null
     ),
@@ -200,7 +239,14 @@ public enum AgentRole {
                     + "4. 设置止损止盈点位\n"
                     + "5. 输出可执行的交易方案\n\n"
                     + "【可用工具】\n"
-                    + "- financial_calculator：金融计算，operation 可选 calculate、peRatio、pbRatio 等",
+                    + "- financial_calculator：金融计算，operation 可选 calculate、peRatio、pbRatio 等\n\n"
+                    + "【输出格式】\n先输出交易方案正文，最后附一个 ```json 代码块，包含：\n"
+                    + "- entry_strategy: \"建仓策略\"\n"
+                    + "- entry_price_range: [最低价, 最高价]\n"
+                    + "- position_pct: 仓位百分比\n"
+                    + "- stop_loss: 止损价\n"
+                    + "- take_profit: 止盈价\n"
+                    + "- risk_reward_ratio: 数字",
             List.of("financial_calculator"),
             null
     ),
@@ -212,7 +258,12 @@ public enum AgentRole {
                     + "1. 从进攻角度评估：潜在收益是否足够高\n"
                     + "2. 支持更大仓位、更宽止损\n"
                     + "3. 强调机会成本和踏空风险\n"
-                    + "4. 每轮需要提出新的激进观点",
+                    + "4. 每轮需要提出新的激进观点\n\n"
+                    + "【输出格式】\n先输出评估正文，最后附一个 ```json 代码块，包含：\n"
+                    + "- position_stance: \"AGGRESSIVE\"\n"
+                    + "- recommended_position_pct: 建议仓位百分比\n"
+                    + "- key_argument: \"核心论点\"\n"
+                    + "- risk_acceptance: \"可接受的最大亏损\"",
             List.of(),
             null
     ),
@@ -223,7 +274,12 @@ public enum AgentRole {
                     + "1. 从防守角度评估：下行风险是否可控\n"
                     + "2. 支持更小仓位、更紧止损\n"
                     + "3. 强调本金安全和风险回报比\n"
-                    + "4. 每轮需要提出新的保守观点",
+                    + "4. 每轮需要提出新的保守观点\n\n"
+                    + "【输出格式】\n先输出评估正文，最后附一个 ```json 代码块，包含：\n"
+                    + "- position_stance: \"CONSERVATIVE\"\n"
+                    + "- recommended_position_pct: 建议仓位百分比\n"
+                    + "- key_argument: \"核心论点\"\n"
+                    + "- max_drawdown_tolerance: \"最大回撤容忍度\"",
             List.of(),
             null
     ),
@@ -234,7 +290,13 @@ public enum AgentRole {
                     + "1. 客观分析方案的优缺点\n"
                     + "2. 权衡收益和风险\n"
                     + "3. 考虑市场环境和宏观因素\n"
-                    + "4. 每轮需要提出新的中肯观点",
+                    + "4. 每轮需要提出新的中肯观点\n\n"
+                    + "【输出格式】\n先输出评估正文，最后附一个 ```json 代码块，包含：\n"
+                    + "- position_stance: \"NEUTRAL\"\n"
+                    + "- recommended_position_pct: 建议仓位百分比\n"
+                    + "- key_argument: \"核心论点\"\n"
+                    + "- pros: [优点列表]\n"
+                    + "- cons: [缺点列表]",
             List.of(),
             null
     ),
@@ -289,6 +351,7 @@ public enum AgentRole {
             int repetitionThreshold,
             int maxFetches,
             int maxConsecutiveNoNewInfo,
-            int maxSearchRounds
+            int maxSearchRounds,
+            int maxSteps
     ) {}
 }
