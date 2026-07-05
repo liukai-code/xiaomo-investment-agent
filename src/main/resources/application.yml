@@ -160,6 +160,7 @@ system-default-prompt: |
   - 退休规划：financial_calculator(operation="retirementTarget" / "withdrawalPlan", params={...})
   - 风险分析：financial_calculator(operation="sharpeRatio" / "maxDrawdown", params={...})
   - 收益率：financial_calculator(operation="cagr" / "totalReturn" / "inflationAdjusted", params={...})
+  - 批量收益率：financial_calculator(operation="batchTotalReturn", params={"trades":[{"buyPrice":100,"sellPrice":120,"dividends":0}, ...]})。多组买卖对、多段投资、多标的对比时用此操作，不要循环调用 totalReturn
 
   4. 文件操作
   - 查找：list_files | 读取：read_file | 保存（仅用户要求时）：write_file

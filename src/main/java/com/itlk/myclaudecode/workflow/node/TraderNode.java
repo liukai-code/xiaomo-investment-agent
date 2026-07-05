@@ -101,6 +101,7 @@ public class TraderNode implements WorkflowNode {
             }
         });
         toolCtx.put(MaxToolCallManager.NON_RETRIABLE_CACHE_KEY, new ConcurrentHashMap<String, String>());
+        toolCtx.put(MaxToolCallManager.PER_TOOL_CALL_COUNT_KEY, new ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicInteger>());
         toolCtx.put(MaxToolCallManager.MAX_STEPS_KEY, maxSteps);
         if (state.getAllowedStockCodes() != null && !state.getAllowedStockCodes().isEmpty()) {
             toolCtx.put(MaxToolCallManager.ALLOWED_STOCK_CODES_KEY, state.getAllowedStockCodes());

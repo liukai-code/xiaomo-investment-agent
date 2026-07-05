@@ -32,7 +32,8 @@ public class FinancialCalcRouterTool {
             - compoundDca: 复利+定投综合（有初始资金+定投）。参数: initialCapital, periodicAmount, annualRate, years, frequency
             - ruleOf72: 72法则（多久翻倍）。参数: annualRate
             - cagr: 复合年增长率。参数: beginValue, endValue, years
-            - totalReturn: 总收益率（含分红）。参数: buyPrice, sellPrice, dividends
+            - totalReturn: 单组总收益率（含分红）。参数: buyPrice, sellPrice, dividends。注意：如需计算多组收益率（多段投资、多标的对比），请用 batchTotalReturn 一次传入，不要循环调用 totalReturn
+            - batchTotalReturn: 批量总收益率（多组买卖对一次计算，返回每段明细+汇总）。参数: trades(数组，每项含buyPrice, sellPrice, dividends)
             - inflationAdjusted: 通胀调整购买力。参数: amount, inflationRate, years
 
             [估值指标]
@@ -65,12 +66,12 @@ public class FinancialCalcRouterTool {
             params 为 JSON 字符串，格式参考各 operation 的参数说明。
             """)
     public String financial_calculator(
-            @ToolParam(description = "操作类型，可选值：calculate, compoundInterest, simpleInterest, annualizedReturn, dcaReturn, compoundDca, ruleOf72, cagr, totalReturn, inflationAdjusted, peRatio, pbRatio, dividendYield, loanPayment, npv, irr, bondPrice, bondYtm, retirementTarget, withdrawalPlan, sharpeRatio, maxDrawdown") String operation,
+            @ToolParam(description = "操作类型，可选值：calculate, compoundInterest, simpleInterest, annualizedReturn, dcaReturn, compoundDca, ruleOf72, cagr, totalReturn, batchTotalReturn, inflationAdjusted, peRatio, pbRatio, dividendYield, loanPayment, npv, irr, bondPrice, bondYtm, retirementTarget, withdrawalPlan, sharpeRatio, maxDrawdown") String operation,
             @ToolParam(description = "JSON格式参数，如 {\"principal\":10000, \"annualRate\":0.05, \"years\":10}") String params) {
         log.info("[FinancialCalcRouterTool] operation={}, params={}", operation, params);
         try {
             if (operation == null || operation.isBlank()) {
-                return "操作类型不能为空。可用操作：calculate, compoundInterest, simpleInterest, annualizedReturn, dcaReturn, compoundDca, ruleOf72, cagr, totalReturn, inflationAdjusted, peRatio, pbRatio, dividendYield, loanPayment, npv, irr, bondPrice, bondYtm, retirementTarget, withdrawalPlan, sharpeRatio, maxDrawdown";
+                return "操作类型不能为空。可用操作：calculate, compoundInterest, simpleInterest, annualizedReturn, dcaReturn, compoundDca, ruleOf72, cagr, totalReturn, batchTotalReturn, inflationAdjusted, peRatio, pbRatio, dividendYield, loanPayment, npv, irr, bondPrice, bondYtm, retirementTarget, withdrawalPlan, sharpeRatio, maxDrawdown";
             }
             JsonNode p = parseParams(params);
             return switch (operation.trim()) {
@@ -83,6 +84,13 @@ public class FinancialCalcRouterTool {
                 case "ruleOf72" -> delegate.ruleOf72(getDouble(p, "annualRate"));
                 case "cagr" -> delegate.cagr(getDouble(p, "beginValue"), getDouble(p, "endValue"), getInt(p, "years"));
                 case "totalReturn" -> delegate.totalReturn(getDouble(p, "buyPrice"), getDouble(p, "sellPrice"), getDouble(p, "dividends"));
+                case "batchTotalReturn" -> {
+                    JsonNode trades = p.get("trades");
+                    if (trades == null || !trades.isArray() || trades.isEmpty()) {
+                        yield "缺少参数 trades（数组），每项需包含 buyPrice, sellPrice, dividends";
+                    }
+                    yield delegate.batchTotalReturn(trades);
+                }
                 case "inflationAdjusted" -> delegate.inflationAdjusted(getDouble(p, "amount"), getDouble(p, "inflationRate"), getInt(p, "years"));
                 case "peRatio" -> delegate.peRatio(getDouble(p, "stockPrice"), getDouble(p, "earningsPerShare"));
                 case "pbRatio" -> delegate.pbRatio(getDouble(p, "stockPrice"), getDouble(p, "bookValuePerShare"));
@@ -99,7 +107,7 @@ public class FinancialCalcRouterTool {
                 case "withdrawalPlan" -> delegate.withdrawalPlan(getDouble(p, "principal"), getDouble(p, "annualWithdrawal"), getDouble(p, "annualRate"));
                 case "sharpeRatio" -> delegate.sharpeRatio(getDouble(p, "portfolioReturn"), getDouble(p, "riskFreeRate"), getDouble(p, "volatility"));
                 case "maxDrawdown" -> delegate.maxDrawdown(getStr(p, "navSeries"));
-                default -> "未知操作: " + operation + "。可用操作：calculate, compoundInterest, simpleInterest, annualizedReturn, dcaReturn, compoundDca, ruleOf72, cagr, totalReturn, inflationAdjusted, peRatio, pbRatio, dividendYield, loanPayment, npv, irr, bondPrice, bondYtm, retirementTarget, withdrawalPlan, sharpeRatio, maxDrawdown";
+                default -> "未知操作: " + operation + "。可用操作：calculate, compoundInterest, simpleInterest, annualizedReturn, dcaReturn, compoundDca, ruleOf72, cagr, totalReturn, batchTotalReturn, inflationAdjusted, peRatio, pbRatio, dividendYield, loanPayment, npv, irr, bondPrice, bondYtm, retirementTarget, withdrawalPlan, sharpeRatio, maxDrawdown";
             };
         } catch (Exception e) {
             log.error("[FinancialCalcRouterTool] 异常: operation={}, error={}", operation, e.getMessage(), e);

@@ -4,6 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
@@ -788,7 +790,7 @@ public class FinancialCalcTool {
         }
     }
 
-    @Tool(description = "总收益率计算（含分红）。当用户问'我这笔投资总共赚了多少'时调用，考虑买入价、卖出价和期间分红。")
+    @Tool(description = "单组总收益率计算（含分红）。当用户问'我这笔投资总共赚了多少'时调用，考虑买入价、卖出价和期间分红。如需计算多组收益率，请用 batchTotalReturn。")
     public String totalReturn(
             @ToolParam(description = "买入价（元）") double buyPrice,
             @ToolParam(description = "卖出价（元）") double sellPrice,
@@ -812,6 +814,68 @@ public class FinancialCalcTool {
         } catch (Exception e) {
             log.error("[FinancialCalcTool] totalReturn 异常: {}", e.getMessage(), e);
             return "总收益率计算失败: " + e.getMessage();
+        }
+    }
+
+    /**
+     * 批量总收益率计算，一次传入多组买卖对，返回每段收益率和汇总。
+     * 适合多段投资分析、多标的对比等场景，避免循环调用 single totalReturn。
+     */
+    public String batchTotalReturn(JsonNode trades) {
+        log.info("[FinancialCalcTool] batchTotalReturn 入参: trades={}", trades);
+        try {
+            StringBuilder sb = new StringBuilder();
+            BigDecimal totalBuy = BigDecimal.ZERO;
+            BigDecimal totalSell = BigDecimal.ZERO;
+            BigDecimal totalDiv = BigDecimal.ZERO;
+            int count = 0;
+
+            for (JsonNode trade : trades) {
+                count++;
+                double buyPrice = trade.has("buyPrice") ? trade.get("buyPrice").asDouble() : 0;
+                double sellPrice = trade.has("sellPrice") ? trade.get("sellPrice").asDouble() : 0;
+                double dividends = trade.has("dividends") ? trade.get("dividends").asDouble() : 0;
+
+                if (buyPrice <= 0) {
+                    sb.append(String.format("第%d组：买入价必须大于0，跳过\n", count));
+                    continue;
+                }
+
+                BigDecimal bp = BigDecimal.valueOf(buyPrice);
+                BigDecimal sp = BigDecimal.valueOf(sellPrice);
+                BigDecimal div = BigDecimal.valueOf(dividends);
+                BigDecimal gain = sp.add(div, MC).subtract(bp, MC);
+                BigDecimal rate = gain.divide(bp, MC).multiply(HUNDRED, MC);
+
+                sb.append(String.format("第%d组：买入%.2f → 卖出%.2f + 分红%.2f = 收益%.2f（收益率%.2f%%）\n",
+                        count, buyPrice, sellPrice, dividends,
+                        gain.setScale(2, RoundingMode.HALF_UP),
+                        rate.setScale(2, RoundingMode.HALF_UP)));
+
+                totalBuy = totalBuy.add(bp, MC);
+                totalSell = totalSell.add(sp, MC);
+                totalDiv = totalDiv.add(div, MC);
+            }
+
+            BigDecimal totalGain = totalSell.add(totalDiv, MC).subtract(totalBuy, MC);
+            BigDecimal totalRate = totalBuy.compareTo(BigDecimal.ZERO) > 0
+                    ? totalGain.divide(totalBuy, MC).multiply(HUNDRED, MC)
+                    : BigDecimal.ZERO;
+
+            sb.append(String.format("\n汇总（共%d组）：\n总买入：%.2f元\n总卖出：%.2f元\n总分红：%.2f元\n总收益：%.2f元\n综合收益率：%.2f%%",
+                    count,
+                    totalBuy.setScale(2, RoundingMode.HALF_UP),
+                    totalSell.setScale(2, RoundingMode.HALF_UP),
+                    totalDiv.setScale(2, RoundingMode.HALF_UP),
+                    totalGain.setScale(2, RoundingMode.HALF_UP),
+                    totalRate.setScale(2, RoundingMode.HALF_UP)));
+
+            String output = "批量总收益率：\n" + sb;
+            log.info("[FinancialCalcTool] batchTotalReturn 出参: {}", output);
+            return output;
+        } catch (Exception e) {
+            log.error("[FinancialCalcTool] batchTotalReturn 异常: {}", e.getMessage(), e);
+            return "批量总收益率计算失败: " + e.getMessage();
         }
     }
 

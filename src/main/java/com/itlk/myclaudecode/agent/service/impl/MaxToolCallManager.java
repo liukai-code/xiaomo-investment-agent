@@ -56,6 +56,7 @@ public class MaxToolCallManager implements ToolCallingManager {
     public static final String ALLOWED_STOCK_CODES_KEY = "allowedStockCodes";
     public static final String RESOLVED_STOCK_NAME_KEY = "resolvedStockName";
     public static final String STATUS_SINK_KEY = "statusSink";
+    public static final String PER_TOOL_CALL_COUNT_KEY = "perToolCallCount";
 
     private static final Set<String> FETCH_TOOL_NAMES = Set.of(
             "fetchArticleContent", "fetchWebpage"
@@ -108,6 +109,7 @@ public class MaxToolCallManager implements ToolCallingManager {
         java.util.Set<String> allowedStockCodes = extractFromContext(prompt, ALLOWED_STOCK_CODES_KEY, java.util.Set.class);
         String resolvedStockName = extractFromContext(prompt, RESOLVED_STOCK_NAME_KEY, String.class);
         int effectiveMaxIterations = maxStepsCtx != null ? Math.min(maxStepsCtx, properties.maxIterations()) : properties.maxIterations();
+        Map<String, AtomicInteger> perToolCallCount = extractFromContext(prompt, PER_TOOL_CALL_COUNT_KEY, Map.class);
 
         int step = counter.incrementAndGet();
         AssistantMessage assistantWithTools = findAssistantWithToolCalls(chatResponse);
@@ -148,6 +150,27 @@ public class MaxToolCallManager implements ToolCallingManager {
             }
             blockHistory.add(new ToolResponseMessage(blockResponses));
             return new CachedToolExecutionResult(blockHistory);
+        }
+
+        // 同工具调用次数限制：防止同一工具被无限循环调用
+        if (perToolCallCount != null) {
+            for (AssistantMessage.ToolCall tc : toolCalls) {
+                AtomicInteger toolCount = perToolCallCount.computeIfAbsent(tc.name(), k -> new AtomicInteger(0));
+                int count = toolCount.incrementAndGet();
+                if (count > properties.maxSameToolCalls()) {
+                    log.warn("[MaxToolCallManager] 同工具调用超限: {} 已调用 {} 次 (上限 {}), 强制停止",
+                            tc.name(), count, properties.maxSameToolCalls());
+                    String blockMsg = "[GUARD: FORCE]\nAction: 工具 " + tc.name() + " 已被调用 " + count + " 次，超过单工具调用上限(" + properties.maxSameToolCalls() + "次)。\n[/GUARD]\n\n该工具已被反复调用过多轮，请直接基于已有的工具返回数据完成分析报告。不要再调用 " + tc.name() + " 工具。";
+                    List<Message> blockHistory = new ArrayList<>();
+                    blockHistory.add(assistantWithTools);
+                    List<ToolResponseMessage.ToolResponse> blockResponses = new ArrayList<>();
+                    for (AssistantMessage.ToolCall t : toolCalls) {
+                        blockResponses.add(new ToolResponseMessage.ToolResponse(t.id(), t.name(), blockMsg));
+                    }
+                    blockHistory.add(new ToolResponseMessage(blockResponses));
+                    return new CachedToolExecutionResult(blockHistory);
+                }
+            }
         }
 
         if (toolCalls.size() == 1) {

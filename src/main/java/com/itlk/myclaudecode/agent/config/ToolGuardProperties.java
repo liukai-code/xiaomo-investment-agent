@@ -15,6 +15,7 @@ public record ToolGuardProperties(
         int maxConsecutiveNoNewInfo,
         int maxSearchRounds,
         int toolTimeoutSeconds,
+        int maxSameToolCalls,
         int reportMinLength,
         int reportMinSections
 ) {
@@ -30,6 +31,7 @@ public record ToolGuardProperties(
         if (maxConsecutiveNoNewInfo <= 0) maxConsecutiveNoNewInfo = 2;
         if (maxSearchRounds <= 0) maxSearchRounds = 1;
         if (toolTimeoutSeconds <= 0) toolTimeoutSeconds = 60;
+        if (maxSameToolCalls <= 0) maxSameToolCalls = 10;
         if (reportMinLength <= 0) reportMinLength = 500;
         if (reportMinSections <= 0) reportMinSections = 2;
     }

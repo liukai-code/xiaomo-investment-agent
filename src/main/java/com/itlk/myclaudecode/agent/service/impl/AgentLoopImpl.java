@@ -194,6 +194,7 @@ public class AgentLoopImpl implements AgentLoop {
             }
         });
         toolCtx.put(MaxToolCallManager.NON_RETRIABLE_CACHE_KEY, new ConcurrentHashMap<String, String>());
+        toolCtx.put(MaxToolCallManager.PER_TOOL_CALL_COUNT_KEY, new ConcurrentHashMap<String, AtomicInteger>());
 
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
@@ -258,6 +259,7 @@ public class AgentLoopImpl implements AgentLoop {
             }
         });
         streamToolCtx.put(MaxToolCallManager.NON_RETRIABLE_CACHE_KEY, new ConcurrentHashMap<String, String>());
+        streamToolCtx.put(MaxToolCallManager.PER_TOOL_CALL_COUNT_KEY, new ConcurrentHashMap<String, AtomicInteger>());
         streamToolCtx.put(MaxToolCallManager.STATUS_SINK_KEY, statusSink);
 
         AnthropicChatOptions options = AnthropicChatOptions.builder()
