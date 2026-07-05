@@ -185,16 +185,26 @@ public class MaxToolCallManager implements ToolCallingManager {
                 }
             }
 
-            // Stock scope guard check
+            // Stock scope guard check + auto-injection
             if (allowedStockCodes != null && !allowedStockCodes.isEmpty() && isAStockTool(tc.name())) {
                 java.util.Set<String> requestedCodes = extractStockCodesFromArgs(tc.arguments());
                 if (!requestedCodes.isEmpty() && !allowedStockCodes.containsAll(requestedCodes)) {
+                    // LLM 传了错误的代码 → 拦截
                     java.util.Set<String> disallowed = new java.util.HashSet<>(requestedCodes);
                     disallowed.removeAll(allowedStockCodes);
                     String scopeMsg = "股票代码 " + disallowed + " 不在分析范围内。请只查询目标股票: " + allowedStockCodes;
                     log.info("[MaxToolCallManager] 股票范围守卫拦截: 请求={}, 允许={}", requestedCodes, allowedStockCodes);
                     List<Message> skipHistory = buildSkipResult(tc, scopeMsg);
                     return new CachedToolExecutionResult(skipHistory);
+                }
+                if (requestedCodes.isEmpty()) {
+                    // LLM 没传 stockCode → 自动注入，避免工具报错导致 LLM fallback 到训练知识
+                    String targetCode = allowedStockCodes.iterator().next();
+                    String injected = injectStockCode(tc.arguments(), tc.name(), targetCode);
+                    if (!injected.equals(tc.arguments())) {
+                        log.info("[MaxToolCallManager] 自动注入 stockCode={}: {} → {}", targetCode, tc.arguments(), injected);
+                        tc = new AssistantMessage.ToolCall(tc.id(), tc.type(), tc.name(), injected);
+                    }
                 }
             }
 
@@ -214,6 +224,17 @@ public class MaxToolCallManager implements ToolCallingManager {
 
             // Info gain and repetition detection
             String resultText = extractResultText(result);
+
+            // Data pollution hard filter: remove non-target stock data from tool results
+            if (allowedStockCodes != null && !allowedStockCodes.isEmpty() && isAStockTool(tc.name())) {
+                java.util.Set<String> foreignCodes = extractForeignStockCodes(resultText, allowedStockCodes);
+                if (!foreignCodes.isEmpty()) {
+                    log.info("[MaxToolCallManager] 检测到非目标标的数据，执行硬过滤: {}", foreignCodes);
+                    result = filterToolResult(result, tc, resultText, allowedStockCodes, foreignCodes);
+                    resultText = extractResultText(result);
+                }
+            }
+
             InfoGainLevel infoGain = infoGainTracker.recordAndGetLevel(resultText);
 
             // Cache non-retriable errors
@@ -449,6 +470,105 @@ public class MaxToolCallManager implements ToolCallingManager {
     }
 
     private record CachedToolExecutionResult(List<Message> conversationHistory) implements ToolExecutionResult {
+    }
+
+    /**
+     * 当 AStock 工具调用缺少 stockCode/stockCodes 参数时，自动注入目标代码。
+     * 避免工具因缺少参数报错，导致 LLM fallback 到训练知识。
+     */
+    private String injectStockCode(String args, String toolName, String targetCode) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.node.ObjectNode root;
+            if (args == null || args.isBlank()) {
+                root = mapper.createObjectNode();
+            } else {
+                com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(args);
+                if (node.isObject()) {
+                    root = (com.fasterxml.jackson.databind.node.ObjectNode) node;
+                } else {
+                    return args;
+                }
+            }
+            // 根据工具类型注入不同的参数名
+            if ("a_stock_quote".equals(toolName)) {
+                if (!root.has("stockCodes") || root.get("stockCodes").asText("").isBlank()) {
+                    root.put("stockCodes", targetCode);
+                }
+            } else {
+                if (!root.has("stockCode") || root.get("stockCode").asText("").isBlank()) {
+                    root.put("stockCode", targetCode);
+                }
+            }
+            return mapper.writeValueAsString(root);
+        } catch (Exception e) {
+            log.debug("[MaxToolCallManager] 注入 stockCode 失败: {}", e.getMessage());
+            return args;
+        }
+    }
+
+    /**
+     * 从工具返回文本中提取所有 6 位股票代码，过滤掉允许范围内的，返回"外来"代码
+     */
+    private java.util.Set<String> extractForeignStockCodes(String text, java.util.Set<String> allowedCodes) {
+        java.util.Set<String> foreign = new java.util.HashSet<>();
+        if (text == null || text.isBlank()) return foreign;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\b(\\d{6})\\b").matcher(text);
+        while (m.find()) {
+            String code = m.group(1);
+            if (!allowedCodes.contains(code)) {
+                foreign.add(code);
+            }
+        }
+        return foreign;
+    }
+
+    /**
+     * 硬过滤工具返回结果：移除非目标标的的数据行，替换为占位符。
+     * 对每一行检查是否包含外来股票代码，若包含则移除该行。
+     */
+    private ToolExecutionResult filterToolResult(ToolExecutionResult original,
+                                                  AssistantMessage.ToolCall tc,
+                                                  String resultText,
+                                                  java.util.Set<String> allowedCodes,
+                                                  java.util.Set<String> foreignCodes) {
+        String[] lines = resultText.split("\\n");
+        StringBuilder filtered = new StringBuilder();
+        int removedCount = 0;
+        for (String line : lines) {
+            boolean containsForeign = false;
+            for (String code : foreignCodes) {
+                if (line.contains(code)) {
+                    containsForeign = true;
+                    break;
+                }
+            }
+            if (containsForeign) {
+                removedCount++;
+                // 跳过该行（硬删除）
+            } else {
+                filtered.append(line).append("\n");
+            }
+        }
+        if (removedCount > 0) {
+            filtered.append("\n[已过滤 ").append(removedCount).append(" 条非目标标的（")
+                    .append(foreignCodes).append("）的数据，当前分析标的为 ").append(allowedCodes).append("]");
+        }
+        log.info("[MaxToolCallManager] 硬过滤完成: 移除 {} 行外来数据", removedCount);
+
+        List<Message> history = new ArrayList<>(original.conversationHistory());
+        if (!history.isEmpty()) {
+            Message last = history.get(history.size() - 1);
+            if (last instanceof ToolResponseMessage toolMsg) {
+                List<ToolResponseMessage.ToolResponse> newResponses = new ArrayList<>();
+                for (ToolResponseMessage.ToolResponse r : toolMsg.getResponses()) {
+                    newResponses.add(new ToolResponseMessage.ToolResponse(
+                            r.id(), r.name(), filtered.toString()));
+                }
+                history.set(history.size() - 1, new ToolResponseMessage(newResponses));
+            }
+        }
+        return new CachedToolExecutionResult(history);
     }
 
     private static class GuardedToolExecutionResult implements ToolExecutionResult {

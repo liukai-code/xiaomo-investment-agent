@@ -180,11 +180,18 @@ public class AnalystNode implements WorkflowNode {
      */
     static String buildStockTargetLine(WorkflowState state) {
         if (state.getResolvedStockCode() != null) {
+            String code = state.getResolvedStockCode();
             String name = state.getResolvedStockName() != null ? state.getResolvedStockName() : "";
-            return "【分析标的】" + name + "（" + state.getResolvedStockCode() + "）\n"
-                    + "⚠️ 标的已锁定为 " + state.getResolvedStockCode()
-                    + "，禁止分析其他股票，禁止重新查询或猜测股票代码。"
-                    + "所有工具调用必须使用 stockCode=\"" + state.getResolvedStockCode() + "\"。";
+            return "【分析标的】" + name + "（" + code + "）\n"
+                    + "⚠️ 标的已锁定为 " + code + "，你必须严格遵守以下约束：\n"
+                    + "1. 所有工具调用必须使用 stockCode=\"" + code + "\"，禁止使用其他代码\n"
+                    + "2. 禁止重新查询、猜测或推断股票代码\n"
+                    + "3. 禁止引用、分析、对比任何非 " + code + " 的公司\n"
+                    + "4. 即使在行业分析、板块分析、概念分析中，也不得提及其他股票名称或代码\n"
+                    + "5. 若工具返回包含其他股票的数据，该数据已被系统过滤，你只能使用剩余数据\n"
+                    + "6. 你的分析范围被严格限制在 " + name + "（" + code + "）这一只股票内\n"
+                    + "7. 工具调用失败时，必须根据错误提示修正参数后重试，禁止 fallback 到训练知识或历史数据\n"
+                    + "8. 禁止使用训练数据中的任何股票信息，所有数据必须来自工具实时返回";
         }
         // fallback：只有 originalQuery 的情况（理论上不应发生）
         return "【分析标的】" + state.getOriginalQuery();

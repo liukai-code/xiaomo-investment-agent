@@ -53,6 +53,10 @@ public class AStockQuoteRouterTool {
                         "mootdx TCP 协议尚未在 Java 端实现，请使用 tencentQuote 或 baiduKline 替代";
                 default -> "未知操作: " + operation + "。可用操作：tencentQuote, baiduKline";
             };
+        } catch (IllegalArgumentException e) {
+            log.error("[AStockQuoteRouterTool] 参数错误: operation={}, error={}", operation, e.getMessage());
+            return "参数错误（operation=" + operation + "）: " + e.getMessage()
+                    + "。请检查 params JSON 格式，例如: {\"stockCodes\":\"430510\"}";
         } catch (Exception e) {
             log.error("[AStockQuoteRouterTool] 异常: operation={}, error={}", operation, e.getMessage(), e);
             return "操作失败（operation=" + operation + "）: " + e.getMessage();

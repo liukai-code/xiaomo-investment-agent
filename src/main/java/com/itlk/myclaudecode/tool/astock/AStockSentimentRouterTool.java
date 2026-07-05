@@ -46,6 +46,10 @@ public class AStockSentimentRouterTool {
                 case "emConceptHit" -> emConceptHit(getStr(p, "stockCode"));
                 default -> "未知操作: " + operation;
             };
+        } catch (IllegalArgumentException e) {
+            log.error("[AStockSentimentRouterTool] 参数错误: operation={}, error={}", operation, e.getMessage());
+            return "参数错误（operation=" + operation + "）: " + e.getMessage()
+                    + "。请检查 params JSON 格式，例如: {\"stockCode\":\"430510\"}";
         } catch (Exception e) {
             log.error("[AStockSentimentRouterTool] 异常: operation={}, error={}", operation, e.getMessage(), e);
             return "操作失败（operation=" + operation + "）: " + e.getMessage();

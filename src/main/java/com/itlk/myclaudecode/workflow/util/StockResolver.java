@@ -6,6 +6,8 @@ import com.itlk.myclaudecode.common.config.HttpClientService;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.Headers;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -67,23 +69,25 @@ public class StockResolver {
         }
         log.info("[StockResolver] 提取到股票名称: {}", name);
 
-        // 3. 调用东财 suggest API 解析
+        // 3. 调用东财 suggest API 解析（遍历多个结果，优先名称精确匹配）
         try {
-            ResolvedStock result = searchEastMoney(name, httpClientService);
-            if (result != null) {
-                log.info("[StockResolver] 东财解析成功: {} -> {}({})", name, result.name(), result.code());
-                return result;
+            List<ResolvedStock> results = searchEastMoneyAll(name, httpClientService);
+            ResolvedStock matched = pickBestMatch(name, results);
+            if (matched != null) {
+                log.info("[StockResolver] 东财解析成功: {} -> {}({})", name, matched.name(), matched.code());
+                return matched;
             }
         } catch (Exception e) {
             log.warn("[StockResolver] 东财搜索异常: {}", e.getMessage());
         }
 
-        // 4. 新浪 fallback
+        // 4. 新浪 fallback（同样遍历多个结果）
         try {
-            ResolvedStock result = searchSinaFallback(name, httpClientService);
-            if (result != null) {
-                log.info("[StockResolver] 新浪解析成功: {} -> {}({})", name, result.name(), result.code());
-                return result;
+            List<ResolvedStock> results = searchSinaFallbackAll(name, httpClientService);
+            ResolvedStock matched = pickBestMatch(name, results);
+            if (matched != null) {
+                log.info("[StockResolver] 新浪解析成功: {} -> {}({})", name, matched.name(), matched.code());
+                return matched;
             }
         } catch (Exception e) {
             log.warn("[StockResolver] 新浪搜索异常: {}", e.getMessage());
@@ -93,9 +97,9 @@ public class StockResolver {
     }
 
     /**
-     * 搜索东财 suggest API，返回第一个匹配的 A 股结果
+     * 搜索东财 suggest API，返回所有匹配的 A 股结果
      */
-    public static ResolvedStock searchEastMoney(String keyword, HttpClientService httpClientService) throws Exception {
+    public static List<ResolvedStock> searchEastMoneyAll(String keyword, HttpClientService httpClientService) throws Exception {
         String url = "https://searchapi.eastmoney.com/api/suggest/get"
                 + "?input=" + java.net.URLEncoder.encode(keyword, "UTF-8")
                 + "&type=14&token=D43BF722C8E33BDC906FB84D85E326E8&count=5";
@@ -105,28 +109,29 @@ public class StockResolver {
                 .add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 .build();
 
+        List<ResolvedStock> results = new ArrayList<>();
         String body = httpClientService.get(url, headers);
-        if (body == null || body.isBlank()) return null;
+        if (body == null || body.isBlank()) return results;
 
         JsonNode root = objectMapper.readTree(body);
         JsonNode quotes = root.path("QuotationCodeTable").path("Data");
-        if (!quotes.isArray() || quotes.isEmpty()) return null;
+        if (!quotes.isArray() || quotes.isEmpty()) return results;
 
         for (JsonNode item : quotes) {
             String code = item.path("Code").asText("");
             String name = item.path("Name").asText("");
             String mktNum = item.path("MktNum").asText("");
             if (code.length() == 6 && ("1".equals(mktNum) || "0".equals(mktNum))) {
-                return new ResolvedStock(code, name);
+                results.add(new ResolvedStock(code, name));
             }
         }
-        return null;
+        return results;
     }
 
     /**
-     * 搜索新浪 suggest API（fallback），返回第一个匹配的 A 股结果
+     * 搜索新浪 suggest API（fallback），返回所有匹配的 A 股结果
      */
-    public static ResolvedStock searchSinaFallback(String keyword, HttpClientService httpClientService) throws Exception {
+    public static List<ResolvedStock> searchSinaFallbackAll(String keyword, HttpClientService httpClientService) throws Exception {
         String url = "https://suggest3.sinajs.cn/suggest/type=&key="
                 + java.net.URLEncoder.encode(keyword, "UTF-8") + "&name=suggest";
         log.info("[StockResolver] searchSinaFallback 请求: {}", url);
@@ -136,8 +141,9 @@ public class StockResolver {
                 .add("Referer", "https://finance.sina.com.cn")
                 .build();
 
+        List<ResolvedStock> results = new ArrayList<>();
         String body = httpClientService.get(url, headers);
-        if (body == null || body.isBlank()) return null;
+        if (body == null || body.isBlank()) return results;
 
         String data = body.contains("\"") ? body.split("\"")[1] : "";
         for (String entry : data.split(";")) {
@@ -151,10 +157,38 @@ public class StockResolver {
             String code = id.substring(2);
             if (("sh".equals(market) || "sz".equals(market)) && code.length() == 6
                     && (code.startsWith("6") || code.startsWith("0") || code.startsWith("3"))) {
-                return new ResolvedStock(code, name);
+                results.add(new ResolvedStock(code, name));
             }
         }
-        return null;
+        return results;
+    }
+
+    /**
+     * 从候选结果中选择最佳匹配。
+     * 优先选择名称包含输入关键词的结果，避免错标。
+     * 如果没有任何名称匹配，返回第一个结果（兜底）。
+     */
+    static ResolvedStock pickBestMatch(String inputName, List<ResolvedStock> candidates) {
+        if (candidates == null || candidates.isEmpty()) return null;
+
+        // 优先：名称包含输入关键词
+        for (ResolvedStock stock : candidates) {
+            if (stock.name() != null && stock.name().contains(inputName)) {
+                return stock;
+            }
+        }
+
+        // 次优：输入关键词包含返回名称（如输入"茅台"返回"贵州茅台"）
+        for (ResolvedStock stock : candidates) {
+            if (stock.name() != null && inputName.contains(stock.name())) {
+                return stock;
+            }
+        }
+
+        // 兜底：取第一个结果，但记录警告
+        log.warn("[StockResolver] 无精确名称匹配，使用第一个结果。输入: {}, 候选: {}",
+                inputName, candidates.stream().map(ResolvedStock::name).toList());
+        return candidates.get(0);
     }
 
     /**

@@ -23,7 +23,7 @@ public class FinancialDataRouterTool {
             行情数据查询。查询股票、基金的实时行情和基本信息。
 
             operation 可选值：
-            - aShareQuote: 查询A股行情。参数: stockCodeOrName（代码或名称，如600519、茅台）
+            - aShareQuote: 查询A股行情。参数: stockCodeOrName（代码或名称，如600519）
             - hkStockQuote: 查询港股行情。参数: stockCode（5位数字如00700）
             - usStockQuote: 查询美股行情。参数: stockCode（如AAPL）
             - fundNav: 查询基金净值。参数: fundCode（6位数字）

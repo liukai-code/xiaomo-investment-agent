@@ -68,6 +68,10 @@ public class AStockReportRouterTool {
                 case "iwencaiQuery" -> iwencaiQuery(getStr(p, "query"), getOptInt(p, "page", 1), getOptInt(p, "limit", 50));
                 default -> "未知操作: " + operation;
             };
+        } catch (IllegalArgumentException e) {
+            log.error("[AStockReportRouterTool] 参数错误: operation={}, error={}", operation, e.getMessage());
+            return "参数错误（operation=" + operation + "）: " + e.getMessage()
+                    + "。请检查 params JSON 格式，例如: {\"stockCode\":\"430510\"}";
         } catch (Exception e) {
             log.error("[AStockReportRouterTool] 异常: operation={}, error={}", operation, e.getMessage(), e);
             return "操作失败（operation=" + operation + "）: " + e.getMessage();
