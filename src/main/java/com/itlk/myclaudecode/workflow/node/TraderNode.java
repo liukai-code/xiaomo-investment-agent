@@ -137,6 +137,11 @@ public class TraderNode implements WorkflowNode {
     private String buildTraderPrompt(WorkflowState state) {
         StringBuilder sb = new StringBuilder();
 
+        // 注入原始查询，明确分析标的
+        sb.append("## 分析标的\n\n");
+        sb.append("请对以下标的进行分析：").append(state.getOriginalQuery()).append("\n\n");
+        sb.append("⚠️ 重要：所有分析必须围绕上述标的展开，禁止引入其他股票的数据。\n\n");
+
         // 预注入缓存数据
         if (!state.getCachedData().isEmpty()) {
             sb.append("## 已有数据（无需重新获取）\n\n");
