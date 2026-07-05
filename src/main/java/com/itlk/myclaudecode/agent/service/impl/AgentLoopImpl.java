@@ -23,6 +23,8 @@ import com.itlk.myclaudecode.tool.SqlTool;
 import com.itlk.myclaudecode.tool.WebFetchTool;
 import com.itlk.myclaudecode.tool.YangJiBaoTool;
 import com.itlk.myclaudecode.tool.astock.*;
+import com.itlk.myclaudecode.common.config.HttpClientService;
+import com.itlk.myclaudecode.workflow.util.StockResolver;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
@@ -68,6 +70,7 @@ public class AgentLoopImpl implements AgentLoop {
     private ChatClient chatClient;
     private final ToolGuardProperties toolGuardProperties;
     private final ToolConfigService toolConfigService;
+    private final HttpClientService httpClientService;
     private List<ToolCallback> allWrappedCallbacks;
 
     @Resource
@@ -111,10 +114,12 @@ public class AgentLoopImpl implements AgentLoop {
                          ToolCallbackProvider toolCallbackProvider,
                          ToolGuardProperties toolGuardProperties,
                          ToolConfigService toolConfigService,
+                         HttpClientService httpClientService,
                          @Value("${system-default-prompt}") String systemPrompt) {
         this.systemPrompt = systemPrompt;
         this.toolGuardProperties = toolGuardProperties;
         this.toolConfigService = toolConfigService;
+        this.httpClientService = httpClientService;
 
         // 将工具对象转为 ToolCallback，再用拦截器包装
         try {
@@ -174,7 +179,8 @@ public class AgentLoopImpl implements AgentLoop {
 
         chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
 
-        List<Message> context = buildContext(conversation.getId(), userId);
+        ResolvedTarget target = resolveStockFromMessage(message);
+        List<Message> context = buildContext(conversation.getId(), userId, target);
 
         Long convId = conversation.getId();
 
@@ -195,6 +201,13 @@ public class AgentLoopImpl implements AgentLoop {
         });
         toolCtx.put(MaxToolCallManager.NON_RETRIABLE_CACHE_KEY, new ConcurrentHashMap<String, String>());
         toolCtx.put(MaxToolCallManager.PER_TOOL_CALL_COUNT_KEY, new ConcurrentHashMap<String, AtomicInteger>());
+        if (target != null) {
+            toolCtx.put(MaxToolCallManager.ALLOWED_STOCK_CODES_KEY, Set.of(target.code()));
+            if (target.name() != null) {
+                toolCtx.put(MaxToolCallManager.RESOLVED_STOCK_NAME_KEY, target.name());
+            }
+            log.info("[Chat] 股票范围守卫已激活: code={}, name={}", target.code(), target.name());
+        }
 
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
@@ -235,7 +248,8 @@ public class AgentLoopImpl implements AgentLoop {
 
         chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
 
-        List<Message> context = buildContext(conversation.getId(), userId);
+        ResolvedTarget target = resolveStockFromMessage(message);
+        List<Message> context = buildContext(conversation.getId(), userId, target);
         Long convId = conversation.getId();
 
         StringBuilder accumulated = new StringBuilder();
@@ -261,6 +275,13 @@ public class AgentLoopImpl implements AgentLoop {
         streamToolCtx.put(MaxToolCallManager.NON_RETRIABLE_CACHE_KEY, new ConcurrentHashMap<String, String>());
         streamToolCtx.put(MaxToolCallManager.PER_TOOL_CALL_COUNT_KEY, new ConcurrentHashMap<String, AtomicInteger>());
         streamToolCtx.put(MaxToolCallManager.STATUS_SINK_KEY, statusSink);
+        if (target != null) {
+            streamToolCtx.put(MaxToolCallManager.ALLOWED_STOCK_CODES_KEY, Set.of(target.code()));
+            if (target.name() != null) {
+                streamToolCtx.put(MaxToolCallManager.RESOLVED_STOCK_NAME_KEY, target.name());
+            }
+            log.info("[ChatStream] 股票范围守卫已激活: code={}, name={}", target.code(), target.name());
+        }
 
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
@@ -415,7 +436,50 @@ public class AgentLoopImpl implements AgentLoop {
         return conversationService.createConversation(userId, "新对话");
     }
 
-    private List<Message> buildContext(Long conversationId, Long userId) {
+    private record ResolvedTarget(String code, String name) {}
+
+    private ResolvedTarget resolveStockFromMessage(String message) {
+        if (message == null || message.isBlank()) return null;
+
+        // 1. 快速路径：6位数字代码
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\b(\\d{6})\\b").matcher(message);
+        if (m.find()) {
+            log.info("[ChatStream] 从消息中提取到数字代码: {}", m.group(1));
+            return new ResolvedTarget(m.group(1), null);
+        }
+
+        // 2. 意图检测：含分析类关键词才尝试解析
+        String[] kws = {"深入分析", "深度分析", "全面分析", "详细分析", "深度研究", "深度调研",
+                "深度剖析", "深入研究", "全面研究", "详细研究", "个股分析", "个股研究",
+                "分析", "研究", "调研", "估值", "行情", "股价", "怎么样", "如何", "可以买", "看好", "研报"};
+        boolean match = false;
+        for (String kw : kws) {
+            if (message.contains(kw)) { match = true; break; }
+        }
+        if (!match) return null;
+
+        // 3. 剥离意图关键词，避免 StockResolver 把"分析"当作股票名称
+        String cleaned = message;
+        for (String kw : kws) {
+            cleaned = cleaned.replace(kw, "");
+        }
+        cleaned = cleaned.replaceAll("[，。？！、\\s]+", "").trim();
+        if (cleaned.isEmpty()) return null;
+
+        log.info("[ChatStream] 关键词剥离后: \"{}\" → \"{}\"", message, cleaned);
+
+        // 4. 复用 StockResolver 解析股票名称
+        try {
+            var r = StockResolver.resolve(cleaned, httpClientService);
+            log.info("[ChatStream] 标的解析成功: {}({})", r.name(), r.code());
+            return new ResolvedTarget(r.code(), r.name());
+        } catch (IllegalArgumentException e) {
+            log.debug("[ChatStream] 标的解析跳过: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private List<Message> buildContext(Long conversationId, Long userId, ResolvedTarget target) {
         List<Message> context = new ArrayList<>();
 
         String enrichedPrompt = systemPrompt;
@@ -425,6 +489,21 @@ public class AgentLoopImpl implements AgentLoop {
         }
         enrichedPrompt += "\n\n[当前时间]\n" + java.time.LocalDateTime.now()
                 .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm:ss EEEE"));
+
+        if (target != null) {
+            String stockLabel = target.name() != null
+                    ? target.name() + "（" + target.code() + "）"
+                    : target.code();
+            enrichedPrompt += "\n\n[当前分析标的]\n"
+                    + "标的已锁定为：" + stockLabel + "\n"
+                    + "⚠️ 你必须严格遵守以下约束：\n"
+                    + "1. 当前用户请求分析的标的是 " + stockLabel + "，所有工具调用和数据获取必须围绕该标的\n"
+                    + "2. 禁止分析、引用、对比任何其他标的\n"
+                    + "3. 如果工具返回包含其他股票的数据，必须忽略，只关注 " + stockLabel + " 的数据\n"
+                    + "4. 输出报告的标题、数据、结论必须与 " + stockLabel + " 完全一致\n"
+                    + "5. 禁止出现用户问A你分析B的情况";
+        }
+
         context.add(new SystemMessage(enrichedPrompt));
 
         List<ChatMessage> recentMessages = cacheService.getCachedRecentMessages(conversationId, MAX_CONTEXT_MESSAGES);

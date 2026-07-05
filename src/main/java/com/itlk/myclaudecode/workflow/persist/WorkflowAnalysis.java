@@ -50,6 +50,27 @@ public class WorkflowAnalysis {
     @Column(columnDefinition = "TEXT")
     private String summary;
 
+    @Column(name = "resolved_stock_code", length = 10)
+    private String resolvedStockCode;
+
+    @Column(name = "resolved_stock_name", length = 50)
+    private String resolvedStockName;
+
+    @Column(name = "workflow_status", length = 20)
+    private String workflowStatus;
+
+    @Column(name = "started_at")
+    private LocalDateTime startedAt;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
+    @Column(name = "error_message", columnDefinition = "TEXT")
+    private String errorMessage;
+
+    @Column(name = "total_tool_calls")
+    private Integer totalToolCalls;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

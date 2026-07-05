@@ -24,7 +24,19 @@ public class StockResolver {
 
     // 常见查询前缀，需要剥离后才能作为股票名称搜索
     private static final String[] QUERY_PREFIXES = {
-            "深度分析", "深入分析"
+            "深度分析", "深入分析", "全面分析", "详细分析", "深度研究", "深度调研",
+            "深度剖析", "深入研究", "全面研究", "详细研究", "个股分析", "个股研究",
+            "帮我分析", "帮我看看", "帮我研究", "分析一下", "研究一下",
+            "分析", "研究", "调研", "估值"
+    };
+
+    // 常见查询后缀，需要剥离后才能作为股票名称搜索
+    private static final String[] QUERY_SUFFIXES = {
+            "值得入手吗", "值得买吗", "可以买吗", "可以入手吗", "能买吗",
+            "怎么样", "如何", "好不好", "行不行", "可以买", "看好吗",
+            "值得投资吗", "有前途吗", "前景如何", "还能涨吗", "还能买吗",
+            "值得持有吗", "现在能买吗", "现在可以买吗", "目前怎么样",
+            "吗", "呢", "吧"
     };
 
     private StockResolver() {
@@ -67,6 +79,15 @@ public class StockResolver {
                 break;
             }
         }
+
+        // 剥离常见查询后缀（如"立讯精密值得入手吗" → "立讯精密"）
+        for (String suffix : QUERY_SUFFIXES) {
+            if (name.endsWith(suffix) && name.length() > suffix.length()) {
+                name = name.substring(0, name.length() - suffix.length());
+                break;
+            }
+        }
+
         log.info("[StockResolver] 提取到股票名称: {}", name);
 
         // 3. 调用东财 suggest API 解析（遍历多个结果，优先名称精确匹配）

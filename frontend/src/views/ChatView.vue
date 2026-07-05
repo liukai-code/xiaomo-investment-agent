@@ -115,7 +115,7 @@ function resetWorkflowState() {
 }
 
 function isDeepAnalysisRequest(text: string): boolean {
-  const keywords = ['深度分析', '全面分析', '深度研究', '深度调研', '多维度分析']
+  const keywords = ['深度分析', '全面分析', '深度研究', '深度调研', '多维度分析', '深入分析']
   return keywords.some((kw) => text.includes(kw))
 }
 

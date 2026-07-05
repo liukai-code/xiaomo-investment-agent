@@ -90,9 +90,12 @@ public class DeepAnalysisWorkflow {
         return engine.execute(graph, state)
                 .doOnComplete(() -> {
                     log.info("工作流完成，持久化结果");
-                    persistResults(state);
+                    persistResults(state, "COMPLETED", null);
                 })
-                .doOnError(e -> log.error("工作流执行错误: {}", e.getMessage(), e));
+                .doOnError(e -> {
+                    log.error("工作流执行错误: {}", e.getMessage(), e);
+                    persistResults(state, "FAILED", e.getMessage());
+                });
     }
 
     private WorkflowGraph buildGraph() {
@@ -179,12 +182,24 @@ public class DeepAnalysisWorkflow {
         return sb.toString();
     }
 
-    private void persistResults(WorkflowState state) {
+    private void persistResults(WorkflowState state, String status, String errorMessage) {
         try {
             WorkflowAnalysis analysis = new WorkflowAnalysis();
             analysis.setUserId(state.getUserId());
             analysis.setConversationId(state.getConversationId());
             analysis.setOriginalQuery(state.getOriginalQuery());
+
+            // 标的锁定信息
+            analysis.setResolvedStockCode(state.getResolvedStockCode());
+            analysis.setResolvedStockName(state.getResolvedStockName());
+
+            // 工作流状态与时间
+            analysis.setWorkflowStatus(status);
+            analysis.setStartedAt(state.getStartTime() != null
+                    ? java.time.LocalDateTime.ofInstant(state.getStartTime(), java.time.ZoneId.systemDefault())
+                    : null);
+            analysis.setCompletedAt(java.time.LocalDateTime.now());
+            analysis.setErrorMessage(errorMessage);
 
             // 分析师报告
             Map<String, String> reportsMap = new HashMap<>();
@@ -206,7 +221,7 @@ public class DeepAnalysisWorkflow {
             }
 
             analysisRepository.save(analysis);
-            log.info("工作流结果已持久化，ID={}", analysis.getId());
+            log.info("工作流结果已持久化，ID={}, status={}", analysis.getId(), status);
         } catch (JsonProcessingException e) {
             log.error("序列化工作流结果失败", e);
         } catch (Exception e) {
