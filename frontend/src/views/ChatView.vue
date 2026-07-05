@@ -365,9 +365,11 @@ watch(() => yjbStore.cardVisible, (visible) => {
           </div>
           <div class="conv-actions">
             <button class="conv-action-btn" @click="toggleMenu(conv.id, $event)"><MoreHorizontal :size="18" /></button>
-            <div v-if="activeMenuConvId === conv.id" class="conv-menu" @click.stop>
-              <div class="conv-menu-item conv-menu-item--danger" @click="handleDeleteConversation(conv.id)">删除</div>
-            </div>
+            <Transition name="menu-fade">
+              <div v-if="activeMenuConvId === conv.id" class="conv-menu" @click.stop>
+                <div class="conv-menu-item conv-menu-item--danger" @click="handleDeleteConversation(conv.id)">删除</div>
+              </div>
+            </Transition>
           </div>
         </div>
       </div>
@@ -520,16 +522,18 @@ watch(() => yjbStore.cardVisible, (visible) => {
   </div>
 
   <!-- 删除确认弹窗 -->
-  <div v-if="deleteConfirmConvId !== null" class="modal-overlay" @click.self="cancelDelete">
-    <div class="modal-box">
-      <div class="modal-title">确认删除</div>
-      <div class="modal-body">删除后将无法恢复，确定要删除该会话吗？</div>
-      <div class="modal-actions">
-        <button class="modal-btn modal-btn--cancel" @click="cancelDelete">取消</button>
-        <button class="modal-btn modal-btn--danger" @click="confirmDelete">删除</button>
+  <Transition name="modal-fade">
+    <div v-if="deleteConfirmConvId !== null" class="modal-overlay" @click.self="cancelDelete">
+      <div class="modal-box">
+        <div class="modal-title">确认删除</div>
+        <div class="modal-body">删除后将无法恢复，确定要删除该会话吗？</div>
+        <div class="modal-actions">
+          <button class="modal-btn modal-btn--cancel" @click="cancelDelete">取消</button>
+          <button class="modal-btn modal-btn--danger" @click="confirmDelete">删除</button>
+        </div>
       </div>
     </div>
-  </div>
+  </Transition>
   </div>
 </template>
 

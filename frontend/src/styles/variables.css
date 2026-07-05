@@ -295,6 +295,16 @@ body {
   background: rgba(239, 68, 68, 0.1);
 }
 
+.menu-fade-enter-active,
+.menu-fade-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.menu-fade-enter-from,
+.menu-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
 /* 删除确认弹窗 */
 .modal-overlay {
   position: fixed;
@@ -362,6 +372,15 @@ body {
 
 .modal-btn--danger:hover {
   background: #dc2626;
+}
+
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
 }
 
 .conv-item .conv-time {
