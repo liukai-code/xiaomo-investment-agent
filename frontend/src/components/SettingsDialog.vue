@@ -235,7 +235,7 @@ function close() {
 .settings-dialog {
   background: white;
   border-radius: 8px;
-  width: 600px;
+  width: 750px;
   max-width: 90vw;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
