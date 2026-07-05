@@ -1,7 +1,16 @@
+export interface StatusEvent {
+  type: 'THINKING' | 'TOOL_CALL' | 'TOOL_RESULT' | 'CONTENT'
+  toolName?: string
+  content?: string
+  step?: number
+  totalSteps?: number
+}
+
 export interface StreamCallbacks {
   onChunk: (text: string) => void
   onDone: (fullText: string) => void
   onError: (err: Error) => void
+  onStatus?: (event: StatusEvent) => void
 }
 
 export function streamChat(
@@ -32,18 +41,41 @@ export function streamChat(
         if (done) break
 
         buffer += decoder.decode(value, { stream: true })
-        const result = processEvents(buffer)
+        const result = processChatEvents(buffer)
         buffer = result.incomplete
-        if (result.content) {
-          lastText = result.content
-          callbacks.onChunk(lastText)
+
+        for (const event of result.events) {
+          if (event.event === 'status' && event.data && callbacks.onStatus) {
+            try {
+              const parsed: StatusEvent = JSON.parse(event.data)
+              callbacks.onStatus(parsed)
+            } catch {
+              // ignore parse errors
+            }
+          } else if (event.event === 'content' && event.data) {
+            lastText = event.data
+            callbacks.onChunk(lastText)
+          } else if (event.event === 'done') {
+            // done 事件在循环结束时处理
+          }
         }
       }
 
       // 处理剩余 buffer
       if (buffer.trim()) {
-        const data = parseEventData(buffer)
-        if (data) lastText = data
+        const remaining = processChatEvents(buffer + '\n\n')
+        for (const event of remaining.events) {
+          if (event.event === 'status' && event.data && callbacks.onStatus) {
+            try {
+              const parsed: StatusEvent = JSON.parse(event.data)
+              callbacks.onStatus(parsed)
+            } catch {
+              // ignore
+            }
+          } else if (event.event === 'content' && event.data) {
+            lastText = event.data
+          }
+        }
       }
 
       callbacks.onDone(lastText)
@@ -57,29 +89,35 @@ export function streamChat(
   return controller
 }
 
-function parseEventData(event: string): string {
-  const dataLines: string[] = []
-  for (const line of event.split(/\n/)) {
-    if (line.startsWith('data:')) {
-      dataLines.push(line.substring(5))
-    } else if (dataLines.length > 0) {
-      // chunk 边界切分导致的续行，拼接到上一个 data 行末尾
-      dataLines[dataLines.length - 1] += line
-    }
-  }
-  return dataLines.join('\n')
+interface ParsedSseEvent {
+  event: string
+  data: string
 }
 
-function processEvents(raw: string): { content: string; incomplete: string } {
-  const events = raw.split(/\n\n/)
-  const incomplete = events.pop() || ''
-  let content = ''
-  for (const event of events) {
-    if (!event.trim()) continue
-    const data = parseEventData(event)
-    if (data) content = data
+function processChatEvents(raw: string): { events: ParsedSseEvent[]; incomplete: string } {
+  const parts = raw.split(/\n\n/)
+  const incomplete = parts.pop() || ''
+  const events: ParsedSseEvent[] = []
+
+  for (const part of parts) {
+    if (!part.trim()) continue
+    let event = 'message'
+    const dataLines: string[] = []
+    for (const line of part.split(/\n/)) {
+      if (line.startsWith('event:')) {
+        event = line.substring(6).trim()
+      } else if (line.startsWith('data:')) {
+        dataLines.push(line.substring(5))
+      } else if (dataLines.length > 0) {
+        dataLines[dataLines.length - 1] += '\n' + line
+      }
+    }
+    if (dataLines.length > 0) {
+      events.push({ event, data: dataLines.join('\n') })
+    }
   }
-  return { content, incomplete }
+
+  return { events, incomplete }
 }
 
 // ========== 深度分析工作流 ==========
@@ -170,11 +208,6 @@ export function streamDeepAnalysis(
   return controller
 }
 
-interface ParsedSseEvent {
-  event: string
-  data: string
-}
-
 function processWorkflowEvents(raw: string): { events: ParsedSseEvent[]; incomplete: string } {
   const parts = raw.split(/\n\n/)
   const incomplete = parts.pop() || ''
@@ -183,18 +216,18 @@ function processWorkflowEvents(raw: string): { events: ParsedSseEvent[]; incompl
   for (const part of parts) {
     if (!part.trim()) continue
     let event = 'message'
-    let data = ''
+    const dataLines: string[] = []
     for (const line of part.split(/\n/)) {
       if (line.startsWith('event:')) {
         event = line.substring(6).trim()
       } else if (line.startsWith('data:')) {
-        data += line.substring(5)
-      } else if (data) {
-        data += line
+        dataLines.push(line.substring(5))
+      } else if (dataLines.length > 0) {
+        dataLines[dataLines.length - 1] += '\n' + line
       }
     }
-    if (data) {
-      events.push({ event, data })
+    if (dataLines.length > 0) {
+      events.push({ event, data: dataLines.join('\n') })
     }
   }
 

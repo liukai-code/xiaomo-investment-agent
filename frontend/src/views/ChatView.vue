@@ -3,11 +3,11 @@ import { ref, nextTick, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
-import { streamChat, streamDeepAnalysis, type WorkflowEvent } from '@/api/chat'
+import { streamChat, streamDeepAnalysis, type WorkflowEvent, type StatusEvent } from '@/api/chat'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
 import WorkflowPanel from '@/components/workflow/WorkflowPanel.vue'
 import { useRafThrottle } from '@/composables/useMarkdownBlocks'
-import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen, Bell, Square } from 'lucide-vue-next'
+import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen, Bell, Square, Loader2 } from 'lucide-vue-next'
 import { useYangjibaoStore } from '@/stores/yangjibao'
 import YjbQrLogin from '@/components/yangjibao/YjbQrLogin.vue'
 import YjbHoldingsCard from '@/components/yangjibao/YjbHoldingsCard.vue'
@@ -32,6 +32,81 @@ let abortController: AbortController | null = null
 const workflowEvents = ref<WorkflowEvent[]>([])
 const isWorkflowRunning = ref(false)
 const isWorkflowMode = ref(false)
+
+// 工具调用状态
+const currentStatus = ref<StatusEvent | null>(null)
+
+// 工具名 → 中文标签映射
+const toolLabelMap: Record<string, string> = {
+  // 基础工具
+  getAShareQuote: '查询A股行情',
+  getHKStockQuote: '查询港股行情',
+  getUSStockQuote: '查询美股行情',
+  getFundNav: '查询基金净值',
+  searchStockByName: '搜索股票',
+  fetchWebpage: '抓取网页',
+  fetchArticleContent: '抓取文章',
+  executeQuery: '执行数据库查询',
+  getDatabaseSchema: '获取数据库结构',
+  read_file: '读取文件',
+  write_file: '写入文件',
+  append_file: '追加文件',
+  list_files: '列出文件',
+  // 金融计算
+  compoundInterest: '复利计算',
+  loanPayment: '贷款计算',
+  npv: '净现值计算',
+  irr: '内部收益率计算',
+  sharpeRatio: '夏普比率计算',
+  // A股数据工具
+  tencentQuote: '查询腾讯行情',
+  baiduKline: '查询百度K线',
+  stockReport: '查询个股研报',
+  industryReport: '查询行业研报',
+  downloadReportPdf: '下载研报PDF',
+  thsEpsForecast: '查询同花顺EPS预测',
+  iwencaiSearch: '问财搜索',
+  iwencaiQuery: '问财查询',
+  conceptBlocks: '查询概念板块',
+  fundFlowMinute: '查询分钟资金流',
+  dragonTigerBoard: '查询龙虎榜',
+  dailyDragonTiger: '查询日龙虎榜',
+  lockupExpiry: '查询解禁信息',
+  industryRanking: '查询行业排名',
+  marginTrading: '查询融资融券',
+  blockTrade: '查询大宗交易',
+  holderNumChange: '查询股东户数变化',
+  dividendHistory: '查询分红历史',
+  fundFlow120d: '查询120日资金流',
+  northboundFlow: '查询北向资金',
+  stockNews: '查询个股新闻',
+  globalNews: '查询全球资讯',
+  cninfoAnnouncements: '查询巨潮公告',
+  irmQA: '查询互动易问答',
+  sinaFinancialReport: '查询新浪财报',
+  ztPool: '查询涨停池',
+  zbPool: '查询炸板池',
+  dtPool: '查询跌停池',
+  yztPool: '查询预涨停池',
+  thsLimitUpPool: '查询同花顺涨停池',
+  sentimentOverview: '查询情绪概览',
+  optionCodes: '查询期权代码',
+  optionTQuote: '查询期权T型报价',
+  optionGreeks: '查询期权希腊字母',
+  thsHotList: '查询同花顺热榜',
+  emHotRank: '查询东财热度排名',
+  emConceptHit: '查询东财概念命中',
+  // MCP
+  bailian_web_search: '百炼搜索',
+}
+
+function getStatusLabel(status: StatusEvent): string {
+  if (status.type === 'THINKING') return '思考中'
+  if (status.type === 'TOOL_CALL' && status.toolName) {
+    return toolLabelMap[status.toolName] || `调用 ${status.toolName}`
+  }
+  return '处理中'
+}
 
 function resetWorkflowState() {
   isWorkflowMode.value = false
@@ -163,6 +238,7 @@ async function handleSend() {
 
   chatStore.isGenerating = true
   statusText.value = '生成中...'
+  currentStatus.value = { type: 'THINKING' }
 
   // 判断是否走深度分析工作流
   if (isDeepAnalysisRequest(text)) {
@@ -176,7 +252,14 @@ async function handleSend() {
   const { schedule, cancel: cancelRaf } = useRafThrottle()
 
   abortController = streamChat(chatStore.currentConvId!, text, authStore.token, {
+    onStatus(event: StatusEvent) {
+      currentStatus.value = event
+    },
     onChunk(fullText: string) {
+      // 第一个 chunk 到达后清除状态指示（已有文本内容）
+      if (currentStatus.value) {
+        currentStatus.value = null
+      }
       schedule(() => {
         chatStore.updateLastAiMessage(fullText)
         scrollToBottomIfNear()
@@ -187,6 +270,7 @@ async function handleSend() {
       chatStore.updateLastAiMessage(fullText || '(empty)')
       chatStore.isGenerating = false
       statusText.value = 'READY'
+      currentStatus.value = null
       abortController = null
       scrollToBottom()
       chatStore.loadConversations()
@@ -197,6 +281,7 @@ async function handleSend() {
       chatStore.updateLastAiMessage(`ERROR: ${err.message}`)
       chatStore.isGenerating = false
       statusText.value = 'READY'
+      currentStatus.value = null
       abortController = null
     },
   })
@@ -237,6 +322,7 @@ function handleStop() {
   chatStore.isGenerating = false
   resetWorkflowState()
   statusText.value = 'READY'
+  currentStatus.value = null
 }
 
 function buildPartialWorkflowSummary(): string {
@@ -480,6 +566,14 @@ watch(() => yjbStore.cardVisible, (visible) => {
                 <div class="bubble">
                   <template v-if="msg.role === 'USER'">{{ msg.content }}</template>
                   <template v-else>
+                    <!-- 工具调用状态指示器 -->
+                    <div
+                      v-if="currentStatus && !msg.content && msg === chatStore.messages[chatStore.messages.length - 1]"
+                      class="status-indicator"
+                    >
+                      <Loader2 :size="14" class="status-spinner" />
+                      <span>{{ getStatusLabel(currentStatus) }}...</span>
+                    </div>
                     <template v-if="isWorkflowMode && msg === chatStore.messages[chatStore.messages.length - 1] && workflowEvents.length > 0">
                       <WorkflowPanel :events="workflowEvents" :is-running="isWorkflowRunning" />
                     </template>
@@ -643,5 +737,23 @@ watch(() => yjbStore.cardVisible, (visible) => {
   width: 0;
   padding: 20px 0;
   opacity: 0;
+}
+
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.status-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>

@@ -117,7 +117,7 @@ public class AgentLoopController {
     }
 
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> chatStream(
+    public Flux<ServerSentEvent<String>> chatStream(
             @RequestParam Long conversationId,
             @RequestParam String message,
             HttpServletRequest request) {

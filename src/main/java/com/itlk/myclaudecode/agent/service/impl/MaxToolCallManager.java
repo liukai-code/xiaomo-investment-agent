@@ -1,6 +1,7 @@
 package com.itlk.myclaudecode.agent.service.impl;
 
 import com.itlk.myclaudecode.agent.config.ToolGuardProperties;
+import com.itlk.myclaudecode.agent.service.ChatStreamEvent;
 import com.itlk.myclaudecode.tool.guard.FetchSessionTracker;
 import com.itlk.myclaudecode.tool.guard.GuardSignal;
 import com.itlk.myclaudecode.tool.guard.ReportCompletenessChecker;
@@ -25,6 +26,7 @@ import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.tool.execution.ToolExecutionExceptionProcessor;
 import org.springframework.ai.tool.resolution.ToolCallbackResolver;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Sinks;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -53,6 +55,7 @@ public class MaxToolCallManager implements ToolCallingManager {
     public static final String MAX_STEPS_KEY = "maxSteps";
     public static final String ALLOWED_STOCK_CODES_KEY = "allowedStockCodes";
     public static final String RESOLVED_STOCK_NAME_KEY = "resolvedStockName";
+    public static final String STATUS_SINK_KEY = "statusSink";
 
     private static final Set<String> FETCH_TOOL_NAMES = Set.of(
             "fetchArticleContent", "fetchWebpage"
@@ -111,6 +114,15 @@ public class MaxToolCallManager implements ToolCallingManager {
         List<AssistantMessage.ToolCall> toolCalls = assistantWithTools.getToolCalls();
         String toolNames = toolCalls.stream().map(AssistantMessage.ToolCall::name).collect(java.util.stream.Collectors.joining(", "));
         log.info("[MaxToolCallManager] 工具调用轮次: {}/{}, 工具: [{}]", step, effectiveMaxIterations, toolNames);
+
+        // 发射工具调用状态事件到前端
+        @SuppressWarnings("unchecked")
+        Sinks.Many<ChatStreamEvent> statusSink = extractFromContext(prompt, STATUS_SINK_KEY, Sinks.Many.class);
+        if (statusSink != null) {
+            for (AssistantMessage.ToolCall tc : toolCalls) {
+                statusSink.tryEmitNext(ChatStreamEvent.toolCall(tc.name(), step, effectiveMaxIterations));
+            }
+        }
         ToolExecutionResult result;
 
         // 硬限制检查：如果已超过最大轮次或 fetch 上限，直接阻止所有工具调用
@@ -333,6 +345,13 @@ public class MaxToolCallManager implements ToolCallingManager {
             }
         } else {
             result = executeSafely(prompt, chatResponse);
+        }
+
+        // 发射工具调用完成事件
+        if (statusSink != null) {
+            for (AssistantMessage.ToolCall tc : toolCalls) {
+                statusSink.tryEmitNext(ChatStreamEvent.toolResult(tc.name()));
+            }
         }
 
         return result;

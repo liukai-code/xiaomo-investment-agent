@@ -1,7 +1,10 @@
 package com.itlk.myclaudecode.agent.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itlk.myclaudecode.agent.config.ToolGuardProperties;
 import com.itlk.myclaudecode.agent.service.AgentLoop;
+import com.itlk.myclaudecode.agent.service.ChatStreamEvent;
 import com.itlk.myclaudecode.conversation.entity.*;
 import com.itlk.myclaudecode.conversation.repository.ChatMessageRepository;
 import com.itlk.myclaudecode.conversation.service.*;
@@ -38,8 +41,10 @@ import org.springframework.stereotype.Service;
 import com.itlk.myclaudecode.tool.config.ToolCallbackContextWrapper;
 import com.itlk.myclaudecode.tool.config.ToolConfigService;
 import com.itlk.myclaudecode.tool.config.ToolEnabledCheckWrapper;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Sinks;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -82,6 +87,9 @@ public class AgentLoopImpl implements AgentLoop {
 
     @Resource
     private MaxToolCallManager maxToolCallManager;
+
+    @Resource
+    private ObjectMapper objectMapper;
 
     public AgentLoopImpl(ChatModel chatModel,
                          FileReadTool fileReadTool,
@@ -220,7 +228,7 @@ public class AgentLoopImpl implements AgentLoop {
 
     @Override
     @Transactional
-    public Flux<String> chatStream(Long userId, Long conversationId, String message) {
+    public Flux<ServerSentEvent<String>> chatStream(Long userId, Long conversationId, String message) {
         Conversation conversation = getOrCreateConversation(userId, conversationId);
         maxToolCallManager.reset();
 
@@ -230,6 +238,9 @@ public class AgentLoopImpl implements AgentLoop {
         Long convId = conversation.getId();
 
         StringBuilder accumulated = new StringBuilder();
+
+        // 创建状态事件 Sink，用于工具调用状态推送
+        Sinks.Many<ChatStreamEvent> statusSink = Sinks.many().multicast().onBackpressureBuffer();
 
         Map<String, Object> streamToolCtx = new HashMap<>();
         streamToolCtx.put("conversationId", convId.toString());
@@ -247,6 +258,7 @@ public class AgentLoopImpl implements AgentLoop {
             }
         });
         streamToolCtx.put(MaxToolCallManager.NON_RETRIABLE_CACHE_KEY, new ConcurrentHashMap<String, String>());
+        streamToolCtx.put(MaxToolCallManager.STATUS_SINK_KEY, statusSink);
 
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
@@ -263,7 +275,23 @@ public class AgentLoopImpl implements AgentLoop {
                 .<ToolCallback>map(cb -> new ToolCallbackContextWrapper(cb))
                 .toList();
 
-        return chatClient.prompt()
+        // 初始 THINKING 事件
+        Flux<ServerSentEvent<String>> thinkingEvent = Flux.just(
+                ServerSentEvent.<String>builder()
+                        .event("status")
+                        .data(toJson(ChatStreamEvent.thinking()))
+                        .build()
+        );
+
+        // 状态事件流（来自 MaxToolCallManager 的工具调用状态）
+        Flux<ServerSentEvent<String>> statusEvents = statusSink.asFlux()
+                .map(event -> ServerSentEvent.<String>builder()
+                        .event("status")
+                        .data(toJson(event))
+                        .build());
+
+        // 文本内容流 + done 事件
+        Flux<ServerSentEvent<String>> contentWithDone = chatClient.prompt()
                 .messages(context.toArray(new Message[0]))
                 .toolCallbacks(enabledTools.toArray(new ToolCallback[0]))
                 .options(options)
@@ -271,21 +299,39 @@ public class AgentLoopImpl implements AgentLoop {
                 .content()
                 .map(delta -> {
                     accumulated.append(delta);
-                    return sanitizeOutput(accumulated.toString());
+                    return ServerSentEvent.<String>builder()
+                            .event("content")
+                            .data(sanitizeOutput(accumulated.toString()))
+                            .build();
                 })
+                // 内容流结束后关闭状态 sink 并发射 done 事件
+                .doOnComplete(() -> statusSink.tryEmitComplete())
+                .concatWith(Flux.just(
+                        ServerSentEvent.<String>builder()
+                                .event("done")
+                                .data(String.valueOf(convId))
+                                .build()
+                ));
+
+        // 合并：thinking → (状态事件 ∥ 内容流+done) → 完成
+        return Flux.concat(thinkingEvent, Flux.merge(statusEvents, contentWithDone))
                 .doOnComplete(() -> {
                     String fullResponse = sanitizeOutput(accumulated.toString());
                     chatMessageService.saveAssistantMessage(convId, fullResponse);
                 })
                 .timeout(Duration.ofSeconds(300))
                 .onErrorResume(e -> {
+                    statusSink.tryEmitError(e);
                     String errorMsg = "服务端响应超时，请重试";
                     log.error("流式请求异常: {}", e.getMessage());
                     String partial = sanitizeOutput(accumulated.toString());
                     if (!partial.isEmpty()) {
                         chatMessageService.saveAssistantMessage(convId, partial);
                     }
-                    return Flux.just("\n\n[" + errorMsg + "]");
+                    return Flux.just(ServerSentEvent.<String>builder()
+                            .event("content")
+                            .data("\n\n[" + errorMsg + "]")
+                            .build());
                 })
                 .doFinally(signal -> {});
     }
@@ -408,5 +454,14 @@ public class AgentLoopImpl implements AgentLoop {
                 .replaceAll("\\n*\\[GUARD:[\\s\\S]*?\\[/GUARD]\\n*", "")
                 .replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "")
                 .trim();
+    }
+
+    private String toJson(ChatStreamEvent event) {
+        try {
+            return objectMapper.writeValueAsString(event);
+        } catch (JsonProcessingException e) {
+            log.warn("序列化 ChatStreamEvent 失败: {}", e.getMessage());
+            return "{}";
+        }
     }
 }
