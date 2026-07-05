@@ -33,6 +33,12 @@ const workflowEvents = ref<WorkflowEvent[]>([])
 const isWorkflowRunning = ref(false)
 const isWorkflowMode = ref(false)
 
+function resetWorkflowState() {
+  isWorkflowMode.value = false
+  isWorkflowRunning.value = false
+  workflowEvents.value = []
+}
+
 function isDeepAnalysisRequest(text: string): boolean {
   const keywords = ['深度分析', '全面分析', '深度研究', '深度调研', '多维度分析']
   return keywords.some((kw) => text.includes(kw))
@@ -74,6 +80,7 @@ function scrollToBottomIfNear() {
 }
 
 async function handleCreateConversation() {
+  resetWorkflowState()
   chatStore.currentConvId = null
   chatStore.messages = []
 }
@@ -85,6 +92,7 @@ async function handleSwitchConversation(id: number) {
     chatStore.isGenerating = false
     statusText.value = 'READY'
   }
+  resetWorkflowState()
   await chatStore.switchConversation(id)
 }
 
@@ -227,8 +235,7 @@ function handleStop() {
   }
 
   chatStore.isGenerating = false
-  isWorkflowRunning.value = false
-  isWorkflowMode.value = false
+  resetWorkflowState()
   statusText.value = 'READY'
 }
 
@@ -274,7 +281,7 @@ function handleDeepAnalysis(text: string) {
       scrollToBottomIfNear()
     },
     onDone() {
-      isWorkflowRunning.value = false
+      resetWorkflowState()
       chatStore.isGenerating = false
       statusText.value = 'READY'
       abortController = null
@@ -287,7 +294,7 @@ function handleDeepAnalysis(text: string) {
       chatStore.generateTitle(chatStore.currentConvId!)
     },
     onError(err: Error) {
-      isWorkflowRunning.value = false
+      resetWorkflowState()
       chatStore.updateLastAiMessage(`深度分析失败: ${err.message}`)
       chatStore.isGenerating = false
       statusText.value = 'READY'
