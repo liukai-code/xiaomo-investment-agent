@@ -236,13 +236,16 @@ public class MaxToolCallManager implements ToolCallingManager {
             // Info gain and repetition detection
             String resultText = extractResultText(result);
 
-            // Inject stock identifier header: force LLM to associate data with target stock
+            // Inject stock identifier + date header: force LLM to associate data with target stock and current date
             if (allowedStockCodes != null && !allowedStockCodes.isEmpty() && isAStockTool(tc.name())) {
                 String targetCode = allowedStockCodes.iterator().next();
                 String stockLabel = resolvedStockName != null
                         ? resolvedStockName + "（" + targetCode + "）"
                         : targetCode;
-                String header = "【以下数据属于 " + stockLabel + "，禁止用于其他标的的分析】\n";
+                String today = java.time.LocalDate.now()
+                        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日"));
+                String header = "【数据归属：" + stockLabel + " | 当前日期：" + today
+                        + " | 禁止用于其他标的或日期的分析】\n";
                 result = prependToResult(result, tc, header);
                 resultText = extractResultText(result);
             }

@@ -185,7 +185,10 @@ public class AnalystNode implements WorkflowNode {
         if (state.getResolvedStockCode() != null) {
             String code = state.getResolvedStockCode();
             String name = state.getResolvedStockName() != null ? state.getResolvedStockName() : "";
+            String today = java.time.LocalDate.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日"));
             return "【分析标的】" + name + "（" + code + "）\n"
+                    + "【当前日期】" + today + "（报告中只能使用此日期，禁止使用其他日期）\n"
                     + "⚠️ 标的已锁定为 " + code + "，你必须严格遵守以下约束：\n"
                     + "1. 所有工具调用必须使用 stockCode=\"" + code + "\"，禁止使用其他代码\n"
                     + "2. 禁止重新查询、猜测或推断股票代码\n"
@@ -194,7 +197,8 @@ public class AnalystNode implements WorkflowNode {
                     + "5. 若工具返回包含其他股票的数据，该数据已被系统过滤，你只能使用剩余数据\n"
                     + "6. 你的分析范围被严格限制在 " + name + "（" + code + "）这一只股票内\n"
                     + "7. 工具调用失败时，必须根据错误提示修正参数后重试，禁止 fallback 到训练知识或历史数据\n"
-                    + "8. 禁止使用训练数据中的任何股票信息，所有数据必须来自工具实时返回";
+                    + "8. 禁止使用训练数据中的任何股票信息或日期，所有数据必须来自工具实时返回\n"
+                    + "9. 报告中的日期必须为 " + today + "，禁止使用训练数据中的任何历史日期";
         }
         // fallback：只有 originalQuery 的情况（理论上不应发生）
         return "【分析标的】" + state.getOriginalQuery();
