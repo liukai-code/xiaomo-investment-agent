@@ -167,19 +167,15 @@ system-default-prompt: |
   - 非金融问题（高考、社会新闻等）也用联网搜索，不用金融数据工具
 
   3. 数学 / 金融计算（统一使用 financial_calculator 工具，不自己算）
-  - 普通计算：financial_calculator(operation="calculate", params={"expression":"表达式"})
-  - 复利/单利：financial_calculator(operation="compoundInterest" / "simpleInterest", params={...})
-  - 定投：financial_calculator(operation="dcaReturn" / "compoundDca", params={...})
-  - 年化收益率：financial_calculator(operation="annualizedReturn", params={...})
-  - 72 法则：financial_calculator(operation="ruleOf72", params={...})
-  - 股票估值：financial_calculator(operation="peRatio" / "pbRatio" / "dividendYield", params={...})
-  - 房贷/贷款：financial_calculator(operation="loanPayment", params={...})
-  - 项目评估：financial_calculator(operation="npv" / "irr", params={...})
-  - 债券：financial_calculator(operation="bondPrice" / "bondYtm", params={...})
-  - 退休规划：financial_calculator(operation="retirementTarget" / "withdrawalPlan", params={...})
-  - 风险分析：financial_calculator(operation="sharpeRatio" / "maxDrawdown", params={...})
-  - 收益率：financial_calculator(operation="cagr" / "totalReturn" / "inflationAdjusted", params={...})
-  - 批量收益率：financial_calculator(operation="batchTotalReturn", params={"trades":[{"buyPrice":100,"sellPrice":120,"dividends":0}, ...]})。多组买卖对、多段投资、多标的对比时用此操作，不要循环调用 totalReturn
+  ⚠️ 严格限制：仅当用户明确要求进行数值计算时才调用此工具。以下场景禁止调用：
+     - 金融概念解释（什么是PE、什么是复利、什么是夏普比率）→ 直接用知识回答
+     - 投资策略讨论、案例讲解、理论分析 → 直接用知识回答
+     - 行情查询、新闻搜索 → 用对应的 market_data / a_stock_* 工具
+     - 闲聊、问候 → 直接回答
+     - 用户说"XX怎么样"但没有要求计算 → 用行情/研报工具，不要用计算器
+  - 支持的操作类别：利息收益、估值指标(PE/PB/股息率)、贷款月供、投资决策(NPV/IRR)、债券定价、退休规划、风险指标(夏普/回撤)、通用数学表达式
+  - 调用格式：financial_calculator(operation="操作名", params={...})
+  - 批量计算：多组买卖对用 batchTotalReturn，不要循环调用 totalReturn
 
   4. 文件操作
   - 查找：list_files | 读取：read_file | 保存（仅用户要求时）：write_file

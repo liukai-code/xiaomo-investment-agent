@@ -20,50 +20,24 @@ public class FinancialCalcRouterTool {
 
     @ToolBehavior(deterministic = true, cacheable = true)
     @Tool(description = """
-            金融计算器。执行各类金融和数学计算。
+            金融数值计算器。仅在用户明确要求进行数值计算时调用，概念解释、策略讨论、行情查询等场景禁止调用。
 
-            operation 可选值与适用场景：
-
-            [利息与收益]
-            - compoundInterest: 复利终值。参数: principal, annualRate, years
-            - simpleInterest: 单利终值。参数: principal, annualRate, years
-            - annualizedReturn: 年化收益率换算。参数: totalReturnPercent, days
-            - dcaReturn: 定投收益（纯定投，无初始资金）。参数: monthlyAmount, annualRate, months
-            - compoundDca: 复利+定投综合（有初始资金+定投）。参数: initialCapital, periodicAmount, annualRate, years, frequency
-            - ruleOf72: 72法则（多久翻倍）。参数: annualRate
-            - cagr: 复合年增长率。参数: beginValue, endValue, years
-            - totalReturn: 单组总收益率（含分红）。参数: buyPrice, sellPrice, dividends。注意：如需计算多组收益率（多段投资、多标的对比），请用 batchTotalReturn 一次传入，不要循环调用 totalReturn
-            - batchTotalReturn: 批量总收益率（多组买卖对一次计算，返回每段明细+汇总）。参数: trades(数组，每项含buyPrice, sellPrice, dividends)
-            - inflationAdjusted: 通胀调整购买力。参数: amount, inflationRate, years
-
-            [估值指标]
-            - peRatio: 市盈率PE。参数: stockPrice, earningsPerShare
-            - pbRatio: 市净率PB。参数: stockPrice, bookValuePerShare
-            - dividendYield: 股息率。参数: annualDividend, stockPrice
-
-            [贷款]
-            - loanPayment: 等额本息月供。参数: principal, annualRate, months
-
-            [投资决策]
-            - npv: 净现值。参数: discountRate, cashFlows
-            - irr: 内部收益率。参数: cashFlows
-
-            [债券]
-            - bondPrice: 债券定价。参数: faceValue, couponRate, marketRate, periods
-            - bondYtm: 债券到期收益率。参数: faceValue, marketPrice, couponRate, periods
-
-            [退休规划]
-            - retirementTarget: 退休所需本金。参数: annualExpense, safeWithdrawalRate(可选)
-            - withdrawalPlan: 定额提取计划。参数: principal, annualWithdrawal, annualRate
-
-            [风险指标]
-            - sharpeRatio: 夏普比率。参数: portfolioReturn, riskFreeRate, volatility
-            - maxDrawdown: 最大回撤。参数: navSeries
-
-            [通用计算]
+            支持的操作（operation）：
             - calculate: 数学表达式计算。参数: expression
+            - compoundInterest / simpleInterest: 复利/单利。参数: principal, annualRate, years
+            - annualizedReturn: 年化收益率。参数: totalReturnPercent, days
+            - dcaReturn / compoundDca: 定投收益。参数: monthlyAmount, annualRate, months 等
+            - ruleOf72: 72法则。参数: annualRate
+            - cagr / totalReturn / batchTotalReturn / inflationAdjusted: 收益率类
+            - peRatio / pbRatio / dividendYield: 估值指标。参数: stockPrice, earningsPerShare 等
+            - loanPayment: 等额本息月供。参数: principal, annualRate, months
+            - npv / irr: 净现值/内部收益率。参数: discountRate, cashFlows 等
+            - bondPrice / bondYtm: 债券定价/到期收益率
+            - retirementTarget / withdrawalPlan: 退休规划
+            - sharpeRatio / maxDrawdown: 风险指标
 
             params 为 JSON 字符串，格式参考各 operation 的参数说明。
+            多组买卖对用 batchTotalReturn（trades 数组），不要循环调用 totalReturn。
             """)
     public String financial_calculator(
             @ToolParam(description = "操作类型，可选值：calculate, compoundInterest, simpleInterest, annualizedReturn, dcaReturn, compoundDca, ruleOf72, cagr, totalReturn, batchTotalReturn, inflationAdjusted, peRatio, pbRatio, dividendYield, loanPayment, npv, irr, bondPrice, bondYtm, retirementTarget, withdrawalPlan, sharpeRatio, maxDrawdown") String operation,
