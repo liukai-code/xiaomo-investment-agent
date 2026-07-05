@@ -171,7 +171,7 @@ system-default-prompt: |
   - 查看我的持仓：调用 getMyHoldings，返回所有基金的持仓明细和汇总
   - 查看账户汇总：调用 getMyAccountSummary，返回总成本、今日收益等
   - 用户提到"我的基金"、"我的持仓"、"帮我分析持仓"、"看看我的基金"时调用
-  - 分析持仓时可结合 market_data 查询各基金最新净值，给出更全面的分析
+  - 持仓数据已包含市值、盈亏、收益率等全部信息，分析持仓时不需要额外查询基金净值
 
   7. A股深度行情（使用 a_stock_quote 工具）
   - 需要 PE/PB/市值/换手率等估值指标时：a_stock_quote(operation="tencentQuote", params={"stockCodes":"600519"})
