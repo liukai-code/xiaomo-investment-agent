@@ -234,6 +234,19 @@ async function handleSend() {
   const text = inputText.value.trim()
   if (!text || chatStore.isGenerating) return
 
+  // 检查用户配置
+  try {
+    const { getConfig } = await import('@/api/config')
+    const config = await getConfig()
+    if (!config || !config.apiKey) {
+      alert('请先配置API Key才能使用AI对话功能')
+      showSettings.value = true
+      return
+    }
+  } catch (error) {
+    console.error('检查配置失败:', error)
+  }
+
   if (!chatStore.currentConvId) {
     const conv = await chatStore.createConversation()
     if (!conv) return
