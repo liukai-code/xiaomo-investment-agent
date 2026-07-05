@@ -10,6 +10,8 @@ import com.itlk.myclaudecode.conversation.repository.ChatMessageRepository;
 import com.itlk.myclaudecode.conversation.service.*;
 import com.itlk.myclaudecode.user.entity.User;
 import com.itlk.myclaudecode.user.repository.UserRepository;
+import com.itlk.myclaudecode.user.config.UserConfigService;
+import com.itlk.myclaudecode.user.config.UserConfigDTO;
 import com.itlk.myclaudecode.tool.FileListTool;
 import com.itlk.myclaudecode.tool.guard.FetchSessionTracker;
 import com.itlk.myclaudecode.tool.guard.InfoGainTracker;
@@ -71,6 +73,7 @@ public class AgentLoopImpl implements AgentLoop {
     private final ToolGuardProperties toolGuardProperties;
     private final ToolConfigService toolConfigService;
     private final HttpClientService httpClientService;
+    private final UserConfigService userConfigService;
     private List<ToolCallback> allWrappedCallbacks;
 
     @Resource
@@ -115,11 +118,13 @@ public class AgentLoopImpl implements AgentLoop {
                          ToolGuardProperties toolGuardProperties,
                          ToolConfigService toolConfigService,
                          HttpClientService httpClientService,
+                         UserConfigService userConfigService,
                          @Value("${system-default-prompt}") String systemPrompt) {
         this.systemPrompt = systemPrompt;
         this.toolGuardProperties = toolGuardProperties;
         this.toolConfigService = toolConfigService;
         this.httpClientService = httpClientService;
+        this.userConfigService = userConfigService;
 
         // 将工具对象转为 ToolCallback，再用拦截器包装
         try {
@@ -174,6 +179,12 @@ public class AgentLoopImpl implements AgentLoop {
     @Override
     @Transactional
     public String chat(Long userId, Long conversationId, String message) {
+        // 检查用户配置
+        UserConfigDTO userConfig = userConfigService.getConfig(userId);
+        if (userConfig == null || userConfig.getApiKey() == null || userConfig.getApiKey().isEmpty()) {
+            return "请先配置API Key才能使用AI对话功能";
+        }
+
         Conversation conversation = getOrCreateConversation(userId, conversationId);
         maxToolCallManager.reset();
 
@@ -243,6 +254,15 @@ public class AgentLoopImpl implements AgentLoop {
     @Override
     @Transactional
     public Flux<ServerSentEvent<String>> chatStream(Long userId, Long conversationId, String message) {
+        // 检查用户配置
+        UserConfigDTO userConfig = userConfigService.getConfig(userId);
+        if (userConfig == null || userConfig.getApiKey() == null || userConfig.getApiKey().isEmpty()) {
+            return Flux.just(ServerSentEvent.<String>builder()
+                    .event("content")
+                    .data("请先配置API Key才能使用AI对话功能")
+                    .build());
+        }
+
         Conversation conversation = getOrCreateConversation(userId, conversationId);
         maxToolCallManager.reset();
 
