@@ -145,7 +145,15 @@ public class YjbController {
                 h.setHoldEarn(item.holdEarn != null ? item.holdEarn : BigDecimal.ZERO);
                 h.setHoldShare(item.holdShare != null ? item.holdShare : BigDecimal.ZERO);
                 h.setHoldCost(item.holdCost != null ? item.holdCost : BigDecimal.ZERO);
-                h.setCostMoney(item.costMoney != null ? item.costMoney : BigDecimal.ZERO);
+                BigDecimal costMoney = item.costMoney != null ? item.costMoney : BigDecimal.ZERO;
+                if (costMoney.compareTo(BigDecimal.ZERO) <= 0) {
+                    BigDecimal unitCost = item.holdCost != null ? item.holdCost : BigDecimal.ZERO;
+                    BigDecimal shares = item.holdShare != null ? item.holdShare : BigDecimal.ZERO;
+                    if (unitCost.compareTo(BigDecimal.ZERO) > 0 && shares.compareTo(BigDecimal.ZERO) > 0) {
+                        costMoney = unitCost.multiply(shares);
+                    }
+                }
+                h.setCostMoney(costMoney);
                 h.setHoldDay(item.holdDay);
                 h.setCategory(item.category);
                 h.setMarketType(item.marketType);

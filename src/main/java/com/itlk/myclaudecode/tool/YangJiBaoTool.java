@@ -51,7 +51,7 @@ public class YangJiBaoTool {
         for (YjbHolding h : holdings) {
             totalMoney = totalMoney.add(nullToZero(h.getMoney()));
             totalEarn = totalEarn.add(nullToZero(h.getHoldEarn()));
-            totalCost = totalCost.add(nullToZero(h.getCostMoney()));
+            totalCost = totalCost.add(resolveCost(h));
         }
 
         StringBuilder sb = new StringBuilder();
@@ -62,7 +62,7 @@ public class YangJiBaoTool {
         for (YjbHolding h : holdings) {
             BigDecimal money = nullToZero(h.getMoney());
             BigDecimal earn = nullToZero(h.getHoldEarn());
-            BigDecimal cost = nullToZero(h.getCostMoney());
+            BigDecimal cost = resolveCost(h);
             BigDecimal rate = cost.compareTo(BigDecimal.ZERO) > 0
                     ? earn.divide(cost, 4, RoundingMode.HALF_UP).multiply(new BigDecimal("100"))
                     : BigDecimal.ZERO;
@@ -117,6 +117,17 @@ public class YangJiBaoTool {
 
     private static BigDecimal nullToZero(BigDecimal val) {
         return val != null ? val : BigDecimal.ZERO;
+    }
+
+    private static BigDecimal resolveCost(YjbHolding h) {
+        BigDecimal cost = nullToZero(h.getCostMoney());
+        if (cost.compareTo(BigDecimal.ZERO) > 0) return cost;
+        BigDecimal holdCost = nullToZero(h.getHoldCost());
+        BigDecimal holdShare = nullToZero(h.getHoldShare());
+        if (holdCost.compareTo(BigDecimal.ZERO) > 0 && holdShare.compareTo(BigDecimal.ZERO) > 0) {
+            return holdCost.multiply(holdShare);
+        }
+        return nullToZero(h.getMoney()).subtract(nullToZero(h.getHoldEarn()));
     }
 
     private static String str(String val) {
