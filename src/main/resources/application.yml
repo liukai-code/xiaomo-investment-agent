@@ -37,6 +37,11 @@ spring:
             dashscope-web-search:
               url: ${DASHSCOPE_MCP_URL}
 
+# 配置加密密钥
+config:
+  encryption:
+    key: ${CONFIG_ENCRYPTION_KEY:}
+
 logging:
   level:
     org.springframework.ai.mcp: ERROR
