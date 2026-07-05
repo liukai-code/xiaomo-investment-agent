@@ -78,6 +78,8 @@ public class AStockNewsRouterTool {
     private String stockNews(String stockCode, int pageSize) {
         try {
             String code = AStockUtils.normalizeCode(stockCode);
+            // 用代码搜索，同时请求更多结果用于后过滤
+            int fetchSize = Math.min(pageSize * 2, 50);
             String innerParams = objectMapper.writeValueAsString(Map.of(
                     "uid", "",
                     "keyword", code,
@@ -87,7 +89,7 @@ public class AStockNewsRouterTool {
                     "clientVersion", "curr",
                     "param", Map.of("cmsArticleWebOld", Map.of(
                             "searchScope", "default", "sort", "default",
-                            "pageIndex", 1, "pageSize", pageSize,
+                            "pageIndex", 1, "pageSize", fetchSize,
                             "preTag", "", "postTag", ""
                     ))
             ));
@@ -104,16 +106,24 @@ public class AStockNewsRouterTool {
             JsonNode root = objectMapper.readTree(jsonStr);
             JsonNode articles = root.path("result").path("cmsArticleWebOld");
 
+            // 后过滤：只保留标题中包含目标代码的新闻，剔除提及无关标的的文章
             StringBuilder sb = new StringBuilder();
-            sb.append(String.format("=== %s 个股新闻 共 %d 条 ===\n\n", code, articles.size()));
+            List<String> kept = new ArrayList<>();
             if (articles.isArray()) {
                 for (JsonNode a : articles) {
                     String title = a.path("title").asText("").replaceAll("<[^>]+>", "");
+                    // 标题必须包含目标代码，否则视为无关文章
+                    if (!title.contains(code)) continue;
                     String date = a.path("date").asText("");
                     String source = a.path("mediaName").asText("");
                     String url2 = a.path("url").asText("");
-                    sb.append(String.format("- %s\n  %s | %s\n  %s\n\n", title, date, source, url2));
+                    kept.add(String.format("- %s\n  %s | %s\n  %s", title, date, source, url2));
+                    if (kept.size() >= pageSize) break;
                 }
+            }
+            sb.append(String.format("=== %s 个股新闻 共 %d 条 ===\n\n", code, kept.size()));
+            for (String item : kept) {
+                sb.append(item).append("\n\n");
             }
             return sb.toString();
         } catch (Exception e) {
