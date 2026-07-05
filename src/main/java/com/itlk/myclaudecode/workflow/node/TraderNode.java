@@ -58,9 +58,14 @@ public class TraderNode implements WorkflowNode {
     public Flux<WorkflowEvent> execute(WorkflowState state, Sinks.Many<WorkflowEvent> sink) {
         log.info("[{}] 开始制定交易方案", roleName);
 
-        // 将标的信息注入到 system prompt 开头
-        String enrichedSystemPrompt = "【分析标的】" + state.getOriginalQuery() + "\n\n"
-                + "⚠️ 你只能为上述标的制定交易方案，禁止引入其他股票的数据。\n\n"
+        // 将标的信息和系统时间注入到 system prompt 开头
+        String now = java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm:ss"));
+        String enrichedSystemPrompt = "【当前时间】" + now + "\n\n"
+                + "【分析标的】" + state.getOriginalQuery() + "\n\n"
+                + "⚠️ 关键约束：\n"
+                + "1. 你只能为上述标的制定交易方案，禁止引入其他股票的数据\n"
+                + "2. 交易方案必须基于上游分析师和辩论的数据，禁止使用训练知识\n\n"
                 + systemPrompt;
 
         ChatClient client = ChatClient.builder(chatModel)

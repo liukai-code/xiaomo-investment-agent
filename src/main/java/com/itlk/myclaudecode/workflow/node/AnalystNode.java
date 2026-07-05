@@ -68,9 +68,16 @@ public class AnalystNode implements WorkflowNode {
     public Flux<WorkflowEvent> execute(WorkflowState state, Sinks.Many<WorkflowEvent> sink) {
         log.info("[{}] 开始执行数据采集", roleName);
 
-        // 将标的信息注入到 system prompt 开头，确保 LLM 不会忽略
-        String enrichedSystemPrompt = "【分析标的】" + state.getOriginalQuery() + "\n\n"
-                + "⚠️ 你只能分析上述标的，禁止分析其他股票。所有工具调用和数据获取必须针对该标的。\n\n"
+        // 将标的信息和系统时间注入到 system prompt 开头
+        String now = java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm:ss"));
+        String enrichedSystemPrompt = "【当前时间】" + now + "\n\n"
+                + "【分析标的】" + state.getOriginalQuery() + "\n\n"
+                + "⚠️ 关键约束：\n"
+                + "1. 你只能分析上述标的，禁止分析其他股票\n"
+                + "2. 所有工具调用和数据获取必须针对该标的\n"
+                + "3. 报告中的数据必须来自工具返回，禁止使用训练知识\n"
+                + "4. 如果工具调用失败，如实报告，禁止用旧数据填充\n\n"
                 + systemPrompt;
 
         ChatClient agentClient = ChatClient.builder(chatModel)
