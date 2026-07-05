@@ -125,6 +125,9 @@ public class AnalystNode implements WorkflowNode {
         if (state.getAllowedStockCodes() != null && !state.getAllowedStockCodes().isEmpty()) {
             toolCtx.put(MaxToolCallManager.ALLOWED_STOCK_CODES_KEY, state.getAllowedStockCodes());
         }
+        if (state.getResolvedStockName() != null) {
+            toolCtx.put(MaxToolCallManager.RESOLVED_STOCK_NAME_KEY, state.getResolvedStockName());
+        }
         toolCtx.put(MaxToolCallManager.REPORT_COMPLETENESS_KEY, completenessChecker);
 
         AnthropicChatOptions options = AnthropicChatOptions.builder()

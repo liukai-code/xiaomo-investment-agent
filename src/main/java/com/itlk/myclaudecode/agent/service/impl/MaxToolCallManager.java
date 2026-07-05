@@ -52,6 +52,7 @@ public class MaxToolCallManager implements ToolCallingManager {
     public static final String NON_RETRIABLE_CACHE_KEY = "nonRetriableCache";
     public static final String MAX_STEPS_KEY = "maxSteps";
     public static final String ALLOWED_STOCK_CODES_KEY = "allowedStockCodes";
+    public static final String RESOLVED_STOCK_NAME_KEY = "resolvedStockName";
 
     private static final Set<String> FETCH_TOOL_NAMES = Set.of(
             "fetchArticleContent", "fetchWebpage"
@@ -102,6 +103,7 @@ public class MaxToolCallManager implements ToolCallingManager {
         Map<String, String> nonRetriableCache = extractFromContext(prompt, NON_RETRIABLE_CACHE_KEY, Map.class);
         Integer maxStepsCtx = extractFromContext(prompt, MAX_STEPS_KEY, Integer.class);
         java.util.Set<String> allowedStockCodes = extractFromContext(prompt, ALLOWED_STOCK_CODES_KEY, java.util.Set.class);
+        String resolvedStockName = extractFromContext(prompt, RESOLVED_STOCK_NAME_KEY, String.class);
         int effectiveMaxIterations = maxStepsCtx != null ? Math.min(maxStepsCtx, properties.maxIterations()) : properties.maxIterations();
 
         int step = counter.incrementAndGet();
@@ -208,6 +210,15 @@ public class MaxToolCallManager implements ToolCallingManager {
                 }
             }
 
+            // Date auto-injection: ensure AStock tools always use today's date
+            if (isAStockTool(tc.name())) {
+                String injected = injectCurrentDate(tc.arguments(), tc.name());
+                if (!injected.equals(tc.arguments())) {
+                    log.info("[MaxToolCallManager] 自动注入当前日期: {} → {}", tc.arguments(), injected);
+                    tc = new AssistantMessage.ToolCall(tc.id(), tc.type(), tc.name(), injected);
+                }
+            }
+
             // Normal execution with cache check
             if (cacheable && duplicateCache != null) {
                 String cacheKey = tc.name() + ":" + tc.arguments().hashCode();
@@ -224,6 +235,17 @@ public class MaxToolCallManager implements ToolCallingManager {
 
             // Info gain and repetition detection
             String resultText = extractResultText(result);
+
+            // Inject stock identifier header: force LLM to associate data with target stock
+            if (allowedStockCodes != null && !allowedStockCodes.isEmpty() && isAStockTool(tc.name())) {
+                String targetCode = allowedStockCodes.iterator().next();
+                String stockLabel = resolvedStockName != null
+                        ? resolvedStockName + "（" + targetCode + "）"
+                        : targetCode;
+                String header = "【以下数据属于 " + stockLabel + "，禁止用于其他标的的分析】\n";
+                result = prependToResult(result, tc, header);
+                resultText = extractResultText(result);
+            }
 
             // Data pollution hard filter: remove non-target stock data from tool results
             if (allowedStockCodes != null && !allowedStockCodes.isEmpty() && isAStockTool(tc.name())) {
@@ -473,6 +495,46 @@ public class MaxToolCallManager implements ToolCallingManager {
     }
 
     /**
+     * 为 AStock 工具自动注入当前日期，防止 LLM 传入错误日期或使用训练数据中的旧日期。
+     * - AStockLimitUpRouterTool: date 参数，格式 yyyyMMdd
+     * - AStockSignalRouterTool: tradeDate 参数，格式 yyyy-MM-dd
+     * - AStockReportRouterTool: industryReport 的 reportDate 参数
+     */
+    private String injectCurrentDate(String args, String toolName) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.node.ObjectNode root;
+            if (args == null || args.isBlank()) {
+                root = mapper.createObjectNode();
+            } else {
+                com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(args);
+                if (node.isObject()) {
+                    root = (com.fasterxml.jackson.databind.node.ObjectNode) node;
+                } else {
+                    return args;
+                }
+            }
+
+            String todayCompact = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+            String todayDash = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+            // AStockLimitUpRouterTool: date 格式 yyyyMMdd
+            if ("a_stock_limit_up".equals(toolName)) {
+                root.put("date", todayCompact);
+            }
+            // AStockSignalRouterTool: tradeDate 格式 yyyy-MM-dd
+            if ("a_stock_signal".equals(toolName)) {
+                root.put("tradeDate", todayDash);
+            }
+
+            return mapper.writeValueAsString(root);
+        } catch (Exception e) {
+            log.debug("[MaxToolCallManager] 注入当前日期失败: {}", e.getMessage());
+            return args;
+        }
+    }
+
+    /**
      * 当 AStock 工具调用缺少 stockCode/stockCodes 参数时，自动注入目标代码。
      * 避免工具因缺少参数报错，导致 LLM fallback 到训练知识。
      */
@@ -505,6 +567,26 @@ public class MaxToolCallManager implements ToolCallingManager {
             log.debug("[MaxToolCallManager] 注入 stockCode 失败: {}", e.getMessage());
             return args;
         }
+    }
+
+    /**
+     * 在工具返回结果前面追加标识头
+     */
+    private ToolExecutionResult prependToResult(ToolExecutionResult original,
+                                                 AssistantMessage.ToolCall tc, String header) {
+        List<Message> history = new ArrayList<>(original.conversationHistory());
+        if (!history.isEmpty()) {
+            Message last = history.get(history.size() - 1);
+            if (last instanceof ToolResponseMessage toolMsg) {
+                List<ToolResponseMessage.ToolResponse> newResponses = new ArrayList<>();
+                for (ToolResponseMessage.ToolResponse r : toolMsg.getResponses()) {
+                    newResponses.add(new ToolResponseMessage.ToolResponse(
+                            r.id(), r.name(), header + r.responseData()));
+                }
+                history.set(history.size() - 1, new ToolResponseMessage(newResponses));
+            }
+        }
+        return new CachedToolExecutionResult(history);
     }
 
     /**
