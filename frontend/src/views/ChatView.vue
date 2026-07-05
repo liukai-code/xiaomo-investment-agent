@@ -11,6 +11,7 @@ import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen, 
 import { useYangjibaoStore } from '@/stores/yangjibao'
 import YjbQrLogin from '@/components/yangjibao/YjbQrLogin.vue'
 import YjbHoldingsCard from '@/components/yangjibao/YjbHoldingsCard.vue'
+import SettingsDialog from '@/components/SettingsDialog.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -25,6 +26,7 @@ const activeMenuConvId = ref<number | null>(null)
 const deleteConfirmConvId = ref<number | null>(null)
 const showUserMenu = ref(false)
 const sidebarCollapsed = ref(false)
+const showSettings = ref(false)
 
 let abortController: AbortController | null = null
 
@@ -174,6 +176,11 @@ async function handleSwitchConversation(id: number) {
 async function handleLogout() {
   await authStore.logout()
   router.push('/login')
+}
+
+function onSettingsSaved() {
+  // 配置保存成功后的处理
+  console.log('配置已保存');
 }
 
 function toggleSidebar() {
@@ -467,7 +474,7 @@ watch(() => yjbStore.cardVisible, (visible) => {
       </div>
 
       <div class="sidebar-footer">
-        <div class="footer-item" title="设置">
+        <div class="footer-item" title="设置" @click="showSettings = true">
           <Settings :size="18" />
           <span class="footer-label">设置</span>
         </div>
@@ -634,6 +641,13 @@ watch(() => yjbStore.cardVisible, (visible) => {
       </div>
     </div>
   </Transition>
+
+  <!-- 设置弹窗 -->
+  <SettingsDialog
+    :visible="showSettings"
+    @close="showSettings = false"
+    @saved="onSettingsSaved"
+  />
   </div>
 </template>
 
