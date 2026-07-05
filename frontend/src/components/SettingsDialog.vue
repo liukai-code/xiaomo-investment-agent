@@ -235,9 +235,12 @@ function close() {
 .settings-dialog {
   background: white;
   border-radius: 8px;
-  width: 750px;
+  width: 850px;
+  height: 550px;
   max-width: 90vw;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
 }
 
 .settings-header {
