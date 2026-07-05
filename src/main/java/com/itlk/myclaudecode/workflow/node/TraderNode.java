@@ -58,9 +58,14 @@ public class TraderNode implements WorkflowNode {
     public Flux<WorkflowEvent> execute(WorkflowState state, Sinks.Many<WorkflowEvent> sink) {
         log.info("[{}] 开始制定交易方案", roleName);
 
+        // 将标的信息注入到 system prompt 开头
+        String enrichedSystemPrompt = "【分析标的】" + state.getOriginalQuery() + "\n\n"
+                + "⚠️ 你只能为上述标的制定交易方案，禁止引入其他股票的数据。\n\n"
+                + systemPrompt;
+
         ChatClient client = ChatClient.builder(chatModel)
                 .defaultToolCallbacks(toolCallbacks.toArray(new ToolCallback[0]))
-                .defaultSystem(systemPrompt)
+                .defaultSystem(enrichedSystemPrompt)
                 .build();
 
         String prompt = buildTraderPrompt(state);
@@ -136,11 +141,6 @@ public class TraderNode implements WorkflowNode {
 
     private String buildTraderPrompt(WorkflowState state) {
         StringBuilder sb = new StringBuilder();
-
-        // 注入原始查询，明确分析标的
-        sb.append("## 分析标的\n\n");
-        sb.append("请对以下标的进行分析：").append(state.getOriginalQuery()).append("\n\n");
-        sb.append("⚠️ 重要：所有分析必须围绕上述标的展开，禁止引入其他股票的数据。\n\n");
 
         // 预注入缓存数据
         if (!state.getCachedData().isEmpty()) {

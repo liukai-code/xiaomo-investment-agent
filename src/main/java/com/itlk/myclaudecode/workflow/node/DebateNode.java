@@ -44,8 +44,13 @@ public class DebateNode implements WorkflowNode {
     public Flux<WorkflowEvent> debateRound(WorkflowState state,
                                             List<DebateMessage> debateHistory,
                                             Sinks.Many<WorkflowEvent> sink) {
+        // 将标的信息注入到 system prompt 开头
+        String enrichedSystemPrompt = "【分析标的】" + state.getOriginalQuery() + "\n\n"
+                + "⚠️ 你只能围绕上述标的进行辩论，禁止引入其他股票的数据。\n\n"
+                + systemPrompt;
+
         ChatClient client = ChatClient.builder(chatModel)
-                .defaultSystem(systemPrompt)
+                .defaultSystem(enrichedSystemPrompt)
                 .build();
 
         int round = countRounds(debateHistory) + 1;
@@ -96,11 +101,6 @@ public class DebateNode implements WorkflowNode {
 
     private String buildDebatePrompt(WorkflowState state, List<DebateMessage> history, int round) {
         StringBuilder sb = new StringBuilder();
-
-        // 注入原始查询，明确分析标的
-        sb.append("## 分析标的\n\n");
-        sb.append("请对以下标的进行分析：").append(state.getOriginalQuery()).append("\n\n");
-        sb.append("⚠️ 重要：所有分析必须围绕上述标的展开，禁止引入其他股票的数据。\n\n");
 
         // 预注入缓存数据
         if (!state.getCachedData().isEmpty()) {

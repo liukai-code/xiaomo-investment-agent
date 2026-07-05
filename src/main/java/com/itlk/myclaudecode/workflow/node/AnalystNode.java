@@ -68,13 +68,17 @@ public class AnalystNode implements WorkflowNode {
     public Flux<WorkflowEvent> execute(WorkflowState state, Sinks.Many<WorkflowEvent> sink) {
         log.info("[{}] 开始执行数据采集", roleName);
 
+        // 将标的信息注入到 system prompt 开头，确保 LLM 不会忽略
+        String enrichedSystemPrompt = "【分析标的】" + state.getOriginalQuery() + "\n\n"
+                + "⚠️ 你只能分析上述标的，禁止分析其他股票。所有工具调用和数据获取必须针对该标的。\n\n"
+                + systemPrompt;
+
         ChatClient agentClient = ChatClient.builder(chatModel)
                 .defaultToolCallbacks(toolCallbacks.toArray(new ToolCallback[0]))
-                .defaultSystem(systemPrompt)
+                .defaultSystem(enrichedSystemPrompt)
                 .build();
 
-        String userPrompt = "请对以下标的进行深度分析：\n\n" + state.getOriginalQuery()
-                + "\n\n请使用可用工具获取数据，产出一份结构化的分析报告。报告需要包含具体的数据和分析结论。";
+        String userPrompt = "请使用可用工具获取" + state.getOriginalQuery() + "的数据，产出一份结构化的分析报告。";
 
         sink.tryEmitNext(WorkflowEvent.agentStart(roleName));
 

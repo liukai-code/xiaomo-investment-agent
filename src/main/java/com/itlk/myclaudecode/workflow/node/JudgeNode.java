@@ -45,8 +45,13 @@ public class JudgeNode implements WorkflowNode {
                                              Sinks.Many<WorkflowEvent> sink) {
         log.info("[{}] 开始裁决", roleName);
 
+        // 将标的信息注入到 system prompt 开头
+        String enrichedSystemPrompt = "【分析标的】" + state.getOriginalQuery() + "\n\n"
+                + "⚠️ 你只能对上述标的做出裁决，禁止引入其他股票的数据。\n\n"
+                + systemPrompt;
+
         ChatClient client = ChatClient.builder(chatModel)
-                .defaultSystem(systemPrompt)
+                .defaultSystem(enrichedSystemPrompt)
                 .build();
 
         String prompt = buildJudgmentPrompt(state, debateHistory);
@@ -92,11 +97,6 @@ public class JudgeNode implements WorkflowNode {
 
     private String buildJudgmentPrompt(WorkflowState state, List<DebateMessage> debateHistory) {
         StringBuilder sb = new StringBuilder();
-
-        // 注入原始查询，明确分析标的
-        sb.append("## 分析标的\n\n");
-        sb.append("请对以下标的进行分析：").append(state.getOriginalQuery()).append("\n\n");
-        sb.append("⚠️ 重要：所有分析必须围绕上述标的展开，禁止引入其他股票的数据。\n\n");
 
         // 预注入缓存数据
         if (!state.getCachedData().isEmpty()) {
