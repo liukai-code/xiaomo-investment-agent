@@ -11,6 +11,7 @@ import com.itlk.myclaudecode.tool.WebFetchTool;
 import com.itlk.myclaudecode.tool.astock.*;
 import com.itlk.myclaudecode.tool.config.ToolConfigService;
 import com.itlk.myclaudecode.tool.config.ToolEnabledCheckWrapper;
+import com.itlk.myclaudecode.conversation.service.UsageRecordService;
 import com.itlk.myclaudecode.workflow.node.AnalystNode;
 import com.itlk.myclaudecode.workflow.node.DebateNode;
 import com.itlk.myclaudecode.workflow.node.JudgeNode;
@@ -36,6 +37,7 @@ public class WorkflowAgentFactory {
     private final ToolCallback[] allToolCallbacks;
     private final ToolConfigService toolConfigService;
     private final ToolGuardProperties guardProperties;
+    private final UsageRecordService usageRecordService;
 
     public WorkflowAgentFactory(
             ChatModel chatModel,
@@ -56,11 +58,13 @@ public class WorkflowAgentFactory {
             AStockSentimentRouterTool aStockSentimentRouterTool,
             ToolCallbackProvider mcpProvider,
             ToolConfigService toolConfigService,
-            ToolGuardProperties guardProperties) {
+            ToolGuardProperties guardProperties,
+            UsageRecordService usageRecordService) {
 
         this.chatModel = chatModel;
         this.toolConfigService = toolConfigService;
         this.guardProperties = guardProperties;
+        this.usageRecordService = usageRecordService;
 
         // 复用 AgentLoopImpl 相同的工具注册模式
         ToolCallbackProvider provider = MethodToolCallbackProvider.builder()
@@ -110,21 +114,21 @@ public class WorkflowAgentFactory {
         if (!missing.isEmpty()) {
             log.warn("[{}] 以下工具未找到，可能名称不匹配: {}", role.roleName(), missing);
         }
-        return new AnalystNode(chatModel, role.roleName(), role.systemPrompt(), scoped, guardProperties, role.guardConfig());
+        return new AnalystNode(chatModel, role.roleName(), role.systemPrompt(), scoped, guardProperties, role.guardConfig(), usageRecordService);
     }
 
     /**
      * 创建辩论节点（无工具）
      */
     public DebateNode createDebateNode(AgentRole role) {
-        return new DebateNode(chatModel, role.roleName(), role.systemPrompt());
+        return new DebateNode(chatModel, role.roleName(), role.systemPrompt(), usageRecordService);
     }
 
     /**
      * 创建裁决节点（无工具）
      */
     public JudgeNode createJudgeNode(AgentRole role) {
-        return new JudgeNode(chatModel, role.roleName(), role.systemPrompt());
+        return new JudgeNode(chatModel, role.roleName(), role.systemPrompt(), usageRecordService);
     }
 
     /**
@@ -137,6 +141,6 @@ public class WorkflowAgentFactory {
                 .collect(Collectors.toList());
         log.info("创建交易员，绑定 {} 个工具", scoped.size());
         return new TraderNode(chatModel, AgentRole.TRADER.roleName(),
-                AgentRole.TRADER.systemPrompt(), scoped, guardProperties, AgentRole.TRADER.guardConfig());
+                AgentRole.TRADER.systemPrompt(), scoped, guardProperties, AgentRole.TRADER.guardConfig(), usageRecordService);
     }
 }

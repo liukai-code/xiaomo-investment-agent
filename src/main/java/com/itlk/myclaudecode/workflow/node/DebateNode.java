@@ -1,5 +1,6 @@
 package com.itlk.myclaudecode.workflow.node;
 
+import com.itlk.myclaudecode.conversation.service.UsageRecordService;
 import com.itlk.myclaudecode.workflow.engine.WorkflowNode;
 import com.itlk.myclaudecode.workflow.event.WorkflowEvent;
 import com.itlk.myclaudecode.workflow.state.DebateMessage;
@@ -21,11 +22,13 @@ public class DebateNode implements WorkflowNode {
     private final ChatModel chatModel;
     private final String roleName;
     private final String systemPrompt;
+    private final UsageRecordService usageRecordService;
 
-    public DebateNode(ChatModel chatModel, String roleName, String systemPrompt) {
+    public DebateNode(ChatModel chatModel, String roleName, String systemPrompt, UsageRecordService usageRecordService) {
         this.chatModel = chatModel;
         this.roleName = roleName;
         this.systemPrompt = systemPrompt;
+        this.usageRecordService = usageRecordService;
     }
 
     @Override
@@ -86,6 +89,13 @@ public class DebateNode implements WorkflowNode {
                     debateHistory.add(msg);
                     sink.tryEmitNext(WorkflowEvent.debateComplete(roleName, fullArgument));
                     log.info("[{}] 第 {} 轮辩论完成", roleName, round);
+                    // Record usage
+                    try {
+                        long inputTokens = UsageRecordService.estimateInputTokensFromText(prompt + systemPrompt);
+                        usageRecordService.record(state.getUserId(), state.getConversationId(), inputTokens, null, 0);
+                    } catch (Exception e) {
+                        log.warn("[{}] 记录用量失败: {}", roleName, e.getMessage());
+                    }
                 });
     }
 

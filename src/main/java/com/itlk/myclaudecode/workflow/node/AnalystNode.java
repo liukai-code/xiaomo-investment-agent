@@ -7,6 +7,7 @@ import com.itlk.myclaudecode.tool.guard.InfoGainTracker;
 import com.itlk.myclaudecode.tool.guard.RepetitionDetector;
 import com.itlk.myclaudecode.tool.guard.ReportCompletenessChecker;
 import com.itlk.myclaudecode.tool.guard.SearchSessionTracker;
+import com.itlk.myclaudecode.conversation.service.UsageRecordService;
 import com.itlk.myclaudecode.workflow.agent.AgentRole;
 import com.itlk.myclaudecode.workflow.engine.WorkflowNode;
 import com.itlk.myclaudecode.workflow.event.WorkflowEvent;
@@ -46,16 +47,19 @@ public class AnalystNode implements WorkflowNode {
     private final List<ToolCallback> toolCallbacks;
     private final ToolGuardProperties guardProperties;
     private final AgentRole.RoleGuardConfig roleGuardConfig;
+    private final UsageRecordService usageRecordService;
 
     public AnalystNode(ChatModel chatModel, String roleName,
                        String systemPrompt, List<ToolCallback> toolCallbacks,
                        ToolGuardProperties guardProperties,
-                       AgentRole.RoleGuardConfig roleGuardConfig) {
+                       AgentRole.RoleGuardConfig roleGuardConfig,
+                       UsageRecordService usageRecordService) {
         this.chatModel = chatModel;
         this.roleName = roleName;
         this.systemPrompt = systemPrompt;
         this.toolCallbacks = toolCallbacks;
         this.guardProperties = guardProperties;
+        this.usageRecordService = usageRecordService;
         this.roleGuardConfig = roleGuardConfig;
     }
 
@@ -153,13 +157,20 @@ public class AnalystNode implements WorkflowNode {
                     String fullReport = sanitizeOutput(report.toString());
                     state.getAnalystReports().put(roleName,
                             new AgentReport(roleName, fullReport, Instant.now()));
-                    // 缓存报告内容供下游 Agent 复用
                     state.getCachedData().put(roleName + "_opinion", fullReport);
-                    // 尝试提取结构化 JSON 数据
                     extractStructuredData(fullReport).ifPresent(json ->
                             state.getCachedData().put(roleName + "_structured", json));
                     sink.tryEmitNext(WorkflowEvent.agentComplete(roleName, fullReport));
                     log.info("[{}] 数据采集完成，报告长度: {}", roleName, fullReport.length());
+                    // Record usage
+                    try {
+                        AtomicInteger toolCounter = (AtomicInteger) toolCtx.get(MaxToolCallManager.TOOL_CALL_COUNTER_KEY);
+                        int toolCalls = toolCounter != null ? toolCounter.get() : 0;
+                        long inputTokens = UsageRecordService.estimateInputTokensFromText(userPrompt + enrichedSystemPrompt);
+                        usageRecordService.record(state.getUserId(), state.getConversationId(), inputTokens, null, toolCalls);
+                    } catch (Exception e) {
+                        log.warn("[{}] 记录用量失败: {}", roleName, e.getMessage());
+                    }
                 })
                 .doOnError(e -> log.error("[{}] 数据采集错误: {}", roleName, e.getMessage()));
     }

@@ -259,7 +259,7 @@ public class AgentLoopImpl implements AgentLoop {
                 Usage usage = chatResponse.getMetadata() != null ? chatResponse.getMetadata().getUsage() : null;
                 AtomicInteger toolCounter = (AtomicInteger) toolCtx.get(MaxToolCallManager.TOOL_CALL_COUNTER_KEY);
                 int toolCalls = toolCounter != null ? toolCounter.get() : 0;
-                Long inputTokens = usage != null && usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : estimateInputTokens(context);
+                Long inputTokens = usage != null && usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : UsageRecordService.estimateInputTokens(context);
                 Long outputTokens = usage != null && usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : null;
                 usageRecordService.record(userId, conversation.getId(), inputTokens, outputTokens, toolCalls);
                 log.info("[Chat] usage recorded: input={}, output={}, tools={}", inputTokens, outputTokens, toolCalls);
@@ -409,7 +409,7 @@ public class AgentLoopImpl implements AgentLoop {
                         AtomicInteger toolCounter = (AtomicInteger) streamToolCtx.get(MaxToolCallManager.TOOL_CALL_COUNTER_KEY);
                         int toolCalls = toolCounter != null ? toolCounter.get() : 0;
                         // Spring AI streaming doesn't aggregate input_tokens from Anthropic, estimate from context
-                        Long inputTokens = lastInputTokens[0] != null ? lastInputTokens[0] : estimateInputTokens(context);
+                        Long inputTokens = lastInputTokens[0] != null ? lastInputTokens[0] : UsageRecordService.estimateInputTokens(context);
                         usageRecordService.record(userId, convId, inputTokens, lastOutputTokens[0], toolCalls);
                         log.info("[ChatStream] usage recorded: input={}, output={}, tools={}", inputTokens, lastOutputTokens[0], toolCalls);
                     } catch (Exception e) {
@@ -650,18 +650,4 @@ public class AgentLoopImpl implements AgentLoop {
         }
     }
 
-    /**
-     * 估算 input tokens：从上下文消息总字符数除以3.5（中英混合内容平均比率）。
-     * 用于 Spring AI 流式模式无法从 Anthropic 拿到 input_tokens 时的兜底。
-     */
-    private Long estimateInputTokens(List<Message> context) {
-        long totalChars = 0;
-        for (Message msg : context) {
-            String text = msg.getText();
-            if (text != null) {
-                totalChars += text.length();
-            }
-        }
-        return Math.max(1, totalChars * 10 / 35);  // chars / 3.5, integer math
-    }
 }
