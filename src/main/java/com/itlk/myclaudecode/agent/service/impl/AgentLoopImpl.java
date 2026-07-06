@@ -71,6 +71,11 @@ public class AgentLoopImpl implements AgentLoop {
 
     private static final int MAX_CONTEXT_MESSAGES = 50;
 
+    /** 标的锁定时主动过滤的持仓工具，防止任务漂移 */
+    private static final Set<String> HOLDINGS_TOOL_NAMES = Set.of(
+            "getMyHoldings", "getMyAccountSummary"
+    );
+
     private final String systemPrompt;
     private ChatClient chatClient;
     private final ToolGuardProperties toolGuardProperties;
@@ -242,6 +247,13 @@ public class AgentLoopImpl implements AgentLoop {
                 .<ToolCallback>map(cb -> new ToolCallbackContextWrapper(cb))
                 .toList();
 
+        // 标的锁定时，主动移除持仓工具，防止任务漂移
+        if (target != null) {
+            enabledTools = enabledTools.stream()
+                    .filter(cb -> !HOLDINGS_TOOL_NAMES.contains(cb.getToolDefinition().name()))
+                    .toList();
+        }
+
         try {
             ChatResponse chatResponse = chatClient.prompt()
                     .messages(context.toArray(new Message[0]))
@@ -340,6 +352,13 @@ public class AgentLoopImpl implements AgentLoop {
                 .filter(cb -> enabledNames.contains(cb.getToolDefinition().name()))
                 .<ToolCallback>map(cb -> new ToolCallbackContextWrapper(cb))
                 .toList();
+
+        // 标的锁定时，主动移除持仓工具，防止任务漂移
+        if (target != null) {
+            enabledTools = enabledTools.stream()
+                    .filter(cb -> !HOLDINGS_TOOL_NAMES.contains(cb.getToolDefinition().name()))
+                    .toList();
+        }
 
         // 初始 THINKING 事件
         Flux<ServerSentEvent<String>> thinkingEvent = Flux.just(
@@ -592,7 +611,9 @@ public class AgentLoopImpl implements AgentLoop {
                     + "2. 禁止分析、引用、对比任何其他标的\n"
                     + "3. 如果工具返回包含其他股票的数据，必须忽略，只关注 " + stockLabel + " 的数据\n"
                     + "4. 输出报告的标题、数据、结论必须与 " + stockLabel + " 完全一致\n"
-                    + "5. 禁止出现用户问A你分析B的情况";
+                    + "5. 禁止出现用户问A你分析B的情况\n"
+                    + "6. 分析范围仅限该标的本身（行情、基本面、技术面、新闻、估值），禁止生成投资组合建议、资产配置方案、多标的推荐列表\n"
+                    + "7. 用户问的是单个标的，回答也必须是单个标的的分析，不要扩展到投资组合层面";
         } else {
             DebugFileLogger.logBuildContext("NO_TARGET", "标的解析失败或未触发，未设置标的锁");
         }
@@ -622,7 +643,8 @@ public class AgentLoopImpl implements AgentLoop {
             context.add(new UserMessage(
                     "⚠️ 重要提醒：你当前正在分析的标的是 " + stockLabel + "。"
                     + "请基于以上工具返回的数据生成分析报告，报告标题和所有内容必须严格对应 " + stockLabel + "。"
-                    + "禁止出现任何其他股票的名称或代码。如果之前的对话中提到了其他标的，必须完全忽略。"));
+                    + "禁止出现任何其他股票的名称或代码。如果之前的对话中提到了其他标的，必须完全忽略。"
+                    + "分析范围仅限该标的本身，禁止生成投资组合建议、资产配置方案或多标的推荐。"));
         }
 
         return context;

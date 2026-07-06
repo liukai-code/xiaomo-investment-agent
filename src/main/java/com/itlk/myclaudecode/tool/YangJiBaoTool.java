@@ -31,7 +31,7 @@ public class YangJiBaoTool {
     }
 
     @ToolBehavior(deterministic = false, cacheable = false)
-    @Tool(description = "查询当前用户在养基宝的基金持仓列表。返回所有基金的名称、代码、持有市值、盈亏金额、收益率等信息。当用户提到'我的基金'、'我的持仓'、'帮我分析持仓'、'看看我的基金'时调用此工具。")
+    @Tool(description = "查询当前用户在养基宝的基金持仓列表。返回所有基金的名称、代码、持有市值、盈亏金额、收益率等信息。仅当用户明确提到'我的基金'、'我的持仓'、'看看我的基金'、'我的仓位'时调用此工具。注意：分析个股时不要调用此工具。")
     public String getMyHoldings() {
         Long userId = CURRENT_USER_ID.get();
         log.info("[YangJiBaoTool] getMyHoldings called, userId={}", userId);
@@ -89,7 +89,7 @@ public class YangJiBaoTool {
     }
 
     @ToolBehavior(deterministic = false, cacheable = false)
-    @Tool(description = "查询当前用户养基宝账户汇总信息，包括总持有成本、今日收益、今日收益率。可配合 getMyHoldings 一起使用来全面分析持仓。")
+    @Tool(description = "查询当前用户养基宝账户汇总信息，包括总持有成本、今日收益、今日收益率。仅当用户明确要求查看账户汇总或持仓时调用，分析个股时不要调用。")
     public String getMyAccountSummary() {
         Long userId = CURRENT_USER_ID.get();
         if (userId == null) {
