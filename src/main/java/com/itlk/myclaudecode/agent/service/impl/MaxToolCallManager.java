@@ -2,6 +2,7 @@ package com.itlk.myclaudecode.agent.service.impl;
 
 import com.itlk.myclaudecode.agent.config.ToolGuardProperties;
 import com.itlk.myclaudecode.agent.service.ChatStreamEvent;
+import com.itlk.myclaudecode.common.util.DebugFileLogger;
 import com.itlk.myclaudecode.tool.guard.FetchSessionTracker;
 import com.itlk.myclaudecode.tool.guard.GuardSignal;
 import com.itlk.myclaudecode.tool.guard.ReportCompletenessChecker;
@@ -64,6 +65,11 @@ public class MaxToolCallManager implements ToolCallingManager {
 
     private static final Set<String> SEARCH_TOOL_NAMES = Set.of(
             "bailian_web_search", "webSearch", "web_search"
+    );
+
+    /** 标的已锁定时，禁止调用的无关工具 */
+    private static final Set<String> STOCK_IRRELEVANT_TOOLS = Set.of(
+            "getMyHoldings", "getMyAccountSummary"
     );
 
     private final ToolCallingManager delegate;
@@ -225,15 +231,30 @@ public class MaxToolCallManager implements ToolCallingManager {
                 }
             }
 
+            // 工具相关性守卫：标的已锁定时，禁止调用持仓等无关工具
+            if (allowedStockCodes != null && !allowedStockCodes.isEmpty()
+                    && STOCK_IRRELEVANT_TOOLS.contains(tc.name())) {
+                String scopeMsg = "当前正在分析标的，请专注于该标的的数据分析，不要调用" + tc.name()
+                        + "。请使用 market_data 或 a_stock_* 工具查询标的行情和基本面数据。";
+                log.info("[MaxToolCallManager] 工具相关性守卫拦截: tool={}, 标的={}", tc.name(), allowedStockCodes);
+                DebugFileLogger.logGuard("TOOL_RELEVANCE", tc.name(),
+                        "BLOCKED | 标的=" + allowedStockCodes + " | 无关工具");
+                List<Message> skipHistory = buildSkipResult(tc, scopeMsg);
+                return new CachedToolExecutionResult(skipHistory);
+            }
+
             // Stock scope guard check + auto-injection
             if (allowedStockCodes != null && !allowedStockCodes.isEmpty() && isAStockTool(tc.name())) {
                 java.util.Set<String> requestedCodes = extractStockCodesFromArgs(tc.arguments());
+                DebugFileLogger.logGuard("STOCK_SCOPE", tc.name(),
+                        "allowedStockCodes=" + allowedStockCodes + " | requestedCodes=" + requestedCodes + " | args=" + tc.arguments());
                 if (!requestedCodes.isEmpty() && !allowedStockCodes.containsAll(requestedCodes)) {
                     // LLM 传了错误的代码 → 拦截
                     java.util.Set<String> disallowed = new java.util.HashSet<>(requestedCodes);
                     disallowed.removeAll(allowedStockCodes);
                     String scopeMsg = "股票代码 " + disallowed + " 不在分析范围内。请只查询目标股票: " + allowedStockCodes;
                     log.info("[MaxToolCallManager] 股票范围守卫拦截: 请求={}, 允许={}", requestedCodes, allowedStockCodes);
+                    DebugFileLogger.logGuard("STOCK_SCOPE", tc.name(), "BLOCKED | wrong code: " + disallowed);
                     List<Message> skipHistory = buildSkipResult(tc, scopeMsg);
                     return new CachedToolExecutionResult(skipHistory);
                 }
@@ -243,6 +264,7 @@ public class MaxToolCallManager implements ToolCallingManager {
                     String injected = injectStockCode(tc.arguments(), tc.name(), targetCode);
                     if (!injected.equals(tc.arguments())) {
                         log.info("[MaxToolCallManager] 自动注入 stockCode={}: {} → {}", targetCode, tc.arguments(), injected);
+                        DebugFileLogger.logGuard("STOCK_SCOPE", tc.name(), "AUTO_INJECT | code=" + targetCode);
                         tc = new AssistantMessage.ToolCall(tc.id(), tc.type(), tc.name(), injected);
                     }
                 }
@@ -284,13 +306,16 @@ public class MaxToolCallManager implements ToolCallingManager {
                         .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日"));
                 String header = "【数据归属：" + stockLabel + " | 当前日期：" + today
                         + " | 禁止用于其他标的或日期的分析】\n";
-                result = prependToResult(result, tc, header);
+                String footer = "\n⚠️ 以上数据属于 " + stockLabel + "，请基于此数据分析该标的，禁止分析其他标的。";
+                result = wrapToResult(result, tc, header, footer);
                 resultText = extractResultText(result);
             }
 
             // Data pollution hard filter: remove non-target stock data from tool results
             if (allowedStockCodes != null && !allowedStockCodes.isEmpty() && isAStockTool(tc.name())) {
                 java.util.Set<String> foreignCodes = extractForeignStockCodes(resultText, allowedStockCodes);
+                DebugFileLogger.logGuard("DATA_POLLUTION", tc.name(),
+                        "allowedCodes=" + allowedStockCodes + " | foreignCodes=" + foreignCodes + " | resultLen=" + resultText.length());
                 if (!foreignCodes.isEmpty()) {
                     log.info("[MaxToolCallManager] 检测到非目标标的数据，执行硬过滤: {}", foreignCodes);
                     result = filterToolResult(result, tc, resultText, allowedStockCodes, foreignCodes);
@@ -630,6 +655,23 @@ public class MaxToolCallManager implements ToolCallingManager {
                 for (ToolResponseMessage.ToolResponse r : toolMsg.getResponses()) {
                     newResponses.add(new ToolResponseMessage.ToolResponse(
                             r.id(), r.name(), header + r.responseData()));
+                }
+                history.set(history.size() - 1, new ToolResponseMessage(newResponses));
+            }
+        }
+        return new CachedToolExecutionResult(history);
+    }
+
+    private ToolExecutionResult wrapToResult(ToolExecutionResult original,
+                                              AssistantMessage.ToolCall tc, String header, String footer) {
+        List<Message> history = new ArrayList<>(original.conversationHistory());
+        if (!history.isEmpty()) {
+            Message last = history.get(history.size() - 1);
+            if (last instanceof ToolResponseMessage toolMsg) {
+                List<ToolResponseMessage.ToolResponse> newResponses = new ArrayList<>();
+                for (ToolResponseMessage.ToolResponse r : toolMsg.getResponses()) {
+                    newResponses.add(new ToolResponseMessage.ToolResponse(
+                            r.id(), r.name(), header + r.responseData() + footer));
                 }
                 history.set(history.size() - 1, new ToolResponseMessage(newResponses));
             }

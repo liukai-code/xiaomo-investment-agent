@@ -3,6 +3,9 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+# 调试日志
+docs/agent-debug.log
+
 ### STS ###
 .apt_generated
 .classpath

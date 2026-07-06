@@ -45,6 +45,7 @@ import org.springframework.stereotype.Service;
 import com.itlk.myclaudecode.tool.config.ToolCallbackContextWrapper;
 import com.itlk.myclaudecode.tool.config.ToolConfigService;
 import com.itlk.myclaudecode.tool.config.ToolEnabledCheckWrapper;
+import com.itlk.myclaudecode.common.util.DebugFileLogger;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
@@ -191,6 +192,7 @@ public class AgentLoopImpl implements AgentLoop {
         chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
 
         ResolvedTarget target = resolveStockFromMessage(message);
+        DebugFileLogger.logBuildContext("CHAT_SYNC", "message=\"" + message + "\" | target=" + (target != null ? target.code() + "(" + target.name() + ")" : "null"));
         List<Message> context = buildContext(conversation.getId(), userId, target);
 
         Long convId = conversation.getId();
@@ -269,6 +271,7 @@ public class AgentLoopImpl implements AgentLoop {
         chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
 
         ResolvedTarget target = resolveStockFromMessage(message);
+        DebugFileLogger.logBuildContext("CHAT_STREAM", "message=\"" + message + "\" | target=" + (target != null ? target.code() + "(" + target.name() + ")" : "null"));
         List<Message> context = buildContext(conversation.getId(), userId, target);
         Long convId = conversation.getId();
 
@@ -459,24 +462,34 @@ public class AgentLoopImpl implements AgentLoop {
     private record ResolvedTarget(String code, String name) {}
 
     private ResolvedTarget resolveStockFromMessage(String message) {
+        DebugFileLogger.logResolveStock("START", message, "-");
         if (message == null || message.isBlank()) return null;
 
         // 1. 快速路径：6位数字代码
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\b(\\d{6})\\b").matcher(message);
         if (m.find()) {
             log.info("[ChatStream] 从消息中提取到数字代码: {}", m.group(1));
+            DebugFileLogger.logResolveStock("CODE_EXTRACT", message, m.group(1));
             return new ResolvedTarget(m.group(1), null);
         }
 
         // 2. 意图检测：含分析类关键词才尝试解析
         String[] kws = {"深入分析", "深度分析", "全面分析", "详细分析", "深度研究", "深度调研",
                 "深度剖析", "深入研究", "全面研究", "详细研究", "个股分析", "个股研究",
-                "分析", "研究", "调研", "估值", "行情", "股价", "怎么样", "如何", "可以买", "看好", "研报"};
+                "帮我分析", "帮我看看", "帮我研究", "分析一下", "研究一下",
+                "分析", "研究", "调研", "估值", "行情", "股价", "怎么样", "如何",
+                "值得入手吗", "值得买吗", "可以买吗", "可以入手吗", "能买吗",
+                "值得投资吗", "值得持有吗", "现在能买吗", "现在可以买吗", "目前怎么样",
+                "可以买", "看好", "看好吗", "有前途吗", "前景如何", "还能涨吗", "还能买吗",
+                "研报", "现在", "目前"};
         boolean match = false;
         for (String kw : kws) {
             if (message.contains(kw)) { match = true; break; }
         }
-        if (!match) return null;
+        if (!match) {
+            DebugFileLogger.logResolveStock("NO_INTENT_KEYWORD", message, "null");
+            return null;
+        }
 
         // 3. 剥离意图关键词，避免 StockResolver 把"分析"当作股票名称
         String cleaned = message;
@@ -484,17 +497,23 @@ public class AgentLoopImpl implements AgentLoop {
             cleaned = cleaned.replace(kw, "");
         }
         cleaned = cleaned.replaceAll("[，。？！、\\s]+", "").trim();
-        if (cleaned.isEmpty()) return null;
+        if (cleaned.isEmpty()) {
+            DebugFileLogger.logResolveStock("CLEANED_EMPTY", message, "null");
+            return null;
+        }
 
         log.info("[ChatStream] 关键词剥离后: \"{}\" → \"{}\"", message, cleaned);
+        DebugFileLogger.logResolveStock("KEYWORD_STRIPPED", message, cleaned);
 
         // 4. 复用 StockResolver 解析股票名称
         try {
             var r = StockResolver.resolve(cleaned, httpClientService);
             log.info("[ChatStream] 标的解析成功: {}({})", r.name(), r.code());
+            DebugFileLogger.logResolveStock("RESOLVED", cleaned, r.code() + "(" + r.name() + ")");
             return new ResolvedTarget(r.code(), r.name());
         } catch (IllegalArgumentException e) {
-            log.debug("[ChatStream] 标的解析跳过: {}", e.getMessage());
+            log.warn("[ChatStream] 标的解析失败: {}", e.getMessage());
+            DebugFileLogger.logResolveStock("RESOLVE_FAILED", cleaned, e.getMessage());
             return null;
         }
     }
@@ -514,6 +533,7 @@ public class AgentLoopImpl implements AgentLoop {
             String stockLabel = target.name() != null
                     ? target.name() + "（" + target.code() + "）"
                     : target.code();
+            DebugFileLogger.logBuildContext("TARGET_LOCKED", stockLabel);
             enrichedPrompt += "\n\n[当前分析标的]\n"
                     + "标的已锁定为：" + stockLabel + "\n"
                     + "⚠️ 你必须严格遵守以下约束：\n"
@@ -522,6 +542,8 @@ public class AgentLoopImpl implements AgentLoop {
                     + "3. 如果工具返回包含其他股票的数据，必须忽略，只关注 " + stockLabel + " 的数据\n"
                     + "4. 输出报告的标题、数据、结论必须与 " + stockLabel + " 完全一致\n"
                     + "5. 禁止出现用户问A你分析B的情况";
+        } else {
+            DebugFileLogger.logBuildContext("NO_TARGET", "标的解析失败或未触发，未设置标的锁");
         }
 
         context.add(new SystemMessage(enrichedPrompt));
@@ -539,6 +561,17 @@ public class AgentLoopImpl implements AgentLoop {
                 case USER -> context.add(new UserMessage(msg.getContent()));
                 case ASSISTANT -> context.add(new AssistantMessage(msg.getContent()));
             }
+        }
+
+        // 标的锁定期：在上下文末尾追加强提醒，防止模型在多轮工具调用后"忘记"分析目标
+        if (target != null) {
+            String stockLabel = target.name() != null
+                    ? target.name() + "（" + target.code() + "）"
+                    : target.code();
+            context.add(new UserMessage(
+                    "⚠️ 重要提醒：你当前正在分析的标的是 " + stockLabel + "。"
+                    + "请基于以上工具返回的数据生成分析报告，报告标题和所有内容必须严格对应 " + stockLabel + "。"
+                    + "禁止出现任何其他股票的名称或代码。如果之前的对话中提到了其他标的，必须完全忽略。"));
         }
 
         return context;
