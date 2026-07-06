@@ -429,6 +429,25 @@ public class FinancialCalcTool {
 
     // ==================== D. 投资决策 ====================
 
+    /**
+     * 解析现金流参数，支持 JSON 数组格式 [-10000,3000,4000] 和逗号分隔格式 "-10000,3000,4000"
+     */
+    private String[] parseCashFlows(String cashFlows) {
+        if (cashFlows == null || cashFlows.isBlank()) {
+            throw new IllegalArgumentException("现金流参数不能为空");
+        }
+        String trimmed = cashFlows.trim();
+        // JSON 数组格式
+        if (trimmed.startsWith("[")) {
+            trimmed = trimmed.substring(1, trimmed.length() - 1);
+        }
+        String[] parts = trimmed.split(",");
+        if (parts.length == 0) {
+            throw new IllegalArgumentException("现金流数组不能为空");
+        }
+        return parts;
+    }
+
     @Tool(description = "净现值（NPV）计算。当用户评估一个投资项目是否值得、比较不同投资方案时调用。NPV>0表示值得投资。")
     public String npv(
             @ToolParam(description = "折现率（如0.1表示10%）") double discountRate,
@@ -436,7 +455,7 @@ public class FinancialCalcTool {
         log.info("[FinancialCalcTool] npv 入参: discountRate={}, cashFlows={}", discountRate, cashFlows);
         try {
             BigDecimal rate = BigDecimal.valueOf(discountRate);
-            String[] parts = cashFlows.split(",");
+            String[] parts = parseCashFlows(cashFlows);
             BigDecimal npvValue = BigDecimal.ZERO;
             StringBuilder breakdown = new StringBuilder();
 
@@ -470,7 +489,7 @@ public class FinancialCalcTool {
             @ToolParam(description = "现金流数组，第一个通常为负数表示初始投入，用逗号分隔，如'-10000,3000,4000,5000,6000'") String cashFlows) {
         log.info("[FinancialCalcTool] irr 入参: cashFlows={}", cashFlows);
         try {
-            String[] parts = cashFlows.split(",");
+            String[] parts = parseCashFlows(cashFlows);
             double[] cf = new double[parts.length];
             for (int i = 0; i < parts.length; i++) {
                 cf[i] = Double.parseDouble(parts[i].trim());
