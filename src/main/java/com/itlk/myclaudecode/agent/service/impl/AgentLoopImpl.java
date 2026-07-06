@@ -638,6 +638,8 @@ public class AgentLoopImpl implements AgentLoop {
         return text
                 .replaceAll("\\n*\\[GUARD:[\\s\\S]*?\\[/GUARD]\\n*", "")
                 .replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "")
+                // 过滤 AI 模型以文本形式输出的工具调用 JSON
+                .replaceAll("(?m)^\\s*\\{\"name\"\\s*:\\s*\"[^\"]+\"\\s*,\\s*\"arguments\"\\s*:\\s*\\{[\\s\\S]*?\\}\\s*\\}\\s*$", "")
                 .trim();
     }
 
