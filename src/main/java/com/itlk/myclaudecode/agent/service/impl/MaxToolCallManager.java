@@ -136,18 +136,12 @@ public class MaxToolCallManager implements ToolCallingManager {
         }
         ToolExecutionResult result;
 
-        // 硬限制检查：如果已超过最大轮次或 fetch 上限，直接阻止所有工具调用
+        // 硬限制检查：迭代硬上限阻止所有工具调用；fetch 硬上限只阻止 fetch 类工具
         boolean overMaxIterations = step > effectiveMaxIterations;
         boolean overMaxFetch = fetchTracker != null && fetchTracker.isOverMaxFetches();
-        if (overMaxIterations || overMaxFetch) {
-            String blockMsg;
-            if (overMaxFetch) {
-                blockMsg = "[GUARD: FORCE]\nAction: 已达到最大抓取次数限制，必须立即停止所有工具调用。\nContext: step=" + step + "/" + effectiveMaxIterations + ", fetch=over\n[/GUARD]\n\n你已经没有可用的工具调用次数了。请直接基于已获取的数据完成分析报告，输出完整内容。不要再请求任何工具。";
-                log.warn("[MaxToolCallManager] 已超过 fetch 硬上限, 阻止工具调用");
-            } else {
-                blockMsg = "[GUARD: FORCE]\nAction: 已达到最大工具调用轮次限制，必须立即停止所有工具调用。\nContext: step=" + step + "/" + effectiveMaxIterations + "\n[/GUARD]\n\n你已经没有可用的工具调用次数了。请直接基于已获取的数据完成分析报告，输出完整内容。不要再请求任何工具。";
-                log.warn("[MaxToolCallManager] 已超过迭代硬上限 ({}/{}), 阻止工具调用", step, effectiveMaxIterations);
-            }
+        if (overMaxIterations) {
+            String blockMsg = "[GUARD: FORCE]\nAction: 已达到最大工具调用轮次限制，必须立即停止所有工具调用。\nContext: step=" + step + "/" + effectiveMaxIterations + "\n[/GUARD]\n\n你已经没有可用的工具调用次数了。请直接基于已获取的数据完成分析报告，输出完整内容。不要再请求任何工具。";
+            log.warn("[MaxToolCallManager] 已超过迭代硬上限 ({}/{}), 阻止工具调用", step, effectiveMaxIterations);
             List<Message> blockHistory = new ArrayList<>();
             blockHistory.add(assistantWithTools);
             List<ToolResponseMessage.ToolResponse> blockResponses = new ArrayList<>();
@@ -156,6 +150,23 @@ public class MaxToolCallManager implements ToolCallingManager {
             }
             blockHistory.add(new ToolResponseMessage(blockResponses));
             return new CachedToolExecutionResult(blockHistory);
+        }
+        if (overMaxFetch) {
+            boolean allFetchTools = toolCalls.stream().allMatch(tc -> isFetchTool(tc.name()));
+            if (allFetchTools) {
+                String blockMsg = "[GUARD: FORCE]\nAction: 已达到最大抓取次数限制，禁止继续抓取。\nContext: step=" + step + "/" + effectiveMaxIterations + ", fetch=over\n[/GUARD]\n\n抓取次数已达上限，请使用已获取的数据完成分析，不要再调用抓取工具。";
+                log.warn("[MaxToolCallManager] 已超过 fetch 硬上限, 阻止 fetch 工具调用");
+                List<Message> blockHistory = new ArrayList<>();
+                blockHistory.add(assistantWithTools);
+                List<ToolResponseMessage.ToolResponse> blockResponses = new ArrayList<>();
+                for (AssistantMessage.ToolCall tc : toolCalls) {
+                    blockResponses.add(new ToolResponseMessage.ToolResponse(tc.id(), tc.name(), blockMsg));
+                }
+                blockHistory.add(new ToolResponseMessage(blockResponses));
+                return new CachedToolExecutionResult(blockHistory);
+            }
+            // 非 fetch 工具不受 fetch 上限限制，继续执行
+            log.info("[MaxToolCallManager] fetch 硬上限已达，但当前工具非 fetch 类，允许继续执行");
         }
 
         // 同工具调用次数限制：防止同一工具被无限循环调用
@@ -680,53 +691,75 @@ public class MaxToolCallManager implements ToolCallingManager {
     }
 
     /**
-     * 从工具返回文本中提取所有 6 位股票代码，过滤掉允许范围内的，返回"外来"代码
+     * 从工具返回文本中识别外来股票代码，过滤掉允许范围内的。
+     * 只识别带 sh/sz/bj 前缀或紧跟中文股票名的代码，避免把资金流数值误判为股票代码。
      */
     private java.util.Set<String> extractForeignStockCodes(String text, java.util.Set<String> allowedCodes) {
         java.util.Set<String> foreign = new java.util.HashSet<>();
         if (text == null || text.isBlank()) return foreign;
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\b(\\d{6})\\b").matcher(text);
-        while (m.find()) {
-            String code = m.group(1);
+
+        // 模式1: sh600487 / sz000858 / bj830799 带交易所前缀
+        java.util.regex.Matcher m1 = java.util.regex.Pattern.compile("(?i)(?:sh|sz|bj)(\\d{6})").matcher(text);
+        while (m1.find()) {
+            String code = m1.group(1);
             if (!allowedCodes.contains(code)) {
                 foreign.add(code);
             }
         }
+
+        // 模式2: 6位数字后紧跟中文字符（股票名称），如 "601869长飞光纤"
+        java.util.regex.Matcher m2 = java.util.regex.Pattern.compile("(\\d{6})[\\u4e00-\\u9fff]").matcher(text);
+        while (m2.find()) {
+            String code = m2.group(1);
+            if (isValidAShareCode(code) && !allowedCodes.contains(code)) {
+                foreign.add(code);
+            }
+        }
+
         return foreign;
     }
 
     /**
-     * 硬过滤工具返回结果：移除非目标标的的数据行，替换为占位符。
-     * 对每一行检查是否包含外来股票代码，若包含则移除该行。
+     * 判断是否为合法的A股代码格式（0/3/6 开头的6位数字）
+     */
+    private boolean isValidAShareCode(String code) {
+        return code.startsWith("0") || code.startsWith("3") || code.startsWith("6");
+    }
+
+    /**
+     * 硬过滤工具返回结果：将外来股票代码及关联的股票名替换为占位符，保留行内其他有用数据。
      */
     private ToolExecutionResult filterToolResult(ToolExecutionResult original,
                                                   AssistantMessage.ToolCall tc,
                                                   String resultText,
                                                   java.util.Set<String> allowedCodes,
                                                   java.util.Set<String> foreignCodes) {
-        String[] lines = resultText.split("\\n");
-        StringBuilder filtered = new StringBuilder();
-        int removedCount = 0;
-        for (String line : lines) {
-            boolean containsForeign = false;
-            for (String code : foreignCodes) {
-                if (line.contains(code)) {
-                    containsForeign = true;
-                    break;
-                }
-            }
-            if (containsForeign) {
-                removedCount++;
-                // 跳过该行（硬删除）
-            } else {
-                filtered.append(line).append("\n");
+        String filtered = resultText;
+        int replacementCount = 0;
+        for (String code : foreignCodes) {
+            // 替换 "代码+中文股票名" 模式，如 "601869长飞光纤" → "[非目标标的]"
+            String codeNamePattern = code + "[\\u4e00-\\u9fff]{2,8}";
+            java.util.regex.Matcher m1 = java.util.regex.Pattern.compile(codeNamePattern).matcher(filtered);
+            while (m1.find()) replacementCount++;
+            filtered = filtered.replaceAll(codeNamePattern, "[非目标标的]");
+
+            // 替换 "sh/sz/bj+代码" 模式
+            String prefixPattern = "(?i)(?:sh|sz|bj)" + code;
+            java.util.regex.Matcher m2 = java.util.regex.Pattern.compile(prefixPattern).matcher(filtered);
+            while (m2.find()) replacementCount++;
+            filtered = filtered.replaceAll(prefixPattern, "[非目标标的]");
+
+            // 替换孤立的合法代码（仅限 0/3/6 开头）
+            if (isValidAShareCode(code)) {
+                java.util.regex.Matcher m3 = java.util.regex.Pattern.compile("\\b" + code + "\\b").matcher(filtered);
+                while (m3.find()) replacementCount++;
+                filtered = filtered.replaceAll("\\b" + code + "\\b", "[非目标标的]");
             }
         }
-        if (removedCount > 0) {
-            filtered.append("\n[已过滤 ").append(removedCount).append(" 条非目标标的（")
-                    .append(foreignCodes).append("）的数据，当前分析标的为 ").append(allowedCodes).append("]");
+        if (replacementCount > 0) {
+            filtered += "\n\n[已替换 " + replacementCount + " 处非目标标的数据，当前分析标的为 " + allowedCodes + "]";
         }
-        log.info("[MaxToolCallManager] 硬过滤完成: 移除 {} 行外来数据", removedCount);
+        log.info("[MaxToolCallManager] 硬过滤完成: 替换 {} 处外来数据", replacementCount);
 
         List<Message> history = new ArrayList<>(original.conversationHistory());
         if (!history.isEmpty()) {
@@ -735,7 +768,7 @@ public class MaxToolCallManager implements ToolCallingManager {
                 List<ToolResponseMessage.ToolResponse> newResponses = new ArrayList<>();
                 for (ToolResponseMessage.ToolResponse r : toolMsg.getResponses()) {
                     newResponses.add(new ToolResponseMessage.ToolResponse(
-                            r.id(), r.name(), filtered.toString()));
+                            r.id(), r.name(), filtered));
                 }
                 history.set(history.size() - 1, new ToolResponseMessage(newResponses));
             }

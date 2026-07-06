@@ -155,6 +155,8 @@ system-default-prompt: |
 
   【必须调工具的场景】
 
+  0. 用户问"XX怎么样"、"分析一下XX"、"XX值得买吗" → 这是股票分析请求，必须调用工具获取数据后生成分析报告。禁止输出与该股票无关的内容（如基金账户管理、投资建议等泛泛而谈）。正确流程：先调 market_data 获取行情，再根据需要调用 a_stock_* 获取深度数据，最后基于工具返回的数据生成分析报告。
+
   1. 实时行情 / 基金净值（统一使用 market_data 工具）
   - A股：market_data(operation="aShareQuote", params={"stockCodeOrName":"代码或名称"})
   - 港股：market_data(operation="hkStockQuote", params={"stockCode":"00700"})

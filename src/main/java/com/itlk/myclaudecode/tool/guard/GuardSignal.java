@@ -31,7 +31,8 @@ public record GuardSignal(
     }
 
     public SignalLevel getLevel() {
-        if (currentStep >= hardLimit || overMaxFetches) return SignalLevel.FORCE;
+        if (currentStep >= hardLimit) return SignalLevel.FORCE;
+        if (overMaxFetches && isFetchTool) return SignalLevel.FORCE;
         if (currentStep >= escalationFinal) return SignalLevel.CRITICAL;
         if (currentStep >= escalationWarning
                 || infoGain == InfoGainLevel.LOW
@@ -76,11 +77,11 @@ public record GuardSignal(
         switch (level) {
             case FORCE:
                 if (overMaxFetches) {
-                    return "已达到最大抓取次数(" + maxFetches + "次)，必须基于已有内容直接回答用户。不要再调用任何fetch工具。";
+                    return "已达到最大抓取次数(" + maxFetches + "次)。你已经通过工具获取了足够的数据，请立即基于工具返回的行情、研报、资金面等数据生成分析报告。禁止输出与分析标的无关的内容。";
                 }
-                return "已达到硬上限，必须基于已有结果直接回答用户。";
+                return "已达到硬上限。请基于已获取的工具数据生成分析报告，禁止输出与分析标的无关的内容。";
             case CRITICAL:
-                return "即将达到硬上限，请立即停止工具调用，基于已有数据完成分析。";
+                return "即将达到硬上限，请停止工具调用，基于已获取的数据完成分析报告。";
             case WARNING:
                 if (repetition == RepetitionResult.STUCK_IDENTICAL) {
                     return "检测到重复调用相同工具和参数，请换一种方式或基于已有结果回答。";
