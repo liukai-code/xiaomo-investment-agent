@@ -37,6 +37,8 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
@@ -97,6 +99,9 @@ public class AgentLoopImpl implements AgentLoop {
 
     @Resource
     private ObjectMapper objectMapper;
+
+    @Resource
+    private UsageRecordService usageRecordService;
 
     public AgentLoopImpl(ChatModel chatModel,
                          FileReadTool fileReadTool,
@@ -238,15 +243,30 @@ public class AgentLoopImpl implements AgentLoop {
                 .toList();
 
         try {
-            String response = chatClient.prompt()
+            ChatResponse chatResponse = chatClient.prompt()
                     .messages(context.toArray(new Message[0]))
                     .toolCallbacks(enabledTools.toArray(new ToolCallback[0]))
                     .options(options)
                     .call()
-                    .content();
+                    .chatResponse();
 
+            String response = chatResponse.getResult().getOutput().getText();
             String sanitized = sanitizeOutput(response);
             chatMessageService.saveMessage(conversation, MessageRole.ASSISTANT, sanitized, null, null);
+
+            // Record token usage
+            try {
+                Usage usage = chatResponse.getMetadata() != null ? chatResponse.getMetadata().getUsage() : null;
+                AtomicInteger toolCounter = (AtomicInteger) toolCtx.get(MaxToolCallManager.TOOL_CALL_COUNTER_KEY);
+                int toolCalls = toolCounter != null ? toolCounter.get() : 0;
+                Long inputTokens = usage != null && usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : estimateInputTokens(context);
+                Long outputTokens = usage != null && usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : null;
+                usageRecordService.record(userId, conversation.getId(), inputTokens, outputTokens, toolCalls);
+                log.info("[Chat] usage recorded: input={}, output={}, tools={}", inputTokens, outputTokens, toolCalls);
+            } catch (Exception e) {
+                log.warn("记录token用量失败: {}", e.getMessage());
+            }
+
             return sanitized;
         } finally {
             // userId 已通过 ToolContext 传递，无需清理 ConcurrentHashMap
@@ -336,15 +356,35 @@ public class AgentLoopImpl implements AgentLoop {
                         .data(toJson(event))
                         .build());
 
+        // Usage tracking accumulators
+        final Long[] lastInputTokens = {null};
+        final Long[] lastOutputTokens = {null};
+
         // 文本内容流 + done 事件
         Flux<ServerSentEvent<String>> contentWithDone = chatClient.prompt()
                 .messages(context.toArray(new Message[0]))
                 .toolCallbacks(enabledTools.toArray(new ToolCallback[0]))
                 .options(options)
                 .stream()
-                .content()
-                .map(delta -> {
-                    accumulated.append(delta);
+                .chatResponse()
+                .map(response -> {
+                    if (response.getResult() != null && response.getResult().getOutput() != null) {
+                        String text = response.getResult().getOutput().getText();
+                        if (text != null) {
+                            accumulated.append(text);
+                        }
+                    }
+                    // Capture usage from each response (last one wins)
+                    if (response.getMetadata() != null && response.getMetadata().getUsage() != null) {
+                        Usage usage = response.getMetadata().getUsage();
+                        if (usage.getPromptTokens() != null && usage.getPromptTokens() > 0) {
+                            lastInputTokens[0] = usage.getPromptTokens().longValue();
+                        }
+                        if (usage.getCompletionTokens() != null && usage.getCompletionTokens() > 0) {
+                            lastOutputTokens[0] = usage.getCompletionTokens().longValue();
+                        }
+                        log.debug("[ChatStream] chunk usage: input={}, output={}", usage.getPromptTokens(), usage.getCompletionTokens());
+                    }
                     return ServerSentEvent.<String>builder()
                             .event("content")
                             .data(sanitizeOutput(accumulated.toString()))
@@ -364,6 +404,17 @@ public class AgentLoopImpl implements AgentLoop {
                 .doOnComplete(() -> {
                     String fullResponse = sanitizeOutput(accumulated.toString());
                     chatMessageService.saveAssistantMessage(convId, fullResponse);
+                    // Record token usage
+                    try {
+                        AtomicInteger toolCounter = (AtomicInteger) streamToolCtx.get(MaxToolCallManager.TOOL_CALL_COUNTER_KEY);
+                        int toolCalls = toolCounter != null ? toolCounter.get() : 0;
+                        // Spring AI streaming doesn't aggregate input_tokens from Anthropic, estimate from context
+                        Long inputTokens = lastInputTokens[0] != null ? lastInputTokens[0] : estimateInputTokens(context);
+                        usageRecordService.record(userId, convId, inputTokens, lastOutputTokens[0], toolCalls);
+                        log.info("[ChatStream] usage recorded: input={}, output={}, tools={}", inputTokens, lastOutputTokens[0], toolCalls);
+                    } catch (Exception e) {
+                        log.warn("记录流式token用量失败: {}", e.getMessage());
+                    }
                 })
                 .timeout(Duration.ofSeconds(300))
                 .onErrorResume(e -> {
@@ -597,5 +648,20 @@ public class AgentLoopImpl implements AgentLoop {
             log.warn("序列化 ChatStreamEvent 失败: {}", e.getMessage());
             return "{}";
         }
+    }
+
+    /**
+     * 估算 input tokens：从上下文消息总字符数除以3.5（中英混合内容平均比率）。
+     * 用于 Spring AI 流式模式无法从 Anthropic 拿到 input_tokens 时的兜底。
+     */
+    private Long estimateInputTokens(List<Message> context) {
+        long totalChars = 0;
+        for (Message msg : context) {
+            String text = msg.getText();
+            if (text != null) {
+                totalChars += text.length();
+            }
+        }
+        return Math.max(1, totalChars * 10 / 35);  // chars / 3.5, integer math
     }
 }

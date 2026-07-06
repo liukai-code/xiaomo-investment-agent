@@ -4,6 +4,8 @@ import com.itlk.myclaudecode.common.entity.Result;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/user/config")
 public class ConfigController {
@@ -53,5 +55,15 @@ public class ConfigController {
 
         userConfigService.deleteConfig(userId);
         return Result.success();
+    }
+
+    @PostMapping("/test")
+    public Result<Map<String, Object>> testConnection(HttpServletRequest request,
+                                                       @RequestBody UserConfigDTO dto) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.error("用户未登录");
+        }
+        return userConfigService.testConnection(dto);
     }
 }

@@ -1,10 +1,19 @@
 package com.itlk.myclaudecode.user.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.itlk.myclaudecode.common.config.HttpClientService;
+import com.itlk.myclaudecode.common.entity.Result;
 import com.itlk.myclaudecode.common.util.EncryptionService;
+import okhttp3.MediaType;
+import okhttp3.Request;
+import okhttp3.RequestBody;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -17,13 +26,19 @@ public class UserConfigService {
     private final UserConfigRepository userConfigRepository;
     private final EncryptionService encryptionService;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final HttpClientService httpClientService;
+    private final ObjectMapper objectMapper;
 
     public UserConfigService(UserConfigRepository userConfigRepository,
                            EncryptionService encryptionService,
-                           RedisTemplate<String, Object> redisTemplate) {
+                           RedisTemplate<String, Object> redisTemplate,
+                           HttpClientService httpClientService,
+                           ObjectMapper objectMapper) {
         this.userConfigRepository = userConfigRepository;
         this.encryptionService = encryptionService;
         this.redisTemplate = redisTemplate;
+        this.httpClientService = httpClientService;
+        this.objectMapper = objectMapper;
     }
 
     public UserConfigDTO getConfig(Long userId) {
@@ -88,6 +103,82 @@ public class UserConfigService {
             return null;
         }
         return encryptionService.decrypt(optionalConfig.get().getApiKeyEncrypted());
+    }
+
+    public Result<Map<String, Object>> testConnection(UserConfigDTO dto) {
+        if (dto.getApiKey() == null || dto.getApiKey().isEmpty()) {
+            return Result.error("API Key 不能为空");
+        }
+
+        String apiKey = dto.getApiKey();
+
+        String baseUrl = dto.getBaseUrl();
+        if (baseUrl == null || baseUrl.isEmpty()) {
+            baseUrl = "https://api.anthropic.com";
+        }
+        if (baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        }
+
+        String modelName = dto.getModelName();
+        if (modelName == null || modelName.isEmpty()) {
+            modelName = "claude-3-sonnet-20240229";
+        }
+
+        String url = baseUrl + "/v1/messages";
+        String requestBody;
+        try {
+            requestBody = objectMapper.writeValueAsString(Map.of(
+                    "model", modelName,
+                    "max_tokens", 1,
+                    "messages", List.of(Map.of("role", "user", "content", "hi"))
+            ));
+        } catch (Exception e) {
+            return Result.error("请求构建失败");
+        }
+
+        try {
+            Request request = new Request.Builder()
+                    .url(url)
+                    .addHeader("x-api-key", apiKey)
+                    .addHeader("anthropic-version", "2023-06-01")
+                    .addHeader("content-type", "application/json")
+                    .post(RequestBody.create(requestBody, MediaType.parse("application/json")))
+                    .build();
+
+            long startTime = System.currentTimeMillis();
+            String responseBody = httpClientService.execute(request);
+            long latency = System.currentTimeMillis() - startTime;
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("latencyMs", latency);
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> responseMap = objectMapper.readValue(responseBody, Map.class);
+                if (responseMap.containsKey("model")) {
+                    result.put("model", responseMap.get("model"));
+                }
+            } catch (Exception ignored) {
+            }
+
+            return Result.success(result);
+        } catch (Exception e) {
+            return Result.error(parseConnectionError(e));
+        }
+    }
+
+    private String parseConnectionError(Exception e) {
+        String msg = e.getMessage();
+        if (msg == null) msg = e.toString();
+        if (msg.contains("401") || msg.contains("Unauthorized")) return "API Key 无效或已过期";
+        if (msg.contains("403") || msg.contains("Forbidden")) return "API Key 权限不足";
+        if (msg.contains("404") || msg.contains("Not Found")) return "API 端点不存在，请检查 Base URL";
+        if (msg.contains("429") || msg.contains("Too Many Requests")) return "请求过于频繁，请稍后重试";
+        if (msg.contains("ConnectException")) return "无法连接到服务器，请检查 Base URL 和网络";
+        if (msg.contains("SocketTimeoutException")) return "连接超时，请检查网络";
+        if (msg.contains("UnknownHostException")) return "无法解析域名，请检查 Base URL";
+        return "连接失败: " + msg;
     }
 
     private UserConfigDTO getCachedConfig(String redisKey) {

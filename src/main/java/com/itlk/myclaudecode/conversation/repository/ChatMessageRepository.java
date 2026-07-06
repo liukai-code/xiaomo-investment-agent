@@ -12,4 +12,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 
     @Query("SELECT m FROM ChatMessage m WHERE m.conversation.id = :convId ORDER BY m.id DESC LIMIT :limit")
     List<ChatMessage> findRecentByConversationId(@Param("convId") Long conversationId, @Param("limit") int limit);
+
+    @Query("SELECT COUNT(m) FROM ChatMessage m WHERE m.conversation.userId = :userId")
+    Long countByUserId(@Param("userId") Long userId);
 }
