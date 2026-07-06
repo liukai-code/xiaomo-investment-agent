@@ -6,10 +6,9 @@ import {
   saveYjbToken,
   checkYjbStatus,
   getFundValuations,
-  getMarketRanking,
   getDayInfo,
 } from '@/api/yangjibao'
-import type { UserAccount, AccountCollect, FundHoldItem, IndexData, FundValuation, MarketRankingItem, DayInfo } from '@/types/yangjibao'
+import type { UserAccount, AccountCollect, FundHoldItem, IndexData, FundValuation, DayInfo } from '@/types/yangjibao'
 
 export const useYangjibaoStore = defineStore('yangjibao', () => {
   const yjbLoggedIn = ref(false)
@@ -20,7 +19,6 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
   const fundHoldings = ref<FundHoldItem[]>([])
   const fundValuations = ref<FundValuation[]>([])
   const indexData = ref<IndexData[]>([])
-  const marketRanking = ref<MarketRankingItem[]>([])
   const dayInfo = ref<DayInfo | null>(null)
 
   const loading = ref(false)
@@ -35,7 +33,6 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
     fundHoldings.value = []
     fundValuations.value = []
     indexData.value = []
-    marketRanking.value = []
     dayInfo.value = null
   }
 
@@ -89,7 +86,6 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
     fundHoldings.value = []
     fundValuations.value = []
     indexData.value = []
-    marketRanking.value = []
     dayInfo.value = null
     try {
       const [idxData, syncResult] = await Promise.all([
@@ -107,11 +103,8 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
       const fundIds = syncResult.holdings.map(h => h.fund_id)
       getFundValuations(fundIds).then(v => { fundValuations.value = v })
 
-      // 行情中心数据（并行请求，不阻塞主流程）
-      Promise.all([getMarketRanking(), getDayInfo()]).then(([ranking, info]) => {
-        marketRanking.value = ranking
-        dayInfo.value = info
-      })
+      // 行情中心数据（不阻塞主流程）
+      getDayInfo().then(info => { dayInfo.value = info })
     } catch (err) {
       console.error('养基宝数据加载失败', err)
     } finally {
@@ -140,7 +133,7 @@ export const useYangjibaoStore = defineStore('yangjibao', () => {
 
   return {
     yjbLoggedIn, accounts, selectedAccountId,
-    accountCollect, fundHoldings, fundValuations, indexData, marketRanking, dayInfo,
+    accountCollect, fundHoldings, fundValuations, indexData, dayInfo,
     loading, cardVisible, qrModalVisible,
     openCard, onQrLoginSuccess, logout,
     loadAllData, loadAccountData, switchAccount, clearYjbAuth, checkLogin,

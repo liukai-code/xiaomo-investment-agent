@@ -2,7 +2,6 @@
 import { ref } from 'vue'
 import { useYangjibaoStore } from '@/stores/yangjibao'
 import IndexQuotes from './IndexQuotes.vue'
-import MarketRanking from './MarketRanking.vue'
 import AccountSummary from './AccountSummary.vue'
 import FundHoldings from './FundHoldings.vue'
 import { TrendingUp, RefreshCw, X, Loader2 } from 'lucide-vue-next'
@@ -95,9 +94,6 @@ function handleClose() {
           </div>
           <div class="yjb-card-section">
             <IndexQuotes :data="yjbStore.indexData" />
-          </div>
-          <div class="yjb-card-section">
-            <MarketRanking :data="yjbStore.marketRanking" />
           </div>
         </div>
       </Transition>

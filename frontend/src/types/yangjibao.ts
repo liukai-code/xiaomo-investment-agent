@@ -50,11 +50,6 @@ export interface FundValuation {
   jzrq: string       // 净值日期
 }
 
-export interface MarketRankingItem {
-  name: string       // 板块名称
-  change_rate: number // 涨跌幅 (%)
-}
-
 export interface DayInfo {
   day: string
   is_market_day: boolean

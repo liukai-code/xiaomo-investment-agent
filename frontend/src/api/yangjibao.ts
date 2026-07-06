@@ -1,6 +1,6 @@
 import axios from 'axios'
 import request from './request'
-import type { QrCode, QrCodeState, UserAccount, AccountCollect, FundHoldItem, IndexData, FundValuation, MarketRankingItem, DayInfo } from '@/types/yangjibao'
+import type { QrCode, QrCodeState, UserAccount, AccountCollect, FundHoldItem, IndexData, FundValuation, DayInfo } from '@/types/yangjibao'
 
 const marketClient = axios.create({
   baseURL: '/yjb-market-api',
@@ -94,22 +94,6 @@ export async function getFundValuations(fundIds: string[]): Promise<FundValuatio
     }))
   } catch (err) {
     console.warn('[YJB] 基金估值接口请求失败:', err)
-    return []
-  }
-}
-
-export async function getMarketRanking(): Promise<MarketRankingItem[]> {
-  try {
-    const resp = await marketClient.get('/market/v1/market-ranking/list')
-    const body = resp.data
-    if (body.code !== 200) return []
-    const data = body.data
-    if (!Array.isArray(data)) return []
-    return data.map((item: any) => ({
-      name: String(item.name ?? item.short_name ?? ''),
-      change_rate: Number(item.change_rate ?? item.rate ?? item.dir ?? 0),
-    }))
-  } catch {
     return []
   }
 }

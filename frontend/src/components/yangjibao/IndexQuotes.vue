@@ -61,7 +61,7 @@ function formatDir(dir: number): string {
 }
 
 .quotes-viewport {
-  height: 148px;
+  height: 280px;
   overflow: hidden;
   border-radius: 10px;
 }
