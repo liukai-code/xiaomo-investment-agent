@@ -210,8 +210,8 @@ const menus = [
 
 const presetModels = [
   'mimo-v2.5-pro',
-  'claude-3-opus',
-  'claude-3-sonnet',
+  'claude-opus-4-7',
+  'claude-sonnet-4-6',
   'gpt-4o',
   'gpt-4-turbo',
 ];

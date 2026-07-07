@@ -84,6 +84,23 @@ public class AgentLoopImpl implements AgentLoop {
     private final UserConfigService userConfigService;
     private List<ToolCallback> allWrappedCallbacks;
 
+    /**
+     * 根据用户配置解析对应的 ChatClient。
+     * 用户有自定义 API Key 配置时，使用用户级 ChatModel；否则使用全局默认。
+     */
+    private ChatClient resolveChatClient(Long userId) {
+        try {
+            ChatModel userChatModel = userConfigService.getUserChatModel(userId);
+            if (userChatModel != null) {
+                log.info("[resolveChatClient] 使用用户自定义配置, userId={}", userId);
+                return ChatClient.builder(userChatModel).build();
+            }
+        } catch (Exception e) {
+            log.warn("[resolveChatClient] 创建用户级 ChatClient 失败, 回退全局配置, userId={}: {}", userId, e.getMessage());
+        }
+        return this.chatClient;
+    }
+
     @Resource
     private UserRepository userRepository;
 
@@ -255,7 +272,8 @@ public class AgentLoopImpl implements AgentLoop {
         }
 
         try {
-            ChatResponse chatResponse = chatClient.prompt()
+            ChatClient activeChatClient = resolveChatClient(userId);
+            ChatResponse chatResponse = activeChatClient.prompt()
                     .messages(context.toArray(new Message[0]))
                     .toolCallbacks(enabledTools.toArray(new ToolCallback[0]))
                     .options(options)
@@ -380,7 +398,8 @@ public class AgentLoopImpl implements AgentLoop {
         final Long[] lastOutputTokens = {null};
 
         // 文本内容流 + done 事件
-        Flux<ServerSentEvent<String>> contentWithDone = chatClient.prompt()
+        ChatClient activeChatClient = resolveChatClient(userId);
+        Flux<ServerSentEvent<String>> contentWithDone = activeChatClient.prompt()
                 .messages(context.toArray(new Message[0]))
                 .toolCallbacks(enabledTools.toArray(new ToolCallback[0]))
                 .options(options)

@@ -7,6 +7,9 @@ import com.itlk.myclaudecode.common.util.EncryptionService;
 import okhttp3.MediaType;
 import okhttp3.Request;
 import okhttp3.RequestBody;
+import org.springframework.ai.anthropic.AnthropicChatModel;
+import org.springframework.ai.anthropic.api.AnthropicApi;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,7 +20,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
+import lombok.extern.slf4j.Slf4j;
+
 @Service
+@Slf4j
 public class UserConfigService {
 
     private static final String REDIS_KEY_PREFIX = "user:config:";
@@ -103,6 +109,54 @@ public class UserConfigService {
             return null;
         }
         return encryptionService.decrypt(optionalConfig.get().getApiKeyEncrypted());
+    }
+
+    /**
+     * 基于用户配置创建 ChatModel，用于 Per-User API Key 路由。
+     * 若用户无自定义配置，返回 null（调用方应使用全局默认 ChatModel）。
+     */
+    public ChatModel getUserChatModel(Long userId) {
+        Optional<UserConfig> optionalConfig = userConfigRepository.findByUserId(userId);
+        if (optionalConfig.isEmpty()) {
+            return null;
+        }
+
+        UserConfig config = optionalConfig.get();
+        if (config.getApiKeyEncrypted() == null || config.getApiKeyEncrypted().isEmpty()) {
+            return null;
+        }
+
+        String apiKey = encryptionService.decrypt(config.getApiKeyEncrypted());
+        String baseUrl = config.getBaseUrl();
+        if (baseUrl == null || baseUrl.isEmpty()) {
+            baseUrl = "https://api.anthropic.com";
+        }
+        if (baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.substring(baseUrl.length() - 1);
+        }
+
+        String modelName = config.getModelName();
+        if (modelName == null || modelName.isEmpty()) {
+            modelName = "claude-sonnet-4-20250514";
+        }
+
+        try {
+            AnthropicApi anthropicApi = AnthropicApi.builder()
+                    .baseUrl(baseUrl)
+                    .apiKey(apiKey)
+                    .build();
+            return AnthropicChatModel.builder()
+                    .anthropicApi(anthropicApi)
+                    .defaultOptions(org.springframework.ai.anthropic.AnthropicChatOptions.builder()
+                            .model(modelName)
+                            .maxTokens(4096)
+                            .temperature(0.7)
+                            .build())
+                    .build();
+        } catch (Exception e) {
+            log.error("创建用户级 ChatModel 失败, userId={}: {}", userId, e.getMessage());
+            return null;
+        }
     }
 
     public Result<Map<String, Object>> testConnection(UserConfigDTO dto) {

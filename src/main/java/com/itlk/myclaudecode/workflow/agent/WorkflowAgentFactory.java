@@ -94,9 +94,17 @@ public class WorkflowAgentFactory {
     }
 
     /**
-     * 创建分析师节点（按角色过滤工具）
+     * 创建分析师节点（按角色过滤工具，使用默认 ChatModel）
      */
     public AnalystNode createAnalyst(AgentRole role) {
+        return createAnalyst(role, null);
+    }
+
+    /**
+     * 创建分析师节点（按角色过滤工具，支持 Per-User ChatModel）
+     */
+    public AnalystNode createAnalyst(AgentRole role, ChatModel userChatModel) {
+        ChatModel model = userChatModel != null ? userChatModel : chatModel;
         Set<String> allowedTools = Set.copyOf(role.toolNames());
         List<ToolCallback> scoped = Arrays.stream(allToolCallbacks)
                 .filter(cb -> allowedTools.contains(cb.getToolDefinition().name()))
@@ -114,33 +122,57 @@ public class WorkflowAgentFactory {
         if (!missing.isEmpty()) {
             log.warn("[{}] 以下工具未找到，可能名称不匹配: {}", role.roleName(), missing);
         }
-        return new AnalystNode(chatModel, role.roleName(), role.systemPrompt(), scoped, guardProperties, role.guardConfig(), usageRecordService);
+        return new AnalystNode(model, role.roleName(), role.systemPrompt(), scoped, guardProperties, role.guardConfig(), usageRecordService);
     }
 
     /**
-     * 创建辩论节点（无工具）
+     * 创建辩论节点（无工具，使用默认 ChatModel）
      */
     public DebateNode createDebateNode(AgentRole role) {
-        return new DebateNode(chatModel, role.roleName(), role.systemPrompt(), usageRecordService);
+        return createDebateNode(role, null);
     }
 
     /**
-     * 创建裁决节点（无工具）
+     * 创建辩论节点（无工具，支持 Per-User ChatModel）
+     */
+    public DebateNode createDebateNode(AgentRole role, ChatModel userChatModel) {
+        ChatModel model = userChatModel != null ? userChatModel : chatModel;
+        return new DebateNode(model, role.roleName(), role.systemPrompt(), usageRecordService);
+    }
+
+    /**
+     * 创建裁决节点（无工具，使用默认 ChatModel）
      */
     public JudgeNode createJudgeNode(AgentRole role) {
-        return new JudgeNode(chatModel, role.roleName(), role.systemPrompt(), usageRecordService);
+        return createJudgeNode(role, null);
     }
 
     /**
-     * 创建交易员节点（绑定计算工具）
+     * 创建裁决节点（无工具，支持 Per-User ChatModel）
+     */
+    public JudgeNode createJudgeNode(AgentRole role, ChatModel userChatModel) {
+        ChatModel model = userChatModel != null ? userChatModel : chatModel;
+        return new JudgeNode(model, role.roleName(), role.systemPrompt(), usageRecordService);
+    }
+
+    /**
+     * 创建交易员节点（绑定计算工具，使用默认 ChatModel）
      */
     public TraderNode createTraderNode() {
+        return createTraderNode(null);
+    }
+
+    /**
+     * 创建交易员节点（绑定计算工具，支持 Per-User ChatModel）
+     */
+    public TraderNode createTraderNode(ChatModel userChatModel) {
+        ChatModel model = userChatModel != null ? userChatModel : chatModel;
         Set<String> allowedTools = Set.copyOf(AgentRole.TRADER.toolNames());
         List<ToolCallback> scoped = Arrays.stream(allToolCallbacks)
                 .filter(cb -> allowedTools.contains(cb.getToolDefinition().name()))
                 .collect(Collectors.toList());
         log.info("创建交易员，绑定 {} 个工具", scoped.size());
-        return new TraderNode(chatModel, AgentRole.TRADER.roleName(),
+        return new TraderNode(model, AgentRole.TRADER.roleName(),
                 AgentRole.TRADER.systemPrompt(), scoped, guardProperties, AgentRole.TRADER.guardConfig(), usageRecordService);
     }
 }

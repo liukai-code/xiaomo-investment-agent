@@ -3,6 +3,7 @@ package com.itlk.myclaudecode.workflow.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itlk.myclaudecode.workflow.agent.AgentRole;
+import com.itlk.myclaudecode.user.config.UserConfigService;
 import com.itlk.myclaudecode.workflow.agent.WorkflowAgentFactory;
 import com.itlk.myclaudecode.workflow.config.RiskOverrideProperties;
 import com.itlk.myclaudecode.workflow.config.WorkflowProperties;
@@ -17,6 +18,7 @@ import com.itlk.myclaudecode.workflow.util.StockCodeExtractor;
 import com.itlk.myclaudecode.workflow.util.StockResolver;
 import com.itlk.myclaudecode.common.config.HttpClientService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -35,6 +37,7 @@ public class DeepAnalysisWorkflow {
     private final RiskOverrideProperties riskOverrideProperties;
     private final ObjectMapper objectMapper;
     private final HttpClientService httpClientService;
+    private final UserConfigService userConfigService;
 
     public DeepAnalysisWorkflow(WorkflowAgentFactory agentFactory,
                                  WorkflowEngine engine,
@@ -42,7 +45,8 @@ public class DeepAnalysisWorkflow {
                                  WorkflowProperties properties,
                                  RiskOverrideProperties riskOverrideProperties,
                                  ObjectMapper objectMapper,
-                                 HttpClientService httpClientService) {
+                                 HttpClientService httpClientService,
+                                 UserConfigService userConfigService) {
         this.agentFactory = agentFactory;
         this.engine = engine;
         this.analysisRepository = analysisRepository;
@@ -50,6 +54,7 @@ public class DeepAnalysisWorkflow {
         this.riskOverrideProperties = riskOverrideProperties;
         this.objectMapper = objectMapper;
         this.httpClientService = httpClientService;
+        this.userConfigService = userConfigService;
     }
 
     /**
@@ -85,7 +90,18 @@ public class DeepAnalysisWorkflow {
             }
         }
 
-        WorkflowGraph graph = buildGraph();
+        // 解析用户级 ChatModel（Per-User API Key 路由）
+        ChatModel userChatModel = null;
+        try {
+            userChatModel = userConfigService.getUserChatModel(userId);
+            if (userChatModel != null) {
+                log.info("[DeepAnalysis] 使用用户自定义配置, userId={}", userId);
+            }
+        } catch (Exception e) {
+            log.warn("[DeepAnalysis] 获取用户级 ChatModel 失败, 使用全局配置, userId={}: {}", userId, e.getMessage());
+        }
+
+        WorkflowGraph graph = buildGraph(userChatModel);
 
         return engine.execute(graph, state)
                 .doOnComplete(() -> {
@@ -98,32 +114,32 @@ public class DeepAnalysisWorkflow {
                 });
     }
 
-    private WorkflowGraph buildGraph() {
+    private WorkflowGraph buildGraph(ChatModel userChatModel) {
         // Layer 1: 4 个并行分析师
         ParallelFanOutNode layer1 = new ParallelFanOutNode("Layer1_DataCollection",
                 List.of(
-                        agentFactory.createAnalyst(AgentRole.MARKET_ANALYST),
-                        agentFactory.createAnalyst(AgentRole.FUNDAMENTALS_ANALYST),
-                        agentFactory.createAnalyst(AgentRole.NEWS_ANALYST),
-                        agentFactory.createAnalyst(AgentRole.SOCIAL_ANALYST)
+                        agentFactory.createAnalyst(AgentRole.MARKET_ANALYST, userChatModel),
+                        agentFactory.createAnalyst(AgentRole.FUNDAMENTALS_ANALYST, userChatModel),
+                        agentFactory.createAnalyst(AgentRole.NEWS_ANALYST, userChatModel),
+                        agentFactory.createAnalyst(AgentRole.SOCIAL_ANALYST, userChatModel)
                 ));
 
         // Layer 2: 多空辩论
         BullBearDebateOrchestrator layer2 = new BullBearDebateOrchestrator(
-                agentFactory.createDebateNode(AgentRole.BULL_RESEARCHER),
-                agentFactory.createDebateNode(AgentRole.BEAR_RESEARCHER),
-                agentFactory.createJudgeNode(AgentRole.RESEARCH_MANAGER),
+                agentFactory.createDebateNode(AgentRole.BULL_RESEARCHER, userChatModel),
+                agentFactory.createDebateNode(AgentRole.BEAR_RESEARCHER, userChatModel),
+                agentFactory.createJudgeNode(AgentRole.RESEARCH_MANAGER, userChatModel),
                 properties.bullBearRounds());
 
         // Layer 3: 交易员
-        TraderNode layer3 = agentFactory.createTraderNode();
+        TraderNode layer3 = agentFactory.createTraderNode(userChatModel);
 
         // Layer 4: 风险评估辩论
         RiskDebateOrchestrator layer4 = new RiskDebateOrchestrator(
-                agentFactory.createDebateNode(AgentRole.AGGRESSIVE_ANALYST),
-                agentFactory.createDebateNode(AgentRole.CONSERVATIVE_ANALYST),
-                agentFactory.createDebateNode(AgentRole.NEUTRAL_ANALYST),
-                agentFactory.createJudgeNode(AgentRole.RISK_JUDGE),
+                agentFactory.createDebateNode(AgentRole.AGGRESSIVE_ANALYST, userChatModel),
+                agentFactory.createDebateNode(AgentRole.CONSERVATIVE_ANALYST, userChatModel),
+                agentFactory.createDebateNode(AgentRole.NEUTRAL_ANALYST, userChatModel),
+                agentFactory.createJudgeNode(AgentRole.RISK_JUDGE, userChatModel),
                 properties.riskRounds());
 
         // Layer 5: 风险覆盖（可选）
