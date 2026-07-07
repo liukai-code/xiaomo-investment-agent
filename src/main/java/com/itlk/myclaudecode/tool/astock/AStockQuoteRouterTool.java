@@ -48,7 +48,11 @@ public class AStockQuoteRouterTool {
             JsonNode p = parseParams(params);
             return switch (operation.trim()) {
                 case "tencentQuote" -> tencentQuote(getStr(p, "stockCodes"));
-                case "baiduKline" -> baiduKline(getStr(p, "stockCode"), getOptStr(p, "startTime", ""));
+                case "baiduKline" -> {
+                    String code = getStrOrAlt(p, "stockCode", "stockCodes");
+                    if (code.contains(",")) code = code.split(",")[0].trim();
+                    yield baiduKline(code, getOptStr(p, "startTime", ""));
+                }
                 case "mootdxKline", "mootdxQuotes", "mootdxTransaction" ->
                         "mootdx TCP 协议尚未在 Java 端实现，请使用 tencentQuote 或 baiduKline 替代";
                 default -> "未知操作: " + operation + "。可用操作：tencentQuote, baiduKline";
@@ -56,7 +60,7 @@ public class AStockQuoteRouterTool {
         } catch (IllegalArgumentException e) {
             log.error("[AStockQuoteRouterTool] 参数错误: operation={}, error={}", operation, e.getMessage());
             return "参数错误（operation=" + operation + "）: " + e.getMessage()
-                    + "。请检查 params JSON 格式，例如: {\"stockCodes\":\"430510\"}";
+                    + "。请检查 params JSON 格式，例如: {\"stockCode\":\"430510\"}";
         } catch (Exception e) {
             log.error("[AStockQuoteRouterTool] 异常: operation={}, error={}", operation, e.getMessage(), e);
             return "操作失败（operation=" + operation + "）: " + e.getMessage();
@@ -223,5 +227,11 @@ public class AStockQuoteRouterTool {
         if (p == null || !p.has(key) || p.get(key).isNull()) return defaultVal;
         String val = p.get(key).asText();
         return val.isEmpty() ? defaultVal : val;
+    }
+
+    private String getStrOrAlt(JsonNode p, String key, String altKey) {
+        if (p != null && p.has(key) && !p.get(key).isNull()) return p.get(key).asText();
+        if (p != null && p.has(altKey) && !p.get(altKey).isNull()) return p.get(altKey).asText();
+        throw new IllegalArgumentException("缺少参数: " + key);
     }
 }

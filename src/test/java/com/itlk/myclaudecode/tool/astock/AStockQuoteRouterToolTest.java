@@ -187,6 +187,24 @@ class AStockQuoteRouterToolTest {
         }
 
         @Test
+        @DisplayName("传入stockCodes复数 → 兼容处理")
+        void stockCodesPlural() throws Exception {
+            when(httpClientService.getWithJdkClient(anyString(), any()))
+                    .thenReturn(BAIDU_KLINE_RESPONSE);
+            String result = tool.a_stock_quote("baiduKline", "{\"stockCodes\":\"600519\"}");
+            assertTrue(result.contains("K线数据"), "stockCodes复数应正常返回K线数据");
+        }
+
+        @Test
+        @DisplayName("传入stockCodes多个代码 → 取第一个")
+        void stockCodesMultiple() throws Exception {
+            when(httpClientService.getWithJdkClient(anyString(), any()))
+                    .thenReturn(BAIDU_KLINE_RESPONSE);
+            String result = tool.a_stock_quote("baiduKline", "{\"stockCodes\":\"600519,000858\"}");
+            assertTrue(result.contains("K线数据"), "多个代码应取第一个正常返回");
+        }
+
+        @Test
         @DisplayName("网络异常 → 返回失败信息")
         void networkError() throws Exception {
             when(httpClientService.getWithJdkClient(anyString(), any()))
