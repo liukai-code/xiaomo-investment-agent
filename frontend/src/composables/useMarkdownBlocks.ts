@@ -221,6 +221,29 @@ export function parseBlocks(text: string): MarkdownBlock[] {
       continue
     }
 
+    // Inline heading: text followed by # heading without preceding newline
+    const inlineHeadingMatch = line.match(/^(.*?)\s*(#{1,6})\s+(.+)$/)
+    if (inlineHeadingMatch && inlineHeadingMatch[1].length > 0) {
+      const before = inlineHeadingMatch[1].trim()
+      if (before) {
+        flushParagraph(true)
+        paragraphLines.push(before)
+        flushParagraph(true)
+      }
+      flushBlockquote(true)
+      flushList(true)
+      flushTable(true)
+      const level = inlineHeadingMatch[2].length as 1 | 2 | 3 | 4 | 5 | 6
+      blocks.push({
+        type: 'heading',
+        level,
+        text: inlineHeadingMatch[3],
+        closed: true,
+        key: blockKey(`h${level}`, inlineHeadingMatch[3]),
+      })
+      continue
+    }
+
     // Display math $$...$$
     if (/^\$\$\s*$/.test(line)) {
       flushParagraph(true)
