@@ -10,6 +10,7 @@ import okhttp3.RequestBody;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,17 +35,20 @@ public class UserConfigService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final HttpClientService httpClientService;
     private final ObjectMapper objectMapper;
+    private final ToolCallingManager toolCallingManager;
 
     public UserConfigService(UserConfigRepository userConfigRepository,
                            EncryptionService encryptionService,
                            RedisTemplate<String, Object> redisTemplate,
                            HttpClientService httpClientService,
-                           ObjectMapper objectMapper) {
+                           ObjectMapper objectMapper,
+                           ToolCallingManager toolCallingManager) {
         this.userConfigRepository = userConfigRepository;
         this.encryptionService = encryptionService;
         this.redisTemplate = redisTemplate;
         this.httpClientService = httpClientService;
         this.objectMapper = objectMapper;
+        this.toolCallingManager = toolCallingManager;
     }
 
     public UserConfigDTO getConfig(Long userId) {
@@ -132,7 +136,7 @@ public class UserConfigService {
             baseUrl = "https://api.anthropic.com";
         }
         if (baseUrl.endsWith("/")) {
-            baseUrl = baseUrl.substring(baseUrl.length() - 1);
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
         }
 
         String modelName = config.getModelName();
@@ -147,6 +151,7 @@ public class UserConfigService {
                     .build();
             return AnthropicChatModel.builder()
                     .anthropicApi(anthropicApi)
+                    .toolCallingManager(toolCallingManager)
                     .defaultOptions(org.springframework.ai.anthropic.AnthropicChatOptions.builder()
                             .model(modelName)
                             .maxTokens(4096)

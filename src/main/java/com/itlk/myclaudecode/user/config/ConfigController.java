@@ -35,23 +35,10 @@ public class ConfigController {
             return Result.error("用户未登录");
         }
 
-        // 验证API Key格式
+        // 验证API Key格式（基本检查）
         if (dto.getApiKey() != null && !dto.getApiKey().isEmpty()) {
-            String apiKey = dto.getApiKey();
-            if (apiKey.length() < 10) {
-                return Result.error("API Key格式不正确，长度不能少于10个字符");
-            }
-            // 根据 Base URL 判断 provider 类型并校验格式
-            String baseUrl = dto.getBaseUrl();
-            if (baseUrl != null && !baseUrl.isEmpty()) {
-                if (baseUrl.contains("openai.com") && !apiKey.startsWith("sk-")) {
-                    return Result.error("OpenAI API Key 通常以 'sk-' 开头，请检查是否正确");
-                }
-            } else {
-                // 默认 Anthropic，校验常见格式
-                if (!apiKey.startsWith("sk-ant-") && !apiKey.startsWith("sk-") && apiKey.length() < 20) {
-                    return Result.error("API Key格式不正确，请确认是否为有效的 Anthropic API Key");
-                }
+            if (dto.getApiKey().length() < 10) {
+                return Result.error("API Key格式不正确");
             }
         }
 
