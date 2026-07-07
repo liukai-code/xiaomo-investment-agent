@@ -75,7 +75,7 @@ const router = useRouter()
 .portal-hero-gradient {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, rgba(27, 27, 24, 0.03), var(--portal-bg));
+  background: linear-gradient(to bottom, rgba(37, 99, 235, 0.04), var(--portal-bg));
 }
 
 .portal-hero-blob {
@@ -90,7 +90,7 @@ const router = useRouter()
   left: 40px;
   width: 384px;
   height: 384px;
-  background: rgba(27, 27, 24, 0.08);
+  background: rgba(37, 99, 235, 0.07);
 }
 
 .portal-hero-blob-2 {
@@ -98,7 +98,7 @@ const router = useRouter()
   right: 40px;
   width: 500px;
   height: 500px;
-  background: rgba(37, 99, 235, 0.05);
+  background: rgba(27, 27, 24, 0.05);
 }
 
 .portal-hero-content {
@@ -173,7 +173,7 @@ const router = useRouter()
 .portal-hero-screenshot-glow {
   position: absolute;
   inset: -16px;
-  background: linear-gradient(to bottom, rgba(27, 27, 24, 0.03), transparent);
+  background: linear-gradient(to bottom, rgba(37, 99, 235, 0.06), transparent);
   border-radius: 48px;
   filter: blur(16px);
   z-index: -1;

@@ -51,10 +51,7 @@
 .portal-footer-logo img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  padding: 2px;
-  image-rendering: -webkit-optimize-contrast;
-  image-rendering: crisp-edges;
+  object-fit: cover;
 }
 
 .portal-footer-brand span {

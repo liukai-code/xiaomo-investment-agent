@@ -21,7 +21,7 @@ const features: FeatureCategory[] = [
   {
     icon: Bot,
     badge: 'AI 对话',
-    badgeColor: 'background: rgba(27,27,24,0.08); color: var(--portal-text);',
+    badgeColor: 'background: rgba(37,99,235,0.1); color: #2563eb;',
     title: 'AI 智能对话',
     desc: '上下文感知的多轮对话，流式输出，支持金融计算、行情查询等 30+ 工具调用',
     items: [

@@ -7,8 +7,8 @@
   --portal-text: #1b1b18;
   --portal-text-muted: #91918e;
   --portal-border: #e6e6e3;
-  --portal-accent: #1b1b18;
-  --portal-accent-fg: #f9f9f7;
+  --portal-accent: #2563eb;
+  --portal-accent-fg: #ffffff;
 }
 
 /* -- Google Fonts -- */
@@ -99,11 +99,11 @@
   gap: 8px;
   padding: 6px 16px;
   border-radius: 9999px;
-  background: rgba(27, 27, 24, 0.05);
-  border: 1px solid rgba(27, 27, 24, 0.1);
+  background: rgba(37, 99, 235, 0.06);
+  border: 1px solid rgba(37, 99, 235, 0.15);
   font-size: 14px;
   font-weight: 500;
-  color: var(--portal-text);
+  color: var(--portal-accent);
   backdrop-filter: blur(4px);
 }
 
@@ -120,12 +120,12 @@
   font-weight: 500;
   border: none;
   cursor: pointer;
-  box-shadow: 0 20px 25px -5px rgba(27, 27, 24, 0.2);
+  box-shadow: 0 20px 25px -5px rgba(37, 99, 235, 0.25);
   transition: all 0.2s;
 }
 
 .portal-btn-primary:hover {
-  box-shadow: 0 25px 50px -12px rgba(27, 27, 24, 0.3);
+  box-shadow: 0 25px 50px -12px rgba(37, 99, 235, 0.35);
   transform: translateY(-1px);
 }
 
@@ -170,8 +170,8 @@
   gap: 12px;
   padding: 16px 48px;
   border-radius: 9999px;
-  background: var(--portal-text);
-  color: var(--portal-bg);
+  background: var(--portal-accent);
+  color: var(--portal-accent-fg);
   font-size: 20px;
   font-weight: 500;
   border: none;
@@ -180,7 +180,7 @@
 }
 
 .portal-btn-cta:hover {
-  box-shadow: 0 25px 50px -12px rgba(27, 27, 24, 0.4);
+  box-shadow: 0 25px 50px -12px rgba(37, 99, 235, 0.4);
   transform: translateY(-2px);
 }
 
@@ -297,7 +297,8 @@
   bottom: 0;
   left: 0;
   height: 2px;
-  background: rgba(27, 27, 24, 0.3);
+  background: var(--portal-accent);
+  opacity: 0.4;
   transition: width 75ms linear;
 }
 
