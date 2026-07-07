@@ -88,9 +88,26 @@ public class WorkflowAgentFactory {
         }
 
         this.allToolCallbacks = callbacks.toArray(new ToolCallback[0]);
-        log.info("WorkflowAgentFactory 初始化完成，共 {} 个工具: {}",
-                allToolCallbacks.length,
-                Arrays.stream(allToolCallbacks).map(cb -> cb.getToolDefinition().name()).toList());
+
+        // 根据 Redis 配置过滤，只显示已启用的工具
+        Set<String> enabledNames = toolConfigService.listAll().entrySet().stream()
+                .filter(java.util.Map.Entry::getValue)
+                .map(java.util.Map.Entry::getKey)
+                .collect(Collectors.toSet());
+        List<String> enabledToolNames = Arrays.stream(allToolCallbacks)
+                .map(cb -> cb.getToolDefinition().name())
+                .filter(enabledNames::contains)
+                .toList();
+        List<String> disabledToolNames = Arrays.stream(allToolCallbacks)
+                .map(cb -> cb.getToolDefinition().name())
+                .filter(name -> !enabledNames.contains(name))
+                .toList();
+        log.info("WorkflowAgentFactory 初始化完成，共 {} 个工具（已启用 {} 个，已禁用 {} 个）: {}",
+                allToolCallbacks.length, enabledToolNames.size(), disabledToolNames.size(),
+                enabledToolNames);
+        if (!disabledToolNames.isEmpty()) {
+            log.info("已禁用的工具: {}", disabledToolNames);
+        }
     }
 
     /**
