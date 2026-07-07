@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { useAuthStore } from '@/stores/auth'
-import { useRouter } from 'vue-router'
+import { watch } from 'vue'
+import { useRoute } from 'vue-router'
 
-const authStore = useAuthStore()
-const router = useRouter()
+const route = useRoute()
 
-onMounted(async () => {
-  const ok = await authStore.checkAuth()
-  if (!ok) {
-    router.push('/login')
-  }
-})
+// Portal 路由需要解除 body 的 overflow: hidden
+watch(
+  () => route.name,
+  (name) => {
+    document.body.classList.toggle('portal-scrollable', name === 'portal')
+  },
+  { immediate: true }
+)
 </script>
 
 <template>

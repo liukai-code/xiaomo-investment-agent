@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <rect width="800" height="500" rx="16" fill="#f8fafc"/>
+  <rect x="40" y="40" width="720" height="420" rx="12" fill="white" stroke="#e2e8f0"/>
+  <!-- User message -->
+  <rect x="480" y="70" width="240" height="60" rx="16" fill="#2563eb"/>
+  <rect x="500" y="85" width="180" height="12" rx="4" fill="white" opacity="0.9"/>
+  <rect x="500" y="105" width="140" height="12" rx="4" fill="white" opacity="0.7"/>
+  <!-- AI message -->
+  <rect x="80" y="150" width="500" height="120" rx="16" fill="#f1f5f9"/>
+  <rect x="100" y="170" width="300" height="12" rx="4" fill="#1e293b" opacity="0.7"/>
+  <rect x="100" y="192" width="400" height="10" rx="4" fill="#94a3b8"/>
+  <rect x="100" y="210" width="350" height="10" rx="4" fill="#94a3b8" opacity="0.7"/>
+  <rect x="100" y="228" width="380" height="10" rx="4" fill="#94a3b8" opacity="0.5"/>
+  <rect x="100" y="250" width="200" height="10" rx="4" fill="#94a3b8" opacity="0.4"/>
+  <!-- Streaming cursor -->
+  <rect x="304" y="250" width="2" height="12" rx="1" fill="#2563eb">
+    <animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite"/>
+  </rect>
+  <!-- Tool call indicator -->
+  <rect x="80" y="290" width="300" height="40" rx="10" fill="#eff6ff" stroke="#bfdbfe"/>
+  <circle cx="105" cy="310" r="8" fill="#2563eb" opacity="0.6"/>
+  <rect x="120" y="305" width="180" height="10" rx="4" fill="#93c5fd"/>
+  <text x="400" y="400" text-anchor="middle" font-family="Inter, sans-serif" font-size="18" fill="#64748b">AI 智能对话</text>
+  <text x="400" y="425" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" fill="#94a3b8">流式输出 · 工具调用 · 多轮上下文</text>
+</svg>

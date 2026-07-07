@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <rect width="1200" height="800" rx="16" fill="#f1f5f9"/>
+  <rect x="0" y="0" width="1200" height="48" rx="16" fill="#e2e8f0"/>
+  <rect x="20" y="16" width="12" height="12" rx="6" fill="#fca5a5"/>
+  <rect x="40" y="16" width="12" height="12" rx="6" fill="#fde68a"/>
+  <rect x="60" y="16" width="12" height="12" rx="6" fill="#86efac"/>
+  <rect x="0" y="48" width="260" height="752" fill="#f8fafc"/>
+  <rect x="20" y="68" width="220" height="36" rx="8" fill="#2563eb" opacity="0.9"/>
+  <rect x="20" y="120" width="180" height="14" rx="4" fill="#cbd5e1"/>
+  <rect x="20" y="148" width="160" height="14" rx="4" fill="#e2e8f0"/>
+  <rect x="20" y="176" width="200" height="14" rx="4" fill="#e2e8f0"/>
+  <rect x="20" y="204" width="140" height="14" rx="4" fill="#e2e8f0"/>
+  <rect x="280" y="68" width="900" height="520" rx="12" fill="white" stroke="#e2e8f0"/>
+  <rect x="300" y="88" width="400" height="18" rx="4" fill="#1e293b" opacity="0.8"/>
+  <rect x="300" y="120" width="300" height="14" rx="4" fill="#94a3b8"/>
+  <rect x="300" y="160" width="860" height="100" rx="12" fill="#eff6ff"/>
+  <rect x="320" y="180" width="360" height="14" rx="4" fill="#2563eb" opacity="0.6"/>
+  <rect x="320" y="204" width="280" height="14" rx="4" fill="#93c5fd"/>
+  <rect x="320" y="228" width="320" height="14" rx="4" fill="#93c5fd" opacity="0.5"/>
+  <rect x="680" y="280" width="460" height="140" rx="12" fill="#f0fdf4"/>
+  <rect x="700" y="300" width="200" height="14" rx="4" fill="#16a34a" opacity="0.7"/>
+  <rect x="700" y="324" width="400" height="10" rx="4" fill="#86efac" opacity="0.5"/>
+  <rect x="700" y="344" width="350" height="10" rx="4" fill="#86efac" opacity="0.4"/>
+  <rect x="700" y="364" width="380" height="10" rx="4" fill="#86efac" opacity="0.3"/>
+  <text x="600" y="440" text-anchor="middle" font-family="Inter, sans-serif" font-size="20" fill="#64748b">小墨 AI 对话界面</text>
+  <text x="600" y="470" text-anchor="middle" font-family="Inter, sans-serif" font-size="14" fill="#94a3b8">产品截图占位 — 替换为实际截图</text>
+</svg>

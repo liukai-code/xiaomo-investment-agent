@@ -1,0 +1,315 @@
+/* ========== Portal 专用样式 ========== */
+
+/* -- 门户配色变量 -- */
+:root {
+  --portal-bg: #f9f9f7;
+  --portal-bg-secondary: #f2f0e9;
+  --portal-text: #1b1b18;
+  --portal-text-muted: #91918e;
+  --portal-border: #e6e6e3;
+  --portal-accent: #1b1b18;
+  --portal-accent-fg: #f9f9f7;
+}
+
+/* -- Google Fonts -- */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap');
+
+/* -- 滚动动画基础类 -- */
+.portal-animate {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.portal-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* -- Blob 动画 -- */
+@keyframes portal-blob {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+.portal-blob {
+  animation: portal-blob 7s infinite;
+}
+
+.portal-blob-delay-2 {
+  animation-delay: 2s;
+}
+
+.portal-blob-delay-4 {
+  animation-delay: 4s;
+}
+
+/* -- Portal 根容器（解决全局 overflow: hidden） -- */
+.portal-root {
+  width: 100%;
+  min-height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--portal-bg);
+  color: var(--portal-text);
+}
+
+/* -- Section 通用 -- */
+.portal-section {
+  padding: 96px 24px;
+}
+
+@media (min-width: 768px) {
+  .portal-section {
+    padding: 160px 24px;
+  }
+}
+
+.portal-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.portal-container-narrow {
+  max-width: 768px;
+  margin: 0 auto;
+}
+
+/* -- 标题 -- */
+.portal-serif {
+  font-family: 'Noto Serif SC', 'Georgia', serif;
+}
+
+/* -- 装饰条 -- */
+.portal-deco-bar {
+  width: 80px;
+  height: 4px;
+  background: var(--portal-text);
+  opacity: 0.15;
+  border-radius: 2px;
+  margin: 0 auto;
+}
+
+/* -- Badge -- */
+.portal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-radius: 9999px;
+  background: rgba(27, 27, 24, 0.05);
+  border: 1px solid rgba(27, 27, 24, 0.1);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--portal-text);
+  backdrop-filter: blur(4px);
+}
+
+/* -- 按钮 -- */
+.portal-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 32px;
+  border-radius: 16px;
+  background: var(--portal-accent);
+  color: var(--portal-accent-fg);
+  font-size: 16px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 20px 25px -5px rgba(27, 27, 24, 0.2);
+  transition: all 0.2s;
+}
+
+.portal-btn-primary:hover {
+  box-shadow: 0 25px 50px -12px rgba(27, 27, 24, 0.3);
+  transform: translateY(-1px);
+}
+
+.portal-btn-primary:active {
+  transform: scale(0.97);
+}
+
+.portal-btn-primary svg {
+  transition: transform 0.2s;
+}
+
+.portal-btn-primary:hover svg {
+  transform: translateX(4px);
+}
+
+.portal-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 32px;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--portal-text);
+  font-size: 16px;
+  font-weight: 500;
+  border: 1px solid var(--portal-border);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.portal-btn-outline:hover {
+  background: var(--portal-bg-secondary);
+}
+
+.portal-btn-outline:active {
+  transform: scale(0.97);
+}
+
+.portal-btn-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 48px;
+  border-radius: 9999px;
+  background: var(--portal-text);
+  color: var(--portal-bg);
+  font-size: 20px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.portal-btn-cta:hover {
+  box-shadow: 0 25px 50px -12px rgba(27, 27, 24, 0.4);
+  transform: translateY(-2px);
+}
+
+.portal-btn-cta:active {
+  transform: scale(0.97);
+}
+
+.portal-btn-cta svg {
+  transition: transform 0.3s;
+}
+
+.portal-btn-cta:hover svg {
+  transform: translateX(6px);
+}
+
+/* -- 网格背景（CTA 区域用） -- */
+.portal-grid-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(128, 128, 128, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(128, 128, 128, 0.07) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse 60% 50% at 50% 50%, #000 60%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 60% 50% at 50% 50%, #000 60%, transparent 100%);
+}
+
+/* -- FAQ 手风琴 -- */
+.portal-accordion-item {
+  border: 1px solid rgba(230, 227, 227, 0.5);
+  border-radius: 16px;
+  background: rgba(242, 240, 233, 0.2);
+  overflow: hidden;
+  transition: background 0.2s;
+}
+
+.portal-accordion-item:hover {
+  background: rgba(242, 240, 233, 0.4);
+}
+
+.portal-accordion-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--portal-text);
+  text-align: left;
+}
+
+.portal-accordion-trigger svg {
+  transition: transform 0.3s;
+  flex-shrink: 0;
+  margin-left: 16px;
+}
+
+.portal-accordion-trigger.open svg {
+  transform: rotate(180deg);
+}
+
+.portal-accordion-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease;
+}
+
+.portal-accordion-content.open {
+  grid-template-rows: 1fr;
+}
+
+.portal-accordion-content > div {
+  overflow: hidden;
+}
+
+.portal-accordion-body {
+  padding: 0 24px 24px;
+  color: var(--portal-text-muted);
+  line-height: 1.8;
+  font-weight: 300;
+}
+
+/* -- 功能项卡片 -- */
+.portal-feature-item {
+  width: 100%;
+  text-align: left;
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.portal-feature-item.active {
+  background: var(--portal-bg-secondary);
+  border-color: var(--portal-border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.portal-feature-item:not(.active):hover {
+  background: rgba(242, 240, 233, 0.4);
+}
+
+.portal-feature-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: rgba(27, 27, 24, 0.3);
+  transition: width 75ms linear;
+}
+
+/* -- 响应式工具 -- */
+@media (max-width: 767px) {
+  .portal-hide-mobile {
+    display: none !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .portal-show-mobile {
+    display: none !important;
+  }
+}

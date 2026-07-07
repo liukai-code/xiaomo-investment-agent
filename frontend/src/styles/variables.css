@@ -31,6 +31,12 @@ body {
   overflow: hidden;
 }
 
+/* Portal 路由下解除 overflow 限制 */
+body.portal-scrollable {
+  overflow: auto;
+  height: auto;
+}
+
 #app {
   width: 100vw;
   height: 100vh;

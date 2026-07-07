@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <rect width="800" height="500" rx="16" fill="#f8fafc"/>
+  <rect x="40" y="40" width="720" height="420" rx="12" fill="white" stroke="#e2e8f0"/>
+  <!-- K-line chart area -->
+  <rect x="60" y="60" width="420" height="260" rx="8" fill="#f1f5f9"/>
+  <!-- Candlesticks -->
+  <line x1="100" y1="120" x2="100" y2="240" stroke="#16a34a" stroke-width="2"/>
+  <rect x="94" y="150" width="12" height="60" fill="#16a34a" rx="2"/>
+  <line x1="140" y1="100" x2="140" y2="260" stroke="#dc2626" stroke-width="2"/>
+  <rect x="134" y="130" width="12" height="80" fill="#dc2626" rx="2"/>
+  <line x1="180" y1="110" x2="180" y2="230" stroke="#16a34a" stroke-width="2"/>
+  <rect x="174" y="140" width="12" height="50" fill="#16a34a" rx="2"/>
+  <line x1="220" y1="90" x2="220" y2="250" stroke="#dc2626" stroke-width="2"/>
+  <rect x="214" y="120" width="12" height="90" fill="#dc2626" rx="2"/>
+  <line x1="260" y1="130" x2="260" y2="220" stroke="#16a34a" stroke-width="2"/>
+  <rect x="254" y="155" width="12" height="40" fill="#16a34a" rx="2"/>
+  <line x1="300" y1="105" x2="300" y2="245" stroke="#dc2626" stroke-width="2"/>
+  <rect x="294" y="135" width="12" height="70" fill="#dc2626" rx="2"/>
+  <line x1="340" y1="115" x2="340" y2="210" stroke="#16a34a" stroke-width="2"/>
+  <rect x="334" y="145" width="12" height="35" fill="#16a34a" rx="2"/>
+  <line x1="380" y1="95" x2="380" y2="235" stroke="#16a34a" stroke-width="2"/>
+  <rect x="374" y="125" width="12" height="65" fill="#16a34a" rx="2"/>
+  <line x1="420" y1="140" x2="420" y2="200" stroke="#16a34a" stroke-width="2"/>
+  <rect x="414" y="160" width="12" height="25" fill="#16a34a" rx="2"/>
+  <line x1="460" y1="100" x2="460" y2="250" stroke="#dc2626" stroke-width="2"/>
+  <rect x="454" y="130" width="12" height="80" fill="#dc2626" rx="2"/>
+  <!-- Data cards on the right -->
+  <rect x="510" y="60" width="220" height="80" rx="10" fill="#f0fdf4" stroke="#bbf7d0"/>
+  <text x="530" y="85" font-family="Inter, sans-serif" font-size="12" fill="#16a34a" font-weight="600">上证指数</text>
+  <text x="530" y="110" font-family="Inter, sans-serif" font-size="20" fill="#16a34a" font-weight="700">3,342.68</text>
+  <text x="660" y="110" font-family="Inter, sans-serif" font-size="12" fill="#16a34a">+1.25%</text>
+  <rect x="510" y="155" width="220" height="80" rx="10" fill="#fef2f2" stroke="#fecaca"/>
+  <text x="530" y="180" font-family="Inter, sans-serif" font-size="12" fill="#dc2626" font-weight="600">深证成指</text>
+  <text x="530" y="205" font-family="Inter, sans-serif" font-size="20" fill="#dc2626" font-weight="700">10,856.34</text>
+  <text x="660" y="205" font-family="Inter, sans-serif" font-size="12" fill="#dc2626">-0.38%</text>
+  <!-- Bottom data table -->
+  <rect x="60" y="340" width="680" height="100" rx="8" fill="#f8fafc"/>
+  <rect x="60" y="340" width="680" height="30" rx="8" fill="#e2e8f0"/>
+  <text x="100" y="360" font-family="Inter, sans-serif" font-size="11" fill="#64748b" font-weight="600">龙虎榜</text>
+  <text x="250" y="360" font-family="Inter, sans-serif" font-size="11" fill="#64748b" font-weight="600">融资融券</text>
+  <text x="400" y="360" font-family="Inter, sans-serif" font-size="11" fill="#64748b" font-weight="600">行业轮动</text>
+  <text x="550" y="360" font-family="Inter, sans-serif" font-size="11" fill="#64748b" font-weight="600">北向资金</text>
+  <rect x="80" y="385" width="120" height="10" rx="3" fill="#cbd5e1"/>
+  <rect x="230" y="385" width="120" height="10" rx="3" fill="#cbd5e1"/>
+  <rect x="380" y="385" width="120" height="10" rx="3" fill="#cbd5e1"/>
+  <rect x="530" y="385" width="120" height="10" rx="3" fill="#cbd5e1"/>
+  <rect x="80" y="405" width="100" height="10" rx="3" fill="#e2e8f0"/>
+  <rect x="230" y="405" width="100" height="10" rx="3" fill="#e2e8f0"/>
+  <rect x="380" y="405" width="100" height="10" rx="3" fill="#e2e8f0"/>
+  <rect x="530" y="405" width="100" height="10" rx="3" fill="#e2e8f0"/>
+  <text x="400" y="490" text-anchor="middle" font-family="Inter, sans-serif" font-size="18" fill="#64748b">A 股数据全景</text>
+</svg>
