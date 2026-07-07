@@ -1,14 +1,10 @@
-<script setup lang="ts">
-import { Sparkles } from 'lucide-vue-next'
-</script>
-
 <template>
   <footer class="portal-footer">
     <div class="portal-container">
       <div class="portal-footer-inner">
         <div class="portal-footer-brand">
           <div class="portal-footer-logo">
-            <Sparkles :size="16" />
+            <img src="/portal/logo.png" alt="小墨" />
           </div>
           <span class="portal-serif">小墨</span>
         </div>
@@ -48,11 +44,14 @@ import { Sparkles } from 'lucide-vue-next'
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: var(--portal-accent);
-  color: var(--portal-accent-fg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.portal-footer-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .portal-footer-brand span {

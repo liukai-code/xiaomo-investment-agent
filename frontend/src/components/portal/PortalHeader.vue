@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Sparkles, Menu, X } from 'lucide-vue-next'
+import { Menu, X } from 'lucide-vue-next'
 
 const router = useRouter()
 const isScrolled = ref(false)
@@ -28,7 +28,7 @@ function goToLogin() {
     <div class="portal-header-inner">
       <div class="portal-header-brand" @click="router.push('/portal')">
         <div class="portal-header-logo">
-          <Sparkles :size="20" />
+          <img src="/portal/logo.png" alt="小墨" />
         </div>
         <span class="portal-serif">小墨</span>
       </div>
@@ -103,11 +103,14 @@ function goToLogin() {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: var(--portal-accent);
-  color: var(--portal-accent-fg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.portal-header-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .portal-header-brand span {
