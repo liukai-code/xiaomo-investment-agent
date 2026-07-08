@@ -23,72 +23,135 @@
 
         <div class="settings-body">
           <!-- API配置 -->
-          <div v-if="activeMenu === 'api'" class="section">
-            <h4>API配置</h4>
-            <p class="section-desc">配置大模型API连接信息</p>
-
-            <div class="form-group">
-              <label><Key :size="14" /> API Key</label>
-              <div class="input-group">
-                <input
-                  :type="showApiKey ? 'text' : 'password'"
-                  v-model="form.apiKey"
-                  placeholder="输入API Key"
-                />
-                <button class="toggle-btn" @click="showApiKey = !showApiKey">
-                  <EyeOff v-if="showApiKey" :size="14" />
-                  <Eye v-else :size="14" />
+          <div v-if="activeMenu === 'api'" class="section api-section">
+            <div class="channel-list-panel">
+              <div class="channel-list-header">
+                <h4>渠道列表</h4>
+                <button class="add-channel-btn" @click="handleAddChannel" title="添加渠道">
+                  <Plus :size="16" />
                 </button>
               </div>
-            </div>
-
-            <div class="form-group">
-              <label><Globe :size="14" /> Base URL</label>
-              <input
-                v-model="form.baseUrl"
-                placeholder="https://api.example.com"
-              />
-            </div>
-
-            <div class="form-group">
-              <label><Cpu :size="14" /> 模型选择</label>
-              <div class="model-select">
-                <select v-model="form.modelName" @change="onModelChange">
-                  <option value="">选择模型</option>
-                  <option v-for="model in presetModels" :key="model" :value="model">
-                    {{ model }}
-                  </option>
-                  <option value="custom">自定义模型</option>
-                </select>
-                <input
-                  v-if="isCustomModel"
-                  v-model="customModelName"
-                  placeholder="输入模型名称"
-                  @blur="onCustomModelBlur"
-                />
+              <div class="channel-list">
+                <div
+                  v-for="channel in channels"
+                  :key="channel.id"
+                  class="channel-item"
+                  :class="{ active: selectedChannelId === channel.id }"
+                  @click="selectChannel(channel)"
+                >
+                  <div class="channel-item-info">
+                    <div class="channel-item-name">
+                      <RadioTower :size="14" />
+                      <span>{{ channel.channelName }}</span>
+                    </div>
+                    <div class="channel-item-model">{{ channel.modelName || '未配置模型' }}</div>
+                  </div>
+                  <div class="channel-item-actions">
+                    <span v-if="channel.active" class="active-badge" title="当前使用">使用中</span>
+                    <button
+                      v-if="!channel.active"
+                      class="icon-btn activate-btn"
+                      @click.stop="handleActivateChannel(channel)"
+                      title="设为当前渠道"
+                    >
+                      <Check :size="14" />
+                    </button>
+                    <button
+                      class="icon-btn delete-btn"
+                      @click.stop="handleDeleteChannel(channel)"
+                      title="删除渠道"
+                    >
+                      <Trash2 :size="14" />
+                    </button>
+                  </div>
+                </div>
+                <div v-if="channels.length === 0" class="channel-empty">
+                  暂无渠道，点击上方 + 添加
+                </div>
               </div>
             </div>
 
-            <div class="section-actions">
-              <button class="test-btn" @click="handleTest" :disabled="testing || loading">
-                <Loader2 v-if="testing" :size="14" class="spin" />
-                <Plug v-else :size="14" />
-                {{ testing ? '测试中...' : '测试连接' }}
-              </button>
-              <button class="save-btn" @click="handleSave" :disabled="loading || testing">
-                <Loader2 v-if="loading" :size="14" class="spin" />
-                <Save v-else :size="14" />
-                {{ loading ? '保存中...' : '保存' }}
-              </button>
-            </div>
-            <div v-if="testResult" class="test-result success">
-              <CheckCircle2 :size="14" />
-              连接成功！延迟: {{ testResult.latencyMs }}ms
-              <span v-if="testResult.model"> | 模型: {{ testResult.model }}</span>
-            </div>
-            <div v-if="testError" class="test-result error">
-              <XCircle :size="14" />
-              {{ testError }}
+            <div class="channel-form-panel">
+              <div v-if="selectedChannelId !== null || isCreating">
+                <h4>{{ isCreating ? '新建渠道' : '编辑渠道' }}</h4>
+                <p class="section-desc">{{ isCreating ? '配置新的API连接信息' : '修改当前渠道配置' }}</p>
+
+                <div class="form-group">
+                  <label><RadioTower :size="14" /> 渠道名称</label>
+                  <input
+                    v-model="channelForm.channelName"
+                    placeholder="输入渠道名称，如：官方API、代理渠道"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label><Key :size="14" /> API Key</label>
+                  <div class="input-group">
+                    <input
+                      :type="showApiKey ? 'text' : 'password'"
+                      v-model="channelForm.apiKey"
+                      :placeholder="isCreating ? '输入API Key' : '留空则不更新'"
+                    />
+                    <button class="toggle-btn" @click="showApiKey = !showApiKey">
+                      <EyeOff v-if="showApiKey" :size="14" />
+                      <Eye v-else :size="14" />
+                    </button>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label><Globe :size="14" /> Base URL</label>
+                  <input
+                    v-model="channelForm.baseUrl"
+                    placeholder="https://api.example.com"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label><Cpu :size="14" /> 模型选择</label>
+                  <div class="model-select">
+                    <select v-model="channelForm.modelName" @change="onModelChange">
+                      <option value="">选择模型</option>
+                      <option v-for="model in presetModels" :key="model" :value="model">
+                        {{ model }}
+                      </option>
+                      <option value="custom">自定义模型</option>
+                    </select>
+                    <input
+                      v-if="isCustomModel"
+                      v-model="customModelName"
+                      placeholder="输入模型名称"
+                      @blur="onCustomModelBlur"
+                    />
+                  </div>
+                </div>
+
+                <div class="section-actions">
+                  <button class="test-btn" @click="handleTest" :disabled="testing || channelLoading">
+                    <Loader2 v-if="testing" :size="14" class="spin" />
+                    <Plug v-else :size="14" />
+                    {{ testing ? '测试中...' : '测试连接' }}
+                  </button>
+                  <button class="save-btn" @click="handleSaveChannel" :disabled="channelLoading || testing">
+                    <Loader2 v-if="channelLoading" :size="14" class="spin" />
+                    <Save v-else :size="14" />
+                    {{ channelLoading ? '保存中...' : '保存' }}
+                  </button>
+                </div>
+                <div v-if="testResult" class="test-result success">
+                  <CheckCircle2 :size="14" />
+                  连接成功！延迟: {{ testResult.latencyMs }}ms
+                  <span v-if="testResult.model"> | 模型: {{ testResult.model }}</span>
+                </div>
+                <div v-if="testError" class="test-result error">
+                  <XCircle :size="14" />
+                  {{ testError }}
+                </div>
+              </div>
+              <div v-else class="channel-form-empty">
+                <RadioTower :size="48" :stroke-width="1" />
+                <p>选择左侧渠道进行编辑，或点击 + 添加新渠道</p>
+              </div>
             </div>
           </div>
 
@@ -178,8 +241,16 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue';
-import { getConfig, saveConfig, testConfig, TestConnectionResult, UserConfig, getUsageStats, UsageStats } from '../api/config';
-import { Settings, X, Key, Globe, Cpu, Eye, EyeOff, Plug, Save, Loader2, CheckCircle2, XCircle, Info, BarChart3 } from 'lucide-vue-next';
+import {
+  getConfig, saveConfig, testConfig, TestConnectionResult, UserConfig,
+  getUsageStats, UsageStats,
+  getChannels, createChannel, updateChannel, deleteChannel, activateChannel,
+  ApiChannel, ApiChannelList,
+} from '../api/config';
+import {
+  Settings, X, Key, Globe, Cpu, Eye, EyeOff, Plug, Save, Loader2,
+  CheckCircle2, XCircle, Info, BarChart3, Plus, Trash2, Check, RadioTower,
+} from 'lucide-vue-next';
 
 const props = defineProps<{
   visible: boolean;
@@ -202,6 +273,12 @@ const usageStats = ref<UsageStats | null>(null);
 const statsLoading = ref(false);
 const statsError = ref('');
 
+// 多渠道相关状态
+const channels = ref<ApiChannel[]>([]);
+const selectedChannelId = ref<number | null>(null);
+const isCreating = ref(false);
+const channelLoading = ref(false);
+
 const menus = [
   { key: 'api', label: 'API配置', icon: Key },
   { key: 'stats', label: '用量统计', icon: BarChart3 },
@@ -216,7 +293,8 @@ const presetModels = [
   'gpt-4-turbo',
 ];
 
-const form = reactive<UserConfig>({
+const channelForm = reactive({
+  channelName: '',
   apiKey: '',
   baseUrl: '',
   modelName: '',
@@ -224,7 +302,7 @@ const form = reactive<UserConfig>({
 
 watch(() => props.visible, async (newVal) => {
   if (newVal) {
-    await loadConfig();
+    await loadChannels();
   }
 });
 
@@ -234,22 +312,59 @@ watch(activeMenu, async (newVal) => {
   }
 });
 
-async function loadConfig() {
+async function loadChannels() {
   try {
-    const config = await getConfig();
-    if (config) {
-      form.apiKey = config.apiKey || '';
-      form.baseUrl = config.baseUrl || '';
-      form.modelName = config.modelName || '';
-
-      if (config.modelName && !presetModels.includes(config.modelName)) {
-        isCustomModel.value = true;
-        customModelName.value = config.modelName;
+    const data = await getChannels();
+    channels.value = data.channels;
+    // 自动选中激活的渠道
+    if (data.activeChannelId) {
+      const activeChannel = data.channels.find(c => c.id === data.activeChannelId);
+      if (activeChannel) {
+        selectChannel(activeChannel);
       }
+    } else if (data.channels.length > 0) {
+      selectChannel(data.channels[0]);
+    } else {
+      selectedChannelId.value = null;
+      isCreating.value = false;
     }
   } catch (error) {
-    console.error('加载配置失败:', error);
+    console.error('加载渠道列表失败:', error);
   }
+}
+
+function selectChannel(channel: ApiChannel) {
+  selectedChannelId.value = channel.id;
+  isCreating.value = false;
+  channelForm.channelName = channel.channelName;
+  channelForm.apiKey = ''; // 不回显已脱敏的key
+  channelForm.baseUrl = channel.baseUrl || '';
+  channelForm.modelName = channel.modelName || '';
+
+  if (channel.modelName && !presetModels.includes(channel.modelName)) {
+    isCustomModel.value = true;
+    customModelName.value = channel.modelName;
+  } else {
+    isCustomModel.value = false;
+    customModelName.value = '';
+  }
+
+  // 清除测试结果
+  testResult.value = null;
+  testError.value = '';
+}
+
+function handleAddChannel() {
+  selectedChannelId.value = null;
+  isCreating.value = true;
+  channelForm.channelName = '';
+  channelForm.apiKey = '';
+  channelForm.baseUrl = '';
+  channelForm.modelName = '';
+  isCustomModel.value = false;
+  customModelName.value = '';
+  testResult.value = null;
+  testError.value = '';
 }
 
 async function loadStats() {
@@ -266,7 +381,7 @@ async function loadStats() {
 }
 
 function onModelChange() {
-  if (form.modelName === 'custom') {
+  if (channelForm.modelName === 'custom') {
     isCustomModel.value = true;
     customModelName.value = '';
   } else {
@@ -276,35 +391,78 @@ function onModelChange() {
 
 function onCustomModelBlur() {
   if (customModelName.value) {
-    form.modelName = customModelName.value;
+    channelForm.modelName = customModelName.value;
   }
 }
 
-async function handleSave() {
-  if (!form.apiKey) {
+async function handleSaveChannel() {
+  if (!channelForm.channelName.trim()) {
+    alert('请输入渠道名称');
+    return;
+  }
+  if (isCreating.value && !channelForm.apiKey) {
     alert('请输入API Key');
     return;
   }
 
-  loading.value = true;
+  channelLoading.value = true;
   try {
-    await saveConfig({
-      apiKey: form.apiKey,
-      baseUrl: form.baseUrl,
-      modelName: form.modelName,
-    });
-    alert('配置保存成功');
+    const payload: ApiChannel = {
+      id: 0,
+      channelName: channelForm.channelName,
+      apiKey: channelForm.apiKey,
+      baseUrl: channelForm.baseUrl,
+      modelName: channelForm.modelName,
+      active: false,
+      createdAt: '',
+      updatedAt: '',
+    };
+
+    if (isCreating.value) {
+      await createChannel(payload);
+    } else {
+      await updateChannel(selectedChannelId.value!, payload);
+    }
+
+    await loadChannels();
     emit('saved');
-    close();
+    alert(isCreating.value ? '渠道创建成功' : '渠道更新成功');
   } catch (error) {
     alert('保存失败: ' + (error as Error).message);
   } finally {
-    loading.value = false;
+    channelLoading.value = false;
+  }
+}
+
+async function handleActivateChannel(channel: ApiChannel) {
+  try {
+    await activateChannel(channel.id);
+    await loadChannels();
+    emit('saved');
+  } catch (error) {
+    alert('激活失败: ' + (error as Error).message);
+  }
+}
+
+async function handleDeleteChannel(channel: ApiChannel) {
+  const confirmMsg = channel.active
+    ? `确定删除当前使用的渠道"${channel.channelName}"吗？删除后将自动切换到其他渠道。`
+    : `确定删除渠道"${channel.channelName}"吗？`;
+  if (!confirm(confirmMsg)) {
+    return;
+  }
+
+  try {
+    await deleteChannel(channel.id);
+    await loadChannels();
+    emit('saved');
+  } catch (error) {
+    alert('删除失败: ' + (error as Error).message);
   }
 }
 
 async function handleTest() {
-  if (!form.apiKey) {
+  if (!channelForm.apiKey) {
     testError.value = '请先输入 API Key';
     return;
   }
@@ -315,9 +473,9 @@ async function handleTest() {
 
   try {
     const result = await testConfig({
-      apiKey: form.apiKey,
-      baseUrl: form.baseUrl,
-      modelName: form.modelName,
+      apiKey: channelForm.apiKey,
+      baseUrl: channelForm.baseUrl,
+      modelName: channelForm.modelName,
     });
     testResult.value = result;
     setTimeout(() => { testResult.value = null; }, 3000);
@@ -351,8 +509,8 @@ function close() {
 .settings-dialog {
   background: white;
   border-radius: 8px;
-  width: 850px;
-  height: 550px;
+  width: 900px;
+  height: 580px;
   max-width: 90vw;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   display: flex;
@@ -417,6 +575,7 @@ function close() {
 .settings-body {
   flex: 1;
   padding: 20px;
+  overflow: hidden;
 }
 
 .section h4 {
@@ -428,6 +587,167 @@ function close() {
   color: #999;
   font-size: 13px;
   margin: 0 0 20px 0;
+}
+
+/* API配置双栏布局 */
+.api-section {
+  display: flex;
+  gap: 16px;
+  height: 100%;
+}
+
+.channel-list-panel {
+  width: 240px;
+  min-width: 240px;
+  border-right: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  padding-right: 16px;
+}
+
+.channel-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.channel-list-header h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.add-channel-btn {
+  padding: 4px 8px;
+  background: #1890ff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.add-channel-btn:hover {
+  background: #40a9ff;
+}
+
+.channel-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.channel-item {
+  padding: 10px 12px;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.channel-item:hover {
+  border-color: #1890ff;
+  background: #f0f8ff;
+}
+
+.channel-item.active {
+  border-color: #1890ff;
+  background: #e6f7ff;
+}
+
+.channel-item-info {
+  margin-bottom: 4px;
+}
+
+.channel-item-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.channel-item-model {
+  font-size: 12px;
+  color: #999;
+  margin-top: 2px;
+  padding-left: 20px;
+}
+
+.channel-item-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.active-badge {
+  font-size: 11px;
+  color: #52c41a;
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-right: auto;
+}
+
+.icon-btn {
+  padding: 4px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #999;
+  display: flex;
+  align-items: center;
+}
+
+.icon-btn:hover {
+  background: #f0f0f0;
+  border-color: #ddd;
+}
+
+.activate-btn:hover {
+  color: #52c41a;
+  background: #f6ffed;
+  border-color: #b7eb8f;
+}
+
+.delete-btn:hover {
+  color: #ff4d4f;
+  background: #fff2f0;
+  border-color: #ffccc7;
+}
+
+.channel-empty {
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+  padding: 20px 0;
+}
+
+.channel-form-panel {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.channel-form-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #ccc;
+  gap: 12px;
+}
+
+.channel-form-empty p {
+  font-size: 14px;
+  color: #999;
 }
 
 .form-group {

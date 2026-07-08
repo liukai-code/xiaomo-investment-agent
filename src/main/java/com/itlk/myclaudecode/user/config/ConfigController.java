@@ -66,4 +66,94 @@ public class ConfigController {
         }
         return userConfigService.testConnection(dto);
     }
+
+    // ==================== 多渠道管理 ====================
+
+    @GetMapping("/channels")
+    public Result<ApiChannelListDTO> listChannels(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.error("用户未登录");
+        }
+        return Result.success(userConfigService.listChannels(userId));
+    }
+
+    @GetMapping("/channels/{channelId}")
+    public Result<ApiChannelDTO> getChannel(HttpServletRequest request,
+                                             @PathVariable Long channelId) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.error("用户未登录");
+        }
+        ApiChannelDTO channel = userConfigService.getChannel(userId, channelId);
+        if (channel == null) {
+            return Result.error("渠道不存在");
+        }
+        return Result.success(channel);
+    }
+
+    @PostMapping("/channels")
+    public Result<ApiChannelDTO> createChannel(HttpServletRequest request,
+                                                @RequestBody ApiChannelDTO dto) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.error("用户未登录");
+        }
+        if (dto.getChannelName() == null || dto.getChannelName().trim().isEmpty()) {
+            return Result.error("渠道名称不能为空");
+        }
+        if (dto.getApiKey() == null || dto.getApiKey().length() < 10) {
+            return Result.error("API Key格式不正确");
+        }
+        try {
+            return Result.success(userConfigService.createChannel(userId, dto));
+        } catch (IllegalArgumentException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    @PutMapping("/channels/{channelId}")
+    public Result<ApiChannelDTO> updateChannel(HttpServletRequest request,
+                                                @PathVariable Long channelId,
+                                                @RequestBody ApiChannelDTO dto) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.error("用户未登录");
+        }
+        try {
+            return Result.success(userConfigService.updateChannel(userId, channelId, dto));
+        } catch (IllegalArgumentException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/channels/{channelId}")
+    public Result<Void> deleteChannel(HttpServletRequest request,
+                                       @PathVariable Long channelId) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.error("用户未登录");
+        }
+        try {
+            userConfigService.deleteChannel(userId, channelId);
+            return Result.success();
+        } catch (IllegalArgumentException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    @PutMapping("/channels/{channelId}/activate")
+    public Result<Void> activateChannel(HttpServletRequest request,
+                                         @PathVariable Long channelId) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.error("用户未登录");
+        }
+        try {
+            userConfigService.activateChannel(userId, channelId);
+            return Result.success();
+        } catch (IllegalArgumentException e) {
+            return Result.error(e.getMessage());
+        }
+    }
 }

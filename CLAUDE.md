@@ -117,6 +117,7 @@ Response: `{ code: 1|0, msg, data }`
 
 ## Conventions
 
+- 使用中文回答用户问题，代码注释和 commit message 也用中文
 - Commit messages: 中文，带 prefix（feat/fix/refactor/docs），禁止自动附加 Co-Authored-By trailer
 - 不要自动执行 `git push`，commit 完成后由用户自行决定是否推送
 - 包名全小写，类名大驼峰

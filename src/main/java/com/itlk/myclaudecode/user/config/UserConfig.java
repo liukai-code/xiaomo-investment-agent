@@ -11,8 +11,11 @@ public class UserConfig {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false, unique = true)
+    @Column(name = "user_id", nullable = false)
     private Long userId;
+
+    @Column(name = "channel_name", length = 64)
+    private String channelName = "默认渠道";
 
     @Column(name = "api_key_encrypted", length = 512)
     private String apiKeyEncrypted;
@@ -22,6 +25,9 @@ public class UserConfig {
 
     @Column(name = "model_name", length = 128)
     private String modelName;
+
+    @Column(name = "is_active")
+    private Boolean isActive = false;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -79,6 +85,22 @@ public class UserConfig {
 
     public void setModelName(String modelName) {
         this.modelName = modelName;
+    }
+
+    public String getChannelName() {
+        return channelName;
+    }
+
+    public void setChannelName(String channelName) {
+        this.channelName = channelName;
+    }
+
+    public Boolean getIsActive() {
+        return isActive;
+    }
+
+    public void setIsActive(Boolean isActive) {
+        this.isActive = isActive;
     }
 
     public LocalDateTime getCreatedAt() {

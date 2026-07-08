@@ -1,0 +1,12 @@
+-- V3__add_channel_support_to_user_config.sql
+-- 将 user_config 从单配置改造为多渠道支持
+-- 注意：此文件为手动参考，实际由 Hibernate ddl-auto: update 自动管理列
+-- 如需手动执行，取消下方注释：
+
+-- ALTER TABLE user_config DROP CONSTRAINT IF EXISTS user_config_user_id_key;
+-- ALTER TABLE user_config ADD COLUMN IF NOT EXISTS channel_name VARCHAR(64) DEFAULT '默认渠道';
+-- ALTER TABLE user_config ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT FALSE;
+-- UPDATE user_config SET is_active = TRUE WHERE is_active IS NULL;
+-- CREATE UNIQUE INDEX IF NOT EXISTS idx_user_config_active ON user_config(user_id) WHERE is_active = TRUE;
+-- CREATE UNIQUE INDEX IF NOT EXISTS idx_user_config_user_channel ON user_config(user_id, channel_name);
+-- CREATE INDEX IF NOT EXISTS idx_user_config_user_active ON user_config(user_id, is_active);

@@ -6,6 +6,22 @@ export interface UserConfig {
   modelName: string;
 }
 
+export interface ApiChannel {
+  id: number;
+  channelName: string;
+  apiKey: string;
+  baseUrl: string;
+  modelName: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApiChannelList {
+  channels: ApiChannel[];
+  activeChannelId: number | null;
+}
+
 export async function getConfig(): Promise<UserConfig | null> {
   const token = localStorage.getItem('token');
   if (!token) {
@@ -136,4 +152,128 @@ export async function getUsageStats(): Promise<UsageStats> {
     return result.data;
   }
   throw new Error(result.msg || '获取统计数据失败');
+}
+
+// ==================== 多渠道管理 ====================
+
+export async function getChannels(): Promise<ApiChannelList> {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('用户未登录');
+  }
+
+  const response = await fetch('/api/user/config/channels', {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('获取渠道列表失败');
+  }
+
+  const result = await response.json();
+  if (result.code === 1) {
+    return result.data;
+  }
+  throw new Error(result.msg || '获取渠道列表失败');
+}
+
+export async function createChannel(channel: ApiChannel): Promise<ApiChannel> {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('用户未登录');
+  }
+
+  const response = await fetch('/api/user/config/channels', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(channel),
+  });
+
+  if (!response.ok) {
+    throw new Error('创建渠道失败');
+  }
+
+  const result = await response.json();
+  if (result.code === 1) {
+    return result.data;
+  }
+  throw new Error(result.msg || '创建渠道失败');
+}
+
+export async function updateChannel(id: number, channel: ApiChannel): Promise<ApiChannel> {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('用户未登录');
+  }
+
+  const response = await fetch(`/api/user/config/channels/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(channel),
+  });
+
+  if (!response.ok) {
+    throw new Error('更新渠道失败');
+  }
+
+  const result = await response.json();
+  if (result.code === 1) {
+    return result.data;
+  }
+  throw new Error(result.msg || '更新渠道失败');
+}
+
+export async function deleteChannel(id: number): Promise<void> {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('用户未登录');
+  }
+
+  const response = await fetch(`/api/user/config/channels/${id}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('删除渠道失败');
+  }
+
+  const result = await response.json();
+  if (result.code !== 1) {
+    throw new Error(result.msg || '删除渠道失败');
+  }
+}
+
+export async function activateChannel(id: number): Promise<void> {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('用户未登录');
+  }
+
+  const response = await fetch(`/api/user/config/channels/${id}/activate`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('激活渠道失败');
+  }
+
+  const result = await response.json();
+  if (result.code !== 1) {
+    throw new Error(result.msg || '激活渠道失败');
+  }
 }
