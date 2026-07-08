@@ -7,6 +7,7 @@ import java.util.List;
 public interface UsageRecordService {
     void record(Long userId, Long conversationId, Long inputTokens, Long outputTokens, Integer toolCallCount);
     UsageStatsDTO getStats(Long userId);
+    void resetStats(Long userId);
 
     /**
      * 估算 input tokens：从消息列表总字符数除以3.5（中英混合内容平均比率）。

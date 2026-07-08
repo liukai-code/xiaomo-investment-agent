@@ -154,6 +154,29 @@ export async function getUsageStats(): Promise<UsageStats> {
   throw new Error(result.msg || '获取统计数据失败');
 }
 
+export async function resetUsageStats(): Promise<void> {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('用户未登录');
+  }
+
+  const response = await fetch('/api/usage/stats', {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('重置统计数据失败');
+  }
+
+  const result = await response.json();
+  if (result.code !== 1) {
+    throw new Error(result.msg || '重置统计数据失败');
+  }
+}
+
 // ==================== 多渠道管理 ====================
 
 export async function getChannels(): Promise<ApiChannelList> {

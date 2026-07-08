@@ -29,6 +29,9 @@ public class UserConfig {
     @Column(name = "is_active")
     private Boolean isActive = false;
 
+    @Column(name = "stats_reset_at")
+    private LocalDateTime statsResetAt;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -101,6 +104,14 @@ public class UserConfig {
 
     public void setIsActive(Boolean isActive) {
         this.isActive = isActive;
+    }
+
+    public LocalDateTime getStatsResetAt() {
+        return statsResetAt;
+    }
+
+    public void setStatsResetAt(LocalDateTime statsResetAt) {
+        this.statsResetAt = statsResetAt;
     }
 
     public LocalDateTime getCreatedAt() {

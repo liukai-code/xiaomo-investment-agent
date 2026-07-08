@@ -212,6 +212,10 @@
               </div>
 
               <div class="section-actions">
+                <button class="reset-btn" @click="handleResetStats" :disabled="statsLoading">
+                  <RotateCcw :size="14" />
+                  重置统计
+                </button>
                 <button class="save-btn" @click="loadStats" :disabled="statsLoading">
                   <BarChart3 :size="14" />
                   刷新数据
@@ -243,13 +247,13 @@
 import { ref, reactive, watch } from 'vue';
 import {
   getConfig, saveConfig, testConfig, TestConnectionResult, UserConfig,
-  getUsageStats, UsageStats,
+  getUsageStats, resetUsageStats, UsageStats,
   getChannels, createChannel, updateChannel, deleteChannel, activateChannel,
   ApiChannel, ApiChannelList,
 } from '../api/config';
 import {
   Settings, X, Key, Globe, Cpu, Eye, EyeOff, Plug, Save, Loader2,
-  CheckCircle2, XCircle, Info, BarChart3, Plus, Trash2, Check, RadioTower,
+  CheckCircle2, XCircle, Info, BarChart3, Plus, Trash2, Check, RadioTower, RotateCcw,
 } from 'lucide-vue-next';
 
 const props = defineProps<{
@@ -375,6 +379,24 @@ async function loadStats() {
   } catch (error) {
     console.error('加载统计数据失败:', error);
     statsError.value = (error as Error).message || '加载失败';
+  } finally {
+    statsLoading.value = false;
+  }
+}
+
+async function handleResetStats() {
+  if (!confirm('确定要重置用量统计吗？对话记录不会被删除。')) {
+    return;
+  }
+  statsLoading.value = true;
+  statsError.value = '';
+  try {
+    await resetUsageStats();
+    usageStats.value = null;
+    await loadStats();
+  } catch (error) {
+    console.error('重置统计数据失败:', error);
+    statsError.value = (error as Error).message || '重置失败';
   } finally {
     statsLoading.value = false;
   }
@@ -843,6 +865,16 @@ button:disabled {
   background: #1890ff;
   color: white;
   border-color: #1890ff;
+}
+
+.reset-btn {
+  background: #52c41a;
+  color: white;
+  border-color: #52c41a;
+}
+
+.reset-btn:hover {
+  background: #73d13d;
 }
 
 .test-result {

@@ -4,6 +4,7 @@ import com.itlk.myclaudecode.conversation.entity.ChatMessage;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
@@ -15,4 +16,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 
     @Query("SELECT COUNT(m) FROM ChatMessage m WHERE m.conversation.userId = :userId")
     Long countByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT COUNT(m) FROM ChatMessage m WHERE m.conversation.userId = :userId AND m.createdAt > :since")
+    Long countByUserIdSince(@Param("userId") Long userId, @Param("since") LocalDateTime since);
 }
