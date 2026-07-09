@@ -22,22 +22,32 @@ public class GetAnalysisReportTool {
             @ToolParam(description = "股票代码（如688398）或股票名称（如丰光精密）") String stockCode,
             @ToolParam(description = "指定分析记录ID，可选，不填则查询该股票最近一次分析") Long analysisId) {
         try {
+            WorkflowAnalysis analysis = null;
+
             // 优先按 analysisId 查询
             if (analysisId != null) {
                 // 通过 analysisId 直接查询，权限校验在 Controller 层
+                var byId = analysisService.findById(analysisId);
+                if (byId.isPresent()) {
+                    analysis = byId.get();
+                } else {
+                    return "未找到ID为「" + analysisId + "」的分析记录。";
+                }
             }
 
-            // 通过 stockCode 查询最近一次分析
-            if (stockCode == null || stockCode.isBlank()) {
-                return "错误：请提供股票代码或股票名称";
-            }
+            // analysisId 未指定或未找到时，通过 stockCode 查询最近一次分析
+            if (analysis == null) {
+                if (stockCode == null || stockCode.isBlank()) {
+                    return "错误：请提供股票代码或股票名称";
+                }
 
-            var analyses = analysisService.findLatestByStockAny(stockCode);
-            if (analyses.isEmpty()) {
-                return "未找到「" + stockCode + "」的深度分析记录。请先在深度分析页面（/analysis）发起分析。";
-            }
+                var analyses = analysisService.findLatestByStockAny(stockCode);
+                if (analyses.isEmpty()) {
+                    return "未找到「" + stockCode + "」的深度分析记录。请先在深度分析页面（/analysis）发起分析。";
+                }
 
-            var analysis = analyses.get();
+                analysis = analyses.get();
+            }
             StringBuilder sb = new StringBuilder();
             sb.append("## ").append(analysis.getResolvedStockName() != null ? analysis.getResolvedStockName() : stockCode);
             sb.append(" 深度分析报告\n\n");

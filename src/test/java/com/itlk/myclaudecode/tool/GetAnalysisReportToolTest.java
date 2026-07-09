@@ -35,6 +35,65 @@ class GetAnalysisReportToolTest {
     class GetReportTest {
 
         @Test
+        @DisplayName("analysisId 有效且存在 → 按 ID 返回报告")
+        void findByAnalysisId() {
+            WorkflowAnalysis analysis = new WorkflowAnalysis();
+            analysis.setId(100L);
+            analysis.setResolvedStockName("贵州茅台");
+            analysis.setResolvedStockCode("600519");
+            analysis.setWorkflowStatus("COMPLETED");
+            analysis.setAction("BUY");
+            analysis.setConfidence(0.9);
+            analysis.setSummary("ID 查询测试");
+            analysis.setCompletedAt(LocalDateTime.of(2026, 7, 9, 10, 0));
+            analysis.setCreatedAt(LocalDateTime.of(2026, 7, 9, 9, 0));
+
+            when(analysisService.findById(100L)).thenReturn(Optional.of(analysis));
+
+            String result = tool.getAnalysisReport("任意", 100L);
+
+            assertTrue(result.contains("贵州茅台"), "应包含股票名称");
+            assertTrue(result.contains("BUY"), "应包含操作建议");
+            assertTrue(result.contains("ID 查询测试"), "应包含摘要");
+            assertTrue(result.contains("深度分析报告"), "应包含报告标题");
+        }
+
+        @Test
+        @DisplayName("analysisId 指定但不存在 → 返回未找到提示")
+        void analysisIdNotFound() {
+            when(analysisService.findById(999L)).thenReturn(Optional.empty());
+
+            String result = tool.getAnalysisReport("任意", 999L);
+
+            assertTrue(result.contains("未找到"), "应返回未找到提示");
+            assertTrue(result.contains("999"), "应包含查询的ID");
+        }
+
+        @Test
+        @DisplayName("analysisId 指定时跳过 stockCode 查询")
+        void analysisIdSkipsStockCode() {
+            WorkflowAnalysis analysis = new WorkflowAnalysis();
+            analysis.setId(100L);
+            analysis.setResolvedStockName("贵州茅台");
+            analysis.setWorkflowStatus("COMPLETED");
+            analysis.setCreatedAt(LocalDateTime.of(2026, 7, 9, 9, 0));
+
+            when(analysisService.findById(100L)).thenReturn(Optional.of(analysis));
+
+            // stockCode 为空，但 analysisId 存在 → 不应报错
+            String result = tool.getAnalysisReport("", 100L);
+
+            assertTrue(result.contains("贵州茅台"), "应通过 analysisId 返回报告");
+        }
+
+        @Test
+        @DisplayName("analysisId 为 null 且 stockCode 为空 → 返回错误提示")
+        void bothNull() {
+            String result = tool.getAnalysisReport(null, null);
+            assertTrue(result.contains("请提供股票代码"), "应提示提供股票代码");
+        }
+
+        @Test
         @DisplayName("stockCode 为空 → 返回错误提示")
         void emptyStockCode() {
             String result = tool.getAnalysisReport("", null);

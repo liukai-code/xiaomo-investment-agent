@@ -145,6 +145,35 @@ class AnalysisServiceTest {
     }
 
     @Nested
+    @DisplayName("findById 按 ID 查询")
+    class FindByIdTest {
+
+        @Test
+        @DisplayName("ID 存在 → 返回分析记录")
+        void found() {
+            WorkflowAnalysis analysis = new WorkflowAnalysis();
+            analysis.setId(100L);
+            analysis.setWorkflowStatus("COMPLETED");
+            when(analysisRepository.findById(100L)).thenReturn(Optional.of(analysis));
+
+            var result = analysisService.findById(100L);
+
+            assertTrue(result.isPresent());
+            assertEquals(100L, result.get().getId());
+        }
+
+        @Test
+        @DisplayName("ID 不存在 → 返回空")
+        void notFound() {
+            when(analysisRepository.findById(999L)).thenReturn(Optional.empty());
+
+            var result = analysisService.findById(999L);
+
+            assertTrue(result.isEmpty());
+        }
+    }
+
+    @Nested
     @DisplayName("findLatestByStockAny 按标的查询")
     class FindLatestByStockAnyTest {
 

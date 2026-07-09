@@ -171,6 +171,12 @@ public class DeepAnalysisWorkflow {
         Sinks.Many<WorkflowEvent> sink = Sinks.many().replay().all();
         analysisEventSinks.put(analysisId, sink);
 
+        // 更新分析记录状态为 RUNNING，使并发守卫生效
+        analysisRepository.findById(analysisId).ifPresent(a -> {
+            a.setWorkflowStatus("RUNNING");
+            analysisRepository.save(a);
+        });
+
         WorkflowState state = new WorkflowState();
         state.setUserId(userId);
         state.setAnalysisId(analysisId);

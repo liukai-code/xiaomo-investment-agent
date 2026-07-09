@@ -78,6 +78,13 @@ public class AnalysisService {
     }
 
     /**
+     * 按 ID 查询分析记录（供 Tool 使用，不校验 userId，权限由 Controller 层负责）
+     */
+    public Optional<WorkflowAnalysis> findById(Long id) {
+        return analysisRepository.findById(id);
+    }
+
+    /**
      * 按标的查询最近一次分析（供 Tool 使用）
      */
     public Optional<WorkflowAnalysis> findLatestByStock(Long userId, String stockCode) {
