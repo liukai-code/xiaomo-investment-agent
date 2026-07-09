@@ -3,9 +3,8 @@ import { ref, nextTick, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
-import { streamChat, streamDeepAnalysis, type WorkflowEvent, type StatusEvent } from '@/api/chat'
+import { streamChat, type StatusEvent } from '@/api/chat'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
-import WorkflowPanel from '@/components/workflow/WorkflowPanel.vue'
 import { useRafThrottle } from '@/composables/useMarkdownBlocks'
 import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen, Bell, Square, Loader2 } from 'lucide-vue-next'
 import { useYangjibaoStore } from '@/stores/yangjibao'
@@ -29,11 +28,6 @@ const sidebarCollapsed = ref(false)
 const showSettings = ref(false)
 
 let abortController: AbortController | null = null
-
-// 深度分析工作流状态
-const workflowEvents = ref<WorkflowEvent[]>([])
-const isWorkflowRunning = ref(false)
-const isWorkflowMode = ref(false)
 
 // 工具调用状态
 const currentStatus = ref<StatusEvent | null>(null)
@@ -110,17 +104,6 @@ function getStatusLabel(status: StatusEvent): string {
   return '处理中'
 }
 
-function resetWorkflowState() {
-  isWorkflowMode.value = false
-  isWorkflowRunning.value = false
-  workflowEvents.value = []
-}
-
-function isDeepAnalysisRequest(text: string): boolean {
-  const keywords = ['深度分析', '全面分析', '深度研究', '深度调研', '多维度分析', '深入分析']
-  return keywords.some((kw) => text.includes(kw))
-}
-
 const currentTitle = computed(() => {
   const conv = chatStore.getCurrentConversation()
   return conv ? conv.title : 'Financial Agent'
@@ -157,7 +140,6 @@ function scrollToBottomIfNear() {
 }
 
 async function handleCreateConversation() {
-  resetWorkflowState()
   chatStore.currentConvId = null
   chatStore.messages = []
 }
@@ -169,7 +151,6 @@ async function handleSwitchConversation(id: number) {
     chatStore.isGenerating = false
     statusText.value = 'READY'
   }
-  resetWorkflowState()
   await chatStore.switchConversation(id)
 }
 
@@ -260,12 +241,6 @@ async function handleSend() {
   statusText.value = '生成中...'
   currentStatus.value = { type: 'THINKING' }
 
-  // 判断是否走深度分析工作流
-  if (isDeepAnalysisRequest(text)) {
-    handleDeepAnalysis(text)
-    return
-  }
-
   chatStore.addStreamingAiMessage()
   scrollToBottom()
 
@@ -318,14 +293,10 @@ function handleStop() {
 
   // 用独立请求保存部分内容（不走共享 axios 实例，避免被 abortController 连带取消）
   if (lastMsg && lastMsg.role === 'ASSISTANT' && convId) {
-    let content = lastMsg.content
-    if (isWorkflowMode.value && workflowEvents.value.length > 0) {
-      content = buildPartialWorkflowSummary()
-    }
+    const content = lastMsg.content
     if (content) {
       const finalContent = content + '\n\n> *已手动终止*'
       lastMsg.content = finalContent
-      // fire-and-forget 但用独立实例，切会话不会被取消
       const token = authStore.token
       fetch(`/agent/conversation/${convId}/message`, {
         method: 'POST',
@@ -339,88 +310,8 @@ function handleStop() {
   }
 
   chatStore.isGenerating = false
-  resetWorkflowState()
   statusText.value = 'READY'
   currentStatus.value = null
-}
-
-function buildPartialWorkflowSummary(): string {
-  const completedPhases = workflowEvents.value
-    .filter((e) => e.type === 'PHASE_COMPLETE')
-    .map((e) => e.phase)
-  const runningPhase = workflowEvents.value
-    .filter((e) => e.type === 'PHASE_START')
-    .map((e) => e.phase)
-    .pop()
-  const finalEvent = workflowEvents.value.find((e) => e.type === 'FINAL_DECISION')
-
-  let summary = '## 深度分析（已终止）\n\n'
-  if (completedPhases.length > 0) {
-    summary += `已完成阶段：${completedPhases.join(' → ')}\n`
-  }
-  if (runningPhase && !completedPhases.includes(runningPhase)) {
-    summary += `中断阶段：${runningPhase}\n`
-  }
-  if (finalEvent?.content) {
-    summary += `\n### 已生成的决策\n\n${finalEvent.content}\n`
-  }
-  summary += '\n---\n*以上由多智能体工作流部分生成，仅供参考*'
-  return summary
-}
-
-function handleDeepAnalysis(text: string) {
-  // 切换到工作流模式
-  isWorkflowMode.value = true
-  isWorkflowRunning.value = true
-  workflowEvents.value = []
-  statusText.value = '深度分析中...'
-
-  // 添加一个占位消息，用于显示工作流面板
-  chatStore.addStreamingAiMessage()
-  chatStore.updateLastAiMessage('深度分析工作流已启动，请稍候...')
-  scrollToBottom()
-
-  abortController = streamDeepAnalysis(chatStore.currentConvId!, text, authStore.token, {
-    onEvent(event: WorkflowEvent) {
-      workflowEvents.value.push(event)
-      scrollToBottomIfNear()
-    },
-    onDone() {
-      resetWorkflowState()
-      chatStore.isGenerating = false
-      statusText.value = 'READY'
-      abortController = null
-
-      // 将最终结果写入消息
-      const summary = buildWorkflowSummary()
-      chatStore.updateLastAiMessage(summary)
-      scrollToBottom()
-      chatStore.loadConversations()
-      chatStore.generateTitle(chatStore.currentConvId!)
-    },
-    onError(err: Error) {
-      resetWorkflowState()
-      chatStore.updateLastAiMessage(`深度分析失败: ${err.message}`)
-      chatStore.isGenerating = false
-      statusText.value = 'READY'
-      abortController = null
-    },
-  })
-}
-
-function buildWorkflowSummary(): string {
-  // 从工作流事件中提取最终决策
-  const finalEvent = workflowEvents.value.find((e) => e.type === 'FINAL_DECISION')
-  if (finalEvent?.content) {
-    return `## 深度分析完成\n\n${finalEvent.content}\n\n---\n*以上由多智能体工作流自动生成，仅供参考*`
-  }
-
-  // 如果没有最终决策，显示各阶段完成状态
-  const completedPhases = workflowEvents.value
-    .filter((e) => e.type === 'PHASE_COMPLETE')
-    .map((e) => e.phase)
-
-  return `## 深度分析完成\n\n已完成阶段：${completedPhases.join(' → ')}\n\n详细分析结果请查看上方工作流面板。\n\n---\n*以上由多智能体工作流自动生成，仅供参考*`
 }
 
 onMounted(async () => {
@@ -593,15 +484,10 @@ watch(() => yjbStore.cardVisible, (visible) => {
                       <Loader2 :size="14" class="status-spinner" />
                       <span>{{ getStatusLabel(currentStatus) }}...</span>
                     </div>
-                    <template v-if="isWorkflowMode && msg === chatStore.messages[chatStore.messages.length - 1] && workflowEvents.length > 0">
-                      <WorkflowPanel :events="workflowEvents" :is-running="isWorkflowRunning" />
-                    </template>
-                    <template v-else>
-                      <MarkdownRenderer
-                        :text="msg.content"
-                        :is-streaming="chatStore.isGenerating && msg === chatStore.messages[chatStore.messages.length - 1]"
-                      />
-                    </template>
+                    <MarkdownRenderer
+                      :text="msg.content"
+                      :is-streaming="chatStore.isGenerating && msg === chatStore.messages[chatStore.messages.length - 1]"
+                    />
                   </template>
                 </div>
               </div>
