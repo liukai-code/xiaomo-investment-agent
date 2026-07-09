@@ -1,12 +1,8 @@
 import request from './request'
+import { processWorkflowEvents } from './chat'
+import type { WorkflowEvent } from './chat'
 
-export interface WorkflowEvent {
-  type: string
-  agentName: string | null
-  content: string | null
-  phase: string | null
-  timestamp: string
-}
+export type { WorkflowEvent }
 
 export interface AnalysisRecord {
   id: number
@@ -93,34 +89,48 @@ export function streamAnalysis(
       const reader = response.body!.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      let doneCalled = false
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
+
         buffer += decoder.decode(value, { stream: true })
+        const result = processWorkflowEvents(buffer)
+        buffer = result.incomplete
 
-        const parts = buffer.split('\n\n')
-        buffer = parts.pop() || ''
-
-        for (const part of parts) {
-          const lines = part.split('\n')
-          let eventType = ''
-          let eventData = ''
-          for (const line of lines) {
-            if (line.startsWith('event:')) eventType = line.slice(6).trim()
-            else if (line.startsWith('data:')) eventData = line.slice(5).trim()
-          }
-          if (eventType === 'workflow' && eventData) {
+        for (const event of result.events) {
+          if (event.event === 'workflow' && event.data) {
             try {
-              callbacks.onEvent(JSON.parse(eventData))
+              callbacks.onEvent(JSON.parse(event.data))
             } catch {
               // ignore parse errors
             }
-          } else if (eventType === 'done') {
+          } else if (event.event === 'done') {
+            doneCalled = true
             callbacks.onDone()
           }
         }
       }
+
+      // 处理剩余 buffer
+      if (buffer.trim()) {
+        const remaining = processWorkflowEvents(buffer + '\n\n')
+        for (const event of remaining.events) {
+          if (event.event === 'workflow' && event.data) {
+            try {
+              callbacks.onEvent(JSON.parse(event.data))
+            } catch {
+              // ignore
+            }
+          } else if (event.event === 'done') {
+            doneCalled = true
+            callbacks.onDone()
+          }
+        }
+      }
+
+      if (!doneCalled) callbacks.onDone()
     })
     .catch((err) => {
       if (err.name !== 'AbortError') callbacks.onError(err.message)

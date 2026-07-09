@@ -89,35 +89,13 @@ export function streamChat(
   return controller
 }
 
-interface ParsedSseEvent {
+export interface ParsedSseEvent {
   event: string
   data: string
 }
 
 function processChatEvents(raw: string): { events: ParsedSseEvent[]; incomplete: string } {
-  const parts = raw.split(/\n\n/)
-  const incomplete = parts.pop() || ''
-  const events: ParsedSseEvent[] = []
-
-  for (const part of parts) {
-    if (!part.trim()) continue
-    let event = 'message'
-    const dataLines: string[] = []
-    for (const line of part.split(/\n/)) {
-      if (line.startsWith('event:')) {
-        event = line.substring(6).trim()
-      } else if (line.startsWith('data:')) {
-        dataLines.push(line.substring(5))
-      } else if (dataLines.length > 0) {
-        dataLines[dataLines.length - 1] += '\n' + line
-      }
-    }
-    if (dataLines.length > 0) {
-      events.push({ event, data: dataLines.join('\n') })
-    }
-  }
-
-  return { events, incomplete }
+  return processWorkflowEvents(raw)
 }
 
 // ========== 深度分析工作流 ==========
@@ -208,7 +186,7 @@ export function streamDeepAnalysis(
   return controller
 }
 
-function processWorkflowEvents(raw: string): { events: ParsedSseEvent[]; incomplete: string } {
+export function processWorkflowEvents(raw: string): { events: ParsedSseEvent[]; incomplete: string } {
   const parts = raw.split(/\n\n/)
   const incomplete = parts.pop() || ''
   const events: ParsedSseEvent[] = []
