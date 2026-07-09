@@ -17,6 +17,7 @@ public class WorkflowState {
     // 输入
     private Long userId;
     private Long conversationId;
+    private Long analysisId;  // 独立分析模式的分析记录 ID
     private String originalQuery;
     private Set<String> allowedStockCodes;
 

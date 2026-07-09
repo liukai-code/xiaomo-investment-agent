@@ -24,6 +24,7 @@ import com.itlk.myclaudecode.tool.FinancialDataRouterTool;
 import com.itlk.myclaudecode.tool.SqlTool;
 import com.itlk.myclaudecode.tool.WebFetchTool;
 import com.itlk.myclaudecode.tool.YangJiBaoTool;
+import com.itlk.myclaudecode.tool.GetAnalysisReportTool;
 import com.itlk.myclaudecode.tool.astock.*;
 import com.itlk.myclaudecode.common.config.HttpClientService;
 import com.itlk.myclaudecode.workflow.util.StockResolver;
@@ -134,6 +135,7 @@ public class AgentLoopImpl implements AgentLoop {
                          SqlTool sqlTool,
                          WebFetchTool webFetchTool,
                          YangJiBaoTool yangJiBaoTool,
+                         GetAnalysisReportTool getAnalysisReportTool,
                          AStockQuoteRouterTool aStockQuoteRouterTool,
                          AStockReportRouterTool aStockReportRouterTool,
                          AStockSignalRouterTool aStockSignalRouterTool,
@@ -159,7 +161,7 @@ public class AgentLoopImpl implements AgentLoop {
             ToolCallbackProvider provider = MethodToolCallbackProvider.builder()
                     .toolObjects(fileReadTool, fileWriteTool, fileListTool,
                             financialCalcRouterTool, financialDataRouterTool, sqlTool, webFetchTool,
-                            yangJiBaoTool,
+                            yangJiBaoTool, getAnalysisReportTool,
                             aStockQuoteRouterTool, aStockReportRouterTool, aStockSignalRouterTool,
                             aStockCapitalRouterTool, aStockNewsRouterTool, aStockLimitUpRouterTool,
                             aStockOptionRouterTool, aStockSentimentRouterTool)
@@ -193,7 +195,7 @@ public class AgentLoopImpl implements AgentLoop {
             ChatClient.Builder builder = ChatClient.builder(chatModel)
                     .defaultTools(fileReadTool, fileWriteTool, fileListTool,
                             financialCalcRouterTool, financialDataRouterTool, sqlTool, webFetchTool,
-                            yangJiBaoTool,
+                            yangJiBaoTool, getAnalysisReportTool,
                             aStockQuoteRouterTool, aStockReportRouterTool, aStockSignalRouterTool,
                             aStockCapitalRouterTool, aStockNewsRouterTool, aStockLimitUpRouterTool,
                             aStockOptionRouterTool, aStockSentimentRouterTool);

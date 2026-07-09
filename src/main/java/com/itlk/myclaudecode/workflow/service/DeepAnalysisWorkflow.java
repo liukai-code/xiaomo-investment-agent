@@ -22,9 +22,12 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
+import reactor.core.publisher.Sinks;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Slf4j
@@ -38,6 +41,9 @@ public class DeepAnalysisWorkflow {
     private final ObjectMapper objectMapper;
     private final HttpClientService httpClientService;
     private final UserConfigService userConfigService;
+
+    /** 独立分析模式的事件 Sink 映射（analysisId -> Sink） */
+    private final ConcurrentHashMap<Long, Sinks.Many<WorkflowEvent>> analysisEventSinks = new ConcurrentHashMap<>();
 
     public DeepAnalysisWorkflow(WorkflowAgentFactory agentFactory,
                                  WorkflowEngine engine,
@@ -58,7 +64,24 @@ public class DeepAnalysisWorkflow {
     }
 
     /**
-     * 执行深度分析工作流
+     * 获取指定分析的事件 Sink（供 Controller 订阅）
+     */
+    public Sinks.Many<WorkflowEvent> getEventSink(Long analysisId) {
+        return analysisEventSinks.get(analysisId);
+    }
+
+    /**
+     * 移除事件 Sink（分析完成后清理）
+     */
+    public void removeEventSink(Long analysisId) {
+        Sinks.Many<WorkflowEvent> sink = analysisEventSinks.remove(analysisId);
+        if (sink != null) {
+            sink.tryEmitComplete();
+        }
+    }
+
+    /**
+     * 执行深度分析工作流（对话模式，关联 conversationId）
      */
     public Flux<WorkflowEvent> execute(Long userId, Long conversationId, String query) {
         log.info("启动深度分析工作流: userId={}, query={}", userId, query);
@@ -104,13 +127,107 @@ public class DeepAnalysisWorkflow {
         WorkflowGraph graph = buildGraph(userChatModel);
 
         return engine.execute(graph, state)
+                .doOnNext(event -> {
+                    // 如果存在独立分析的 Sink，同步发布事件
+                    Long analysisId = state.getAnalysisId();
+                    if (analysisId != null) {
+                        Sinks.Many<WorkflowEvent> sink = analysisEventSinks.get(analysisId);
+                        if (sink != null && sink.currentSubscriberCount() > 0) {
+                            sink.tryEmitNext(event);
+                        }
+                    }
+                })
                 .doOnComplete(() -> {
                     log.info("工作流完成，持久化结果");
-                    persistResults(state, "COMPLETED", null);
+                    if (state.getAnalysisId() != null) {
+                        persistResultsWithId(state, state.getAnalysisId(), "COMPLETED", null);
+                        removeEventSink(state.getAnalysisId());
+                    } else {
+                        persistResults(state, "COMPLETED", null);
+                    }
                 })
                 .doOnError(e -> {
                     log.error("工作流执行错误: {}", e.getMessage(), e);
-                    persistResults(state, "FAILED", e.getMessage());
+                    if (state.getAnalysisId() != null) {
+                        persistResultsWithId(state, state.getAnalysisId(), "FAILED", e.getMessage());
+                        Sinks.Many<WorkflowEvent> sink = analysisEventSinks.get(state.getAnalysisId());
+                        if (sink != null) {
+                            sink.tryEmitNext(WorkflowEvent.error("工作流执行失败: " + e.getMessage()));
+                        }
+                        removeEventSink(state.getAnalysisId());
+                    } else {
+                        persistResults(state, "FAILED", e.getMessage());
+                    }
+                });
+    }
+
+    /**
+     * 使用预创建的分析记录执行工作流（独立分析模式，不关联对话）
+     */
+    public Flux<WorkflowEvent> executeWithAnalysisId(Long userId, Long analysisId, String query) {
+        log.info("启动独立分析工作流: userId={}, analysisId={}, query={}", userId, analysisId, query);
+
+        // 创建事件 Sink
+        Sinks.Many<WorkflowEvent> sink = Sinks.many().replay().all();
+        analysisEventSinks.put(analysisId, sink);
+
+        WorkflowState state = new WorkflowState();
+        state.setUserId(userId);
+        state.setAnalysisId(analysisId);
+        state.setOriginalQuery(query);
+
+        // 提取股票代码用于范围守卫
+        var stockCodes = StockCodeExtractor.extract(query);
+        if (!stockCodes.isEmpty()) {
+            String code = stockCodes.iterator().next();
+            state.setResolvedStockCode(code);
+            state.setAllowedStockCodes(stockCodes);
+            log.info("从查询中提取到数字代码: {}", code);
+        } else {
+            try {
+                var resolved = StockResolver.resolve(query, httpClientService);
+                state.setResolvedStockCode(resolved.code());
+                state.setResolvedStockName(resolved.name());
+                state.setAllowedStockCodes(java.util.Set.of(resolved.code()));
+                log.info("标的解析成功: {}({})", resolved.name(), resolved.code());
+            } catch (IllegalArgumentException e) {
+                log.warn("标的解析失败: {}", e.getMessage());
+                removeEventSink(analysisId);
+                return Flux.just(WorkflowEvent.error("标的解析失败: " + e.getMessage()));
+            }
+        }
+
+        // 解析用户级 ChatModel（Per-User API Key 路由）
+        ChatModel userChatModel = null;
+        try {
+            userChatModel = userConfigService.getUserChatModel(userId);
+            if (userChatModel != null) {
+                log.info("[DeepAnalysis] 使用用户自定义配置, userId={}", userId);
+            }
+        } catch (Exception e) {
+            log.warn("[DeepAnalysis] 获取用户级 ChatModel 失败, 使用全局配置, userId={}: {}", userId, e.getMessage());
+        }
+
+        WorkflowGraph graph = buildGraph(userChatModel);
+
+        return engine.execute(graph, state)
+                .doOnNext(event -> {
+                    Sinks.Many<WorkflowEvent> s = analysisEventSinks.get(analysisId);
+                    if (s != null && s.currentSubscriberCount() > 0) {
+                        s.tryEmitNext(event);
+                    }
+                })
+                .doOnComplete(() -> {
+                    persistResultsWithId(state, analysisId, "COMPLETED", null);
+                    removeEventSink(analysisId);
+                })
+                .doOnError(e -> {
+                    persistResultsWithId(state, analysisId, "FAILED", e.getMessage());
+                    Sinks.Many<WorkflowEvent> s = analysisEventSinks.get(analysisId);
+                    if (s != null) {
+                        s.tryEmitNext(WorkflowEvent.error("工作流执行失败: " + e.getMessage()));
+                    }
+                    removeEventSink(analysisId);
                 });
     }
 
@@ -243,5 +360,52 @@ public class DeepAnalysisWorkflow {
         } catch (Exception e) {
             log.error("持久化工作流结果失败", e);
         }
+    }
+
+    /**
+     * 使用指定 analysisId 持久化结果（更新已有记录而非新建）
+     */
+    private void persistResultsWithId(WorkflowState state, Long analysisId, String status, String errorMessage) {
+        analysisRepository.findById(analysisId).ifPresent(analysis -> {
+            try {
+                analysis.setWorkflowStatus(status);
+                analysis.setResolvedStockCode(state.getResolvedStockCode());
+                analysis.setResolvedStockName(state.getResolvedStockName());
+
+                // 分析师报告
+                if (state.getAnalystReports() != null && !state.getAnalystReports().isEmpty()) {
+                    Map<String, String> reportsMap = new HashMap<>();
+                    state.getAnalystReports().forEach((k, v) -> reportsMap.put(k, v.reportContent()));
+                    analysis.setAnalystReportsJson(objectMapper.writeValueAsString(reportsMap));
+                }
+
+                // 辩论记录
+                if (state.getBullBearDebate() != null) {
+                    analysis.setBullBearDebateJson(objectMapper.writeValueAsString(state.getBullBearDebate()));
+                }
+                analysis.setInvestmentPlan(state.getInvestmentPlan());
+                analysis.setTradingProposal(state.getTradingProposal());
+                if (state.getRiskDebate() != null) {
+                    analysis.setRiskDebateJson(objectMapper.writeValueAsString(state.getRiskDebate()));
+                }
+
+                // 最终裁决
+                if (state.getFinalDecision() != null) {
+                    analysis.setAction(state.getFinalDecision().action());
+                    analysis.setConfidence(state.getFinalDecision().confidence());
+                    analysis.setTargetPrice(state.getFinalDecision().targetPrice());
+                    analysis.setSummary(state.getFinalDecision().summary());
+                }
+
+                analysis.setCompletedAt(java.time.LocalDateTime.now());
+                analysis.setErrorMessage(errorMessage);
+                analysisRepository.save(analysis);
+                log.info("分析结果已持久化: id={}, status={}", analysisId, status);
+            } catch (JsonProcessingException e) {
+                log.error("序列化工作流结果失败: analysisId={}", analysisId, e);
+            } catch (Exception e) {
+                log.error("持久化工作流结果失败: analysisId={}", analysisId, e);
+            }
+        });
     }
 }
