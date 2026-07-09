@@ -87,9 +87,8 @@ class FinancialDataToolTest {
 
         @Test
         @DisplayName("不存在的股票 → 返回提示")
-        void nonExistentStock() throws Exception {
-            when(httpClientService.get(anyString(), any(Headers.class)))
-                    .thenReturn("{\"QuotationCodeTable\":{\"Data\":[]}}");
+        void nonExistentStock() {
+            // "xyzxyzxyz" 不含中文字符，StockResolver 在名称提取阶段直接抛异常，不会调用 HTTP
             String result = tool.getAShareQuote("xyzxyzxyz");
             assertTrue(result.contains("未找到") || result.contains("没有"),
                     "不存在的股票应返回提示");

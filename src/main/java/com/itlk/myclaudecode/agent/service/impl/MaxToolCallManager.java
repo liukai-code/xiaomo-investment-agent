@@ -786,9 +786,13 @@ public class MaxToolCallManager implements ToolCallingManager {
         }
 
         private static List<Message> injectAsSeparateMessage(List<Message> messages, GuardSignal signal) {
-            List<Message> result = new ArrayList<>(messages.size() + 1);
+            List<Message> result = new ArrayList<>(messages.size() + 2);
             result.addAll(messages);
-            // Inject as a separate synthetic tool response, not appended to the real tool's output
+            // 先插入匹配的 tool_use，满足 Anthropic API 协议要求
+            AssistantMessage.ToolCall guardToolCall = new AssistantMessage.ToolCall(
+                    "__guard_signal__", "function", "__guard_signal__", "{}");
+            result.add(new AssistantMessage("", Map.of(), List.of(guardToolCall)));
+            // 再插入 tool_result
             List<ToolResponseMessage.ToolResponse> signalResponses = new ArrayList<>();
             signalResponses.add(new ToolResponseMessage.ToolResponse(
                     "__guard_signal__", "__guard_signal__", signal.format()));
