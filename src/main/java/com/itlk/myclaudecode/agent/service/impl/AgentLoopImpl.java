@@ -577,6 +577,16 @@ public class AgentLoopImpl implements AgentLoop {
             return null;
         }
 
+        // 2.5 板块/行业级查询检测：包含板块关键词时，不触发标的守卫
+        String[] sectorKeywords = {"板块", "行业", "概念", "赛道", "题材", "领域"};
+        for (String sk : sectorKeywords) {
+            if (message.contains(sk)) {
+                log.info("[ChatStream] 检测到板块/行业关键词「{}」，跳过标的守卫", sk);
+                DebugFileLogger.logResolveStock("SECTOR_QUERY", message, "null");
+                return null;
+            }
+        }
+
         // 3. 剥离意图关键词，避免 StockResolver 把"分析"当作股票名称
         String cleaned = message;
         for (String kw : kws) {
