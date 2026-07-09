@@ -31,7 +31,7 @@ const phaseAgents: Record<string, string[]> = {
 }
 
 const agentLabels: Record<string, string> = {
-  MarketAnalyst: '技术面分析师',
+  MarketAnalyst: '技术分析师',
   FundamentalsAnalyst: '基本面分析师',
   NewsAnalyst: '新闻分析师',
   SocialAnalyst: '舆情分析师',
@@ -55,7 +55,7 @@ const agentStates = computed(() => {
       states.set(name, { status: 'running', content: '', round: 0 })
     } else if (event.type === 'AGENT_CHUNK' || event.type === 'DEBATE_CHUNK') {
       const existing = states.get(name)
-      if (existing) existing.content += event.content || ''
+      if (existing) existing.content = event.content || ''
     } else if (event.type === 'AGENT_COMPLETE' || event.type === 'DEBATE_COMPLETE') {
       const existing = states.get(name)
       if (existing) {

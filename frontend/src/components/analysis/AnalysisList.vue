@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Trash2, TrendingUp, TrendingDown, Minus, Loader2 } from 'lucide-vue-next'
+import { Trash2, Loader2 } from 'lucide-vue-next'
 import type { AnalysisRecord } from '@/api/analysis'
 
 const props = defineProps<{
@@ -21,12 +21,6 @@ function getStatusLabel(status: string) {
     FAILED: '失败',
   }
   return map[status] || status
-}
-
-function getActionIcon(action: string | null) {
-  if (action === 'BUY') return TrendingUp
-  if (action === 'SELL') return TrendingDown
-  return Minus
 }
 
 function getActionClass(action: string | null) {
