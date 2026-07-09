@@ -10,7 +10,7 @@ public interface ChatMessageService {
     void saveMessage(Conversation conversation, MessageRole role, String content,
                      String toolName, String toolCallId);
 
-    void saveAssistantMessage(Long conversationId, String content);
+    void saveAssistantMessage(Long userId, Long conversationId, String content);
 
     List<ChatMessage> getHistory(Long userId, Long conversationId);
 }

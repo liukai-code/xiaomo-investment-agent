@@ -441,7 +441,7 @@ public class AgentLoopImpl implements AgentLoop {
         return Flux.concat(thinkingEvent, Flux.merge(statusEvents, contentWithDone))
                 .doOnComplete(() -> {
                     String fullResponse = sanitizeOutput(accumulated.toString());
-                    chatMessageService.saveAssistantMessage(convId, fullResponse);
+                    chatMessageService.saveAssistantMessage(userId, convId, fullResponse);
                     // Record token usage
                     try {
                         AtomicInteger toolCounter = (AtomicInteger) streamToolCtx.get(MaxToolCallManager.TOOL_CALL_COUNTER_KEY);
@@ -461,7 +461,7 @@ public class AgentLoopImpl implements AgentLoop {
                     log.error("流式请求异常: {}", e.getMessage());
                     String partial = sanitizeOutput(accumulated.toString());
                     if (!partial.isEmpty()) {
-                        chatMessageService.saveAssistantMessage(convId, partial);
+                        chatMessageService.saveAssistantMessage(userId, convId, partial);
                     }
                     return Flux.just(ServerSentEvent.<String>builder()
                             .event("content")
@@ -474,8 +474,7 @@ public class AgentLoopImpl implements AgentLoop {
     @Override
     @Transactional
     public String generateTitle(Long userId, Long conversationId) {
-        Conversation conversation = conversationService.getConversation(conversationId);
-        conversationService.checkOwnership(conversation, userId);
+        Conversation conversation = conversationService.getConversationForUser(conversationId, userId);
 
         if (!"新对话".equals(conversation.getTitle())) {
             return conversation.getTitle();
@@ -541,9 +540,7 @@ public class AgentLoopImpl implements AgentLoop {
 
     private Conversation getOrCreateConversation(Long userId, Long conversationId) {
         if (conversationId != null) {
-            Conversation conversation = conversationService.getConversation(conversationId);
-            conversationService.checkOwnership(conversation, userId);
-            return conversation;
+            return conversationService.getConversationForUser(conversationId, userId);
         }
         return conversationService.createConversation(userId, "新对话");
     }

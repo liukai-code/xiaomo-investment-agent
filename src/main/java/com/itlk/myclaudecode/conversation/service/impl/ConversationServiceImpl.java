@@ -53,6 +53,13 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     @Override
+    public Conversation getConversationForUser(Long conversationId, Long userId) {
+        Conversation conversation = getConversation(conversationId);
+        checkOwnership(conversation, userId);
+        return conversation;
+    }
+
+    @Override
     public void checkOwnership(Conversation conversation, Long userId) {
         if (conversation.getUserId() != null && !conversation.getUserId().equals(userId)) {
             throw new RuntimeException("无权访问该会话");
@@ -62,8 +69,7 @@ public class ConversationServiceImpl implements ConversationService {
     @Override
     @Transactional
     public void deleteConversation(Long userId, Long conversationId) {
-        Conversation conversation = getConversation(conversationId);
-        checkOwnership(conversation, userId);
+        getConversationForUser(conversationId, userId);
         conversationRepository.deleteById(conversationId);
         cacheService.evictConversationList(userId);
         cacheService.evictMessageCache(conversationId);

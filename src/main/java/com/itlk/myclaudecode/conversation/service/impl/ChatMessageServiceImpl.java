@@ -45,15 +45,14 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
     @Override
     @Transactional
-    public void saveAssistantMessage(Long conversationId, String content) {
-        Conversation conversation = conversationService.getConversation(conversationId);
+    public void saveAssistantMessage(Long userId, Long conversationId, String content) {
+        Conversation conversation = conversationService.getConversationForUser(conversationId, userId);
         saveMessage(conversation, MessageRole.ASSISTANT, content, null, null);
     }
 
     @Override
     public List<ChatMessage> getHistory(Long userId, Long conversationId) {
-        Conversation conversation = conversationService.getConversation(conversationId);
-        conversationService.checkOwnership(conversation, userId);
+        conversationService.getConversationForUser(conversationId, userId);
 
         List<ChatMessage> cached = cacheService.getCachedMessages(conversationId);
         if (cached != null) {

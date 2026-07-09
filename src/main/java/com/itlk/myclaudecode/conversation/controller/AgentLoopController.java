@@ -97,8 +97,8 @@ public class AgentLoopController {
             @PathVariable Long id,
             @RequestBody String content,
             HttpServletRequest request) {
-        getUserId(request);
-        chatMessageService.saveAssistantMessage(id, content);
+        Long userId = getUserId(request);
+        chatMessageService.saveAssistantMessage(userId, id, content);
         return Result.success(null);
     }
 
@@ -137,7 +137,7 @@ public class AgentLoopController {
         log.info("收到深度分析请求：userId={}, conversationId={}, message={}", userId, conversationId, message);
 
         // 保存用户消息
-        Conversation conversation = conversationService.getConversation(conversationId);
+        Conversation conversation = conversationService.getConversationForUser(conversationId, userId);
         chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
 
         return deepAnalysisWorkflow.execute(userId, conversationId, message)
