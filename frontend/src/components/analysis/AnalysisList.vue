@@ -60,9 +60,9 @@ function formatTime(dateStr: string | null) {
             <span class="stock-code">{{ item.resolvedStockCode }}</span>
           </div>
           <div class="item-meta">
-            <span class="status-badge" :class="'status-' + item.workflowStatus.toLowerCase()">
+            <span class="status-badge" :class="'status-' + (item.workflowStatus || 'pending').toLowerCase()">
               <Loader2 v-if="item.workflowStatus === 'RUNNING'" :size="12" class="spin" />
-              {{ getStatusLabel(item.workflowStatus) }}
+              {{ getStatusLabel(item.workflowStatus || 'PENDING') }}
             </span>
             <span v-if="item.action" class="action-badge" :class="getActionClass(item.action)">
               {{ item.action }}
