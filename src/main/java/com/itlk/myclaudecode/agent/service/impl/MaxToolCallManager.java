@@ -129,8 +129,9 @@ public class MaxToolCallManager implements ToolCallingManager {
         log.info("[MaxToolCallManager] statusSink={}, sinkPresent={}", statusSink != null ? "存在" : "null", statusSink != null);
         if (statusSink != null) {
             for (AssistantMessage.ToolCall tc : toolCalls) {
-                ChatStreamEvent event = ChatStreamEvent.toolCall(tc.name(), step, effectiveMaxIterations);
-                log.info("[MaxToolCallManager] 发射 TOOL_CALL 事件: toolName={}, step={}", tc.name(), step);
+                String operation = extractOperation(tc.arguments());
+                ChatStreamEvent event = ChatStreamEvent.toolCall(tc.name(), operation, step, effectiveMaxIterations);
+                log.info("[MaxToolCallManager] 发射 TOOL_CALL 事件: toolName={}, operation={}, step={}", tc.name(), operation, step);
                 statusSink.tryEmitNext(event);
             }
         }
@@ -499,6 +500,20 @@ public class MaxToolCallManager implements ToolCallingManager {
             return sb.toString();
         }
         return last.getText() != null ? last.getText() : "";
+    }
+
+    /**
+     * 从工具调用参数 JSON 中提取 operation 字段，用于前端显示具体操作名。
+     */
+    private String extractOperation(String arguments) {
+        if (arguments == null || arguments.isBlank()) return null;
+        try {
+            com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(arguments);
+            com.fasterxml.jackson.databind.JsonNode op = node.get("operation");
+            return op != null && !op.isNull() ? op.asText() : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private boolean isFetchTool(String toolName) {

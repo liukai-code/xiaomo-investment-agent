@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 public record ChatStreamEvent(
         ChatStreamEventType type,
         String toolName,
+        String operation,
         String content,
         Integer step,
         Integer totalSteps
@@ -18,14 +19,14 @@ public record ChatStreamEvent(
     }
 
     public static ChatStreamEvent thinking() {
-        return new ChatStreamEvent(ChatStreamEventType.THINKING, null, null, null, null);
+        return new ChatStreamEvent(ChatStreamEventType.THINKING, null, null, null, null, null);
     }
 
-    public static ChatStreamEvent toolCall(String toolName, int step, int totalSteps) {
-        return new ChatStreamEvent(ChatStreamEventType.TOOL_CALL, toolName, null, step, totalSteps);
+    public static ChatStreamEvent toolCall(String toolName, String operation, int step, int totalSteps) {
+        return new ChatStreamEvent(ChatStreamEventType.TOOL_CALL, toolName, operation, null, step, totalSteps);
     }
 
     public static ChatStreamEvent toolResult(String toolName) {
-        return new ChatStreamEvent(ChatStreamEventType.TOOL_RESULT, toolName, null, null, null);
+        return new ChatStreamEvent(ChatStreamEventType.TOOL_RESULT, toolName, null, null, null, null);
     }
 }

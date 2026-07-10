@@ -48,74 +48,91 @@ let abortController: AbortController | null = null
 // 工具调用状态
 const currentStatus = ref<StatusEvent | null>(null)
 
-// 工具名 → 中文标签映射
+// 工具名 → 用户友好的状态描述
+// 支持两种 key：精确匹配 "toolName:operation"，通用匹配 "toolName"
 const toolLabelMap: Record<string, string> = {
+  // market_data 路由 - 按 operation 区分
+  'market_data:aShareQuote':   '正在获取A股行情',
+  'market_data:hkStockQuote':  '正在获取港股行情',
+  'market_data:usStockQuote':  '正在获取美股行情',
+  'market_data:fundNav':       '正在查询基金净值',
+  'market_data:searchStock':   '正在搜索股票',
+  market_data:                 '正在获取行情数据',
+  // A股数据路由 - 按 operation 区分
+  'a_stock_quote:tencentQuote':  '正在获取实时行情',
+  'a_stock_quote:baiduKline':    '正在获取K线数据',
+  a_stock_quote:                 '正在获取行情数据',
+  'a_stock_report:stockReport':      '正在查询个股研报',
+  'a_stock_report:industryReport':   '正在查询行业研报',
+  'a_stock_report:downloadReportPdf':'正在下载研报PDF',
+  'a_stock_report:thsEpsForecast':   '正在查询盈利预测',
+  'a_stock_report:iwencaiSearch':    '正在智能搜索',
+  'a_stock_report:iwencaiQuery':     '正在智能查询',
+  a_stock_report:                    '正在查询研报',
+  'a_stock_signal:conceptBlocks':    '正在查询概念板块',
+  'a_stock_signal:fundFlowMinute':   '正在查询分钟资金流向',
+  'a_stock_signal:dragonTigerBoard': '正在查询龙虎榜',
+  'a_stock_signal:dailyDragonTiger': '正在查询龙虎榜',
+  'a_stock_signal:lockupExpiry':     '正在查询解禁信息',
+  'a_stock_signal:industryRanking':  '正在查询行业排名',
+  a_stock_signal:                    '正在查询板块与资金',
+  'a_stock_capital:marginTrading':   '正在查询融资融券',
+  'a_stock_capital:blockTrade':      '正在查询大宗交易',
+  'a_stock_capital:holderNumChange': '正在查询股东户数',
+  'a_stock_capital:dividendHistory': '正在查询分红历史',
+  'a_stock_capital:fundFlow120d':    '正在查询资金流向',
+  'a_stock_capital:northboundFlow':  '正在查询北向资金',
+  a_stock_capital:                   '正在查询资金数据',
+  'a_stock_news:stockNews':          '正在查询个股新闻',
+  'a_stock_news:globalNews':         '正在查询全球资讯',
+  'a_stock_news:cninfoAnnouncements':'正在查询公司公告',
+  'a_stock_news:irmQA':              '正在查询互动问答',
+  'a_stock_news:sinaFinancialReport':'正在查询财务报告',
+  a_stock_news:                      '正在查询资讯',
+  'a_stock_limit_up:ztPool':         '正在查询涨停数据',
+  'a_stock_limit_up:zbPool':         '正在查询炸板数据',
+  'a_stock_limit_up:dtPool':         '正在查询跌停数据',
+  'a_stock_limit_up:yztPool':        '正在查询预涨停数据',
+  'a_stock_limit_up:thsLimitUpPool': '正在查询涨停数据',
+  'a_stock_limit_up:sentimentOverview':'正在分析市场情绪',
+  a_stock_limit_up:                  '正在查询涨跌停数据',
+  'a_stock_option:optionCodes':      '正在查询期权合约',
+  'a_stock_option:optionTQuote':     '正在查询期权报价',
+  'a_stock_option:optionGreeks':     '正在查询期权指标',
+  a_stock_option:                    '正在查询期权数据',
+  'a_stock_sentiment:thsHotList':    '正在查询热门榜单',
+  'a_stock_sentiment:emHotRank':     '正在查询热度排名',
+  'a_stock_sentiment:emConceptHit':  '正在查询热门概念',
+  a_stock_sentiment:                 '正在查询市场热点',
+  // 金融计算路由
+  financial_calculator:              '正在计算',
   // 基础工具
-  getAShareQuote: '查询A股行情',
-  getHKStockQuote: '查询港股行情',
-  getUSStockQuote: '查询美股行情',
-  getFundNav: '查询基金净值',
-  searchStockByName: '搜索股票',
-  fetchWebpage: '抓取网页',
-  fetchArticleContent: '抓取文章',
-  executeQuery: '执行数据库查询',
-  getDatabaseSchema: '获取数据库结构',
-  read_file: '读取文件',
-  write_file: '写入文件',
-  append_file: '追加文件',
-  list_files: '列出文件',
-  // 金融计算
-  compoundInterest: '复利计算',
-  loanPayment: '贷款计算',
-  npv: '净现值计算',
-  irr: '内部收益率计算',
-  sharpeRatio: '夏普比率计算',
-  // A股数据工具
-  tencentQuote: '查询腾讯行情',
-  baiduKline: '查询百度K线',
-  stockReport: '查询个股研报',
-  industryReport: '查询行业研报',
-  downloadReportPdf: '下载研报PDF',
-  thsEpsForecast: '查询同花顺EPS预测',
-  iwencaiSearch: '问财搜索',
-  iwencaiQuery: '问财查询',
-  conceptBlocks: '查询概念板块',
-  fundFlowMinute: '查询分钟资金流',
-  dragonTigerBoard: '查询龙虎榜',
-  dailyDragonTiger: '查询日龙虎榜',
-  lockupExpiry: '查询解禁信息',
-  industryRanking: '查询行业排名',
-  marginTrading: '查询融资融券',
-  blockTrade: '查询大宗交易',
-  holderNumChange: '查询股东户数变化',
-  dividendHistory: '查询分红历史',
-  fundFlow120d: '查询120日资金流',
-  northboundFlow: '查询北向资金',
-  stockNews: '查询个股新闻',
-  globalNews: '查询全球资讯',
-  cninfoAnnouncements: '查询巨潮公告',
-  irmQA: '查询互动易问答',
-  sinaFinancialReport: '查询新浪财报',
-  ztPool: '查询涨停池',
-  zbPool: '查询炸板池',
-  dtPool: '查询跌停池',
-  yztPool: '查询预涨停池',
-  thsLimitUpPool: '查询同花顺涨停池',
-  sentimentOverview: '查询情绪概览',
-  optionCodes: '查询期权代码',
-  optionTQuote: '查询期权T型报价',
-  optionGreeks: '查询期权希腊字母',
-  thsHotList: '查询同花顺热榜',
-  emHotRank: '查询东财热度排名',
-  emConceptHit: '查询东财概念命中',
+  fetchWebpage:       '正在抓取网页内容',
+  fetchArticleContent:'正在抓取文章内容',
+  executeQuery:       '正在查询数据库',
+  getDatabaseSchema:  '正在获取数据库结构',
+  readFile:           '正在读取文件',
+  writeFile:          '正在写入文件',
+  appendFile:         '正在追加文件',
+  listFiles:          '正在列出文件',
+  // 养基宝
+  getMyHoldings:      '正在查询基金持仓',
+  getMyAccountSummary:'正在查询账户信息',
+  // 深度分析
+  getAnalysisReport:  '正在查询分析报告',
   // MCP
-  bailian_web_search: '百炼搜索',
+  bailian_web_search: '正在搜索网络信息',
 }
 
 function getStatusLabel(status: StatusEvent): string {
   if (status.type === 'THINKING') return '思考中'
   if (status.type === 'TOOL_CALL' && status.toolName) {
-    return toolLabelMap[status.toolName] || `调用 ${status.toolName}`
+    // 优先精确匹配 toolName:operation，再通用匹配 toolName
+    if (status.operation) {
+      const exact = toolLabelMap[`${status.toolName}:${status.operation}`]
+      if (exact) return exact
+    }
+    return toolLabelMap[status.toolName] || '正在获取数据'
   }
   return '处理中'
 }
