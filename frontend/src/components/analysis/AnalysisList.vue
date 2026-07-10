@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { Trash2, Loader2 } from 'lucide-vue-next'
+import ExportMenu from './ExportMenu.vue'
 import type { AnalysisRecord } from '@/api/analysis'
 
 const props = defineProps<{
   analyses: AnalysisRecord[]
   selectedId: number | null
   loading: boolean
+  exportingId?: number | null
 }>()
 
 const emit = defineEmits<{
   select: [id: number]
   delete: [id: number]
+  export: [id: number, format: 'pdf' | 'word' | 'md']
 }>()
 
 function getStatusLabel(status: string) {
@@ -72,12 +75,18 @@ function formatTime(dateStr: string | null) {
           </div>
           <div class="item-time">{{ formatTime(item.createdAt) }}</div>
         </div>
-        <button
-          class="delete-btn"
-          @click.stop="emit('delete', item.id)"
-        >
-          <Trash2 :size="14" />
-        </button>
+        <div class="item-actions" @click.stop>
+          <ExportMenu
+            :disabled="exportingId === item.id || item.workflowStatus === 'RUNNING'"
+            @export="(fmt) => emit('export', item.id, fmt)"
+          />
+          <button
+            class="delete-btn"
+            @click.stop="emit('delete', item.id)"
+          >
+            <Trash2 :size="18" />
+          </button>
+        </div>
       </div>
     </TransitionGroup>
   </div>
@@ -154,17 +163,26 @@ function formatTime(dateStr: string | null) {
 .action-hold { background: var(--surface-2, #f1f5f9); color: var(--text-dim, #94a3b8); }
 .confidence { font-size: 11px; color: var(--text-dim, #94a3b8); }
 .item-time { font-size: 11px; color: var(--text-dim, #94a3b8); margin-top: 2px; }
-.delete-btn {
+.item-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   opacity: 0;
+  flex-shrink: 0;
+}
+.list-item:hover .item-actions { opacity: 1; }
+.delete-btn {
   background: none;
   border: none;
   color: var(--text-dim, #94a3b8);
   cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
+  padding: 10px;
+  border-radius: 10px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.list-item:hover .delete-btn { opacity: 1; }
 .delete-btn:hover { color: var(--danger, #dc2626); background: #fef2f2; }
 .list-item-enter-active { transition: all 0.25s ease-out; }
 .list-item-leave-active { transition: all 0.2s ease-in; position: absolute; width: 100%; }

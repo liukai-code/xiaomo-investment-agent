@@ -67,8 +67,10 @@ function handleBack() {
             :analyses="analysisStore.analyses"
             :selected-id="analysisStore.selectedId"
             :loading="analysisStore.loading"
+            :exporting-id="analysisStore.exportingId"
             @select="handleSelect"
             @delete="analysisStore.handleDeleteAnalysis"
+            @export="analysisStore.exportAnalysis"
           />
         </div>
       </Transition>
@@ -101,7 +103,7 @@ function handleBack() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--border, #e2e8f0);
   background: var(--surface, #ffffff);
   flex-shrink: 0;
@@ -187,7 +189,7 @@ function handleBack() {
 
 .list-toggle svg {
   transition: transform 0.2s ease;
-  color: var(--text-dim, #94a3b8);
+  color: var(--text, #1e293b);
 }
 
 .list-body {

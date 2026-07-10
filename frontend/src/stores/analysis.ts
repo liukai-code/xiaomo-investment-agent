@@ -11,6 +11,7 @@ import {
   type WorkflowEvent,
 } from '@/api/analysis'
 import { useAuthStore } from './auth'
+import { exportAnalysisReport } from '@/utils/exportAnalysis'
 
 export const useAnalysisStore = defineStore('analysis', () => {
   const analyses = ref<AnalysisRecord[]>([])
@@ -21,6 +22,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const loading = ref(false)
   const detailLoading = ref(false)
   const panelVisible = ref(false)
+  const exportingId = ref<number | null>(null)
 
   let abortController: AbortController | null = null
 
@@ -168,6 +170,54 @@ export const useAnalysisStore = defineStore('analysis', () => {
     }
   }
 
+  async function exportAnalysis(id: number, format: 'pdf' | 'word' | 'md') {
+    exportingId.value = id
+    try {
+      // 获取详情
+      let record: AnalysisRecord
+      if (selectedDetail.value?.id === id) {
+        record = selectedDetail.value
+      } else {
+        record = await getAnalysisDetail(id)
+      }
+
+      // 获取 workflow events
+      let events: WorkflowEvent[] = []
+      if (selectedId.value === id && workflowEvents.value.length > 0) {
+        events = workflowEvents.value
+      } else {
+        // 通过 SSE 流获取完整事件（已完成的分析从数据库重建）
+        const authStore = useAuthStore()
+        events = await new Promise<WorkflowEvent[]>((resolve) => {
+          const collected: WorkflowEvent[] = []
+          const controller = streamAnalysis(id, authStore.token, {
+            onEvent(event) {
+              collected.push(event)
+            },
+            onDone() {
+              resolve(collected)
+            },
+            onError() {
+              resolve(collected)
+            },
+          })
+          // 超时保护
+          setTimeout(() => {
+            controller.abort()
+            resolve(collected)
+          }, 30000)
+        })
+      }
+
+      await exportAnalysisReport({ record, events, format })
+    } catch (e) {
+      console.error('导出失败:', e)
+      alert('导出失败，请重试')
+    } finally {
+      exportingId.value = null
+    }
+  }
+
   return {
     analyses,
     selectedId,
@@ -177,11 +227,13 @@ export const useAnalysisStore = defineStore('analysis', () => {
     loading,
     detailLoading,
     panelVisible,
+    exportingId,
     loadAnalyses,
     selectAnalysis,
     handleStartAnalysis,
     handleDeleteAnalysis,
     stopAnalysis,
     togglePanel,
+    exportAnalysis,
   }
 })
