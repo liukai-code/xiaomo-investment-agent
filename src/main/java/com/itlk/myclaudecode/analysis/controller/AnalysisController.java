@@ -7,6 +7,8 @@ import com.itlk.myclaudecode.workflow.event.WorkflowEvent;
 import com.itlk.myclaudecode.workflow.persist.WorkflowAnalysis;
 import com.itlk.myclaudecode.workflow.service.DeepAnalysisWorkflow;
 import com.itlk.myclaudecode.workflow.util.StockCodeExtractor;
+import com.itlk.myclaudecode.workflow.util.StockResolver;
+import com.itlk.myclaudecode.common.config.HttpClientService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +34,8 @@ public class AnalysisController {
     private DeepAnalysisWorkflow deepAnalysisWorkflow;
     @Resource
     private ObjectMapper objectMapper;
+    @Resource
+    private HttpClientService httpClientService;
 
     private Long getUserId(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
@@ -56,6 +60,13 @@ public class AnalysisController {
         var stockCodes = StockCodeExtractor.extract(query);
         String stockCode = stockCodes.isEmpty() ? null : stockCodes.iterator().next();
         String stockName = null;
+        try {
+            var resolved = StockResolver.resolve(query, httpClientService);
+            stockCode = resolved.code();
+            stockName = resolved.name();
+        } catch (Exception e) {
+            log.warn("标的名称解析失败，仅使用代码: {}", e.getMessage());
+        }
 
         // 创建分析记录
         WorkflowAnalysis analysis = analysisService.createAnalysis(userId, query, stockCode, stockName);
@@ -164,6 +175,20 @@ public class AnalysisController {
             HttpServletRequest request) {
         Long userId = getUserId(request);
         analysisService.deleteAnalysis(id, userId);
+        return Result.success();
+    }
+
+    /**
+     * 取消正在运行的分析
+     */
+    @PostMapping("/{id}/cancel")
+    public Result<Void> cancelAnalysis(
+            @PathVariable Long id,
+            HttpServletRequest request) {
+        Long userId = getUserId(request);
+        // 验证权限
+        analysisService.getAnalysis(id, userId);
+        deepAnalysisWorkflow.cancelAnalysis(id);
         return Result.success();
     }
 }

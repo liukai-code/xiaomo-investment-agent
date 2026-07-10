@@ -62,6 +62,11 @@ export async function deleteAnalysis(id: number): Promise<void> {
   if (res.data.code !== 1) throw new Error(res.data.msg || '删除失败')
 }
 
+export async function cancelAnalysis(id: number): Promise<void> {
+  const res = await request.post<Result<void>>(`/api/analysis/${id}/cancel`)
+  if (res.data.code !== 1) throw new Error(res.data.msg || '取消失败')
+}
+
 /**
  * SSE 实时分析事件流
  */

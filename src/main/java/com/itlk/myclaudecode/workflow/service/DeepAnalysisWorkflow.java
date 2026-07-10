@@ -45,6 +45,9 @@ public class DeepAnalysisWorkflow {
     /** 独立分析模式的事件 Sink 映射（analysisId -> Sink） */
     private final ConcurrentHashMap<Long, Sinks.Many<WorkflowEvent>> analysisEventSinks = new ConcurrentHashMap<>();
 
+    /** 已取消的分析 ID 集合（防止工作流完成后覆盖状态） */
+    private final java.util.Set<Long> cancelledAnalyses = ConcurrentHashMap.newKeySet();
+
     public DeepAnalysisWorkflow(WorkflowAgentFactory agentFactory,
                                  WorkflowEngine engine,
                                  WorkflowAnalysisRepository analysisRepository,
@@ -78,6 +81,22 @@ public class DeepAnalysisWorkflow {
         if (sink != null) {
             sink.tryEmitComplete();
         }
+    }
+
+    /**
+     * 取消正在运行的分析
+     * 标记为已取消、移除 Sink、更新数据库状态为 FAILED
+     */
+    public void cancelAnalysis(Long analysisId) {
+        cancelledAnalyses.add(analysisId);
+        removeEventSink(analysisId);
+        analysisRepository.findById(analysisId).ifPresent(a -> {
+            a.setWorkflowStatus("FAILED");
+            a.setErrorMessage("用户手动停止");
+            a.setCompletedAt(java.time.LocalDateTime.now());
+            analysisRepository.save(a);
+        });
+        log.info("分析已取消: analysisId={}", analysisId);
     }
 
     /**
@@ -372,6 +391,11 @@ public class DeepAnalysisWorkflow {
      * 使用指定 analysisId 持久化结果（更新已有记录而非新建）
      */
     private void persistResultsWithId(WorkflowState state, Long analysisId, String status, String errorMessage) {
+        // 已取消的分析不覆盖状态
+        if (cancelledAnalyses.remove(analysisId)) {
+            log.info("跳过已取消分析的结果持久化: analysisId={}", analysisId);
+            return;
+        }
         analysisRepository.findById(analysisId).ifPresent(analysis -> {
             try {
                 analysis.setWorkflowStatus(status);

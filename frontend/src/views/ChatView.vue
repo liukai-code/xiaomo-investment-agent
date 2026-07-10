@@ -6,8 +6,10 @@ import { useChatStore } from '@/stores/chat'
 import { streamChat, type StatusEvent } from '@/api/chat'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
 import { useRafThrottle } from '@/composables/useMarkdownBlocks'
-import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen, Bell, Square, Loader2 } from 'lucide-vue-next'
+import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen, Bell, Square, Loader2, Brain } from 'lucide-vue-next'
 import { useYangjibaoStore } from '@/stores/yangjibao'
+import { useAnalysisStore } from '@/stores/analysis'
+import AnalysisSidePanel from '@/components/analysis/AnalysisSidePanel.vue'
 import YjbQrLogin from '@/components/yangjibao/YjbQrLogin.vue'
 import YjbHoldingsCard from '@/components/yangjibao/YjbHoldingsCard.vue'
 import SettingsDialog from '@/components/SettingsDialog.vue'
@@ -16,6 +18,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const chatStore = useChatStore()
 const yjbStore = useYangjibaoStore()
+const analysisStore = useAnalysisStore()
 
 const messagesEl = ref<HTMLDivElement>()
 const inputEl = ref<HTMLTextAreaElement>()
@@ -26,6 +29,19 @@ const deleteConfirmConvId = ref<number | null>(null)
 const showUserMenu = ref(false)
 const sidebarCollapsed = ref(false)
 const showSettings = ref(false)
+
+// 侧面板互斥切换
+function toggleAnalysisPanel() {
+  if (!analysisStore.panelVisible) {
+    yjbStore.cardVisible = false
+  }
+  analysisStore.togglePanel()
+}
+
+function openHoldingsCard() {
+  analysisStore.panelVisible = false
+  yjbStore.openCard()
+}
 
 let abortController: AbortController | null = null
 
@@ -400,8 +416,17 @@ watch(() => yjbStore.cardVisible, (visible) => {
           <span class="title">{{ currentTitle }}</span>
         </div>
         <div class="header-right">
+          <button
+            class="analysis-toggle-btn"
+            :class="{ active: analysisStore.panelVisible }"
+            @click="toggleAnalysisPanel"
+            title="个股深度分析"
+          >
+            <Brain :size="16" />
+            <span>个股深度分析</span>
+          </button>
           <div class="yjb-trigger-wrapper">
-            <button class="yjb-connect-btn" @click.stop="yjbStore.openCard()">
+            <button class="yjb-connect-btn" @click.stop="openHoldingsCard()">
               <span v-if="yjbStore.yjbLoggedIn" class="yjb-status-dot connected"></span>
               <span v-else class="yjb-status-dot"></span>
               {{ yjbStore.yjbLoggedIn ? '已连接养基宝' : '连接养基宝' }}
@@ -516,6 +541,11 @@ watch(() => yjbStore.cardVisible, (visible) => {
             </div>
           </template>
         </div>
+
+        <!-- 右侧深度分析面板 -->
+        <Transition name="analysis-slide">
+          <AnalysisSidePanel v-if="analysisStore.panelVisible" />
+        </Transition>
 
         <!-- 右侧养基宝卡片 -->
         <Transition name="holdings-slide">
@@ -649,6 +679,45 @@ watch(() => yjbStore.cardVisible, (visible) => {
   width: 0;
   padding: 20px 0;
   opacity: 0;
+}
+
+.analysis-slide-enter-active,
+.analysis-slide-leave-active {
+  transition: width 0.3s ease, padding 0.3s ease, opacity 0.25s ease;
+}
+
+.analysis-slide-enter-from,
+.analysis-slide-leave-to {
+  width: 0;
+  padding: 0;
+  opacity: 0;
+}
+
+.analysis-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  height: 36px;
+}
+
+.analysis-toggle-btn:hover {
+  background: var(--border);
+}
+
+.analysis-toggle-btn.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .status-indicator {

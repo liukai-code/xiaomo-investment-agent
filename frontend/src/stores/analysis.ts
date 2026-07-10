@@ -5,6 +5,7 @@ import {
   getAnalysisDetail,
   startAnalysis as apiStartAnalysis,
   deleteAnalysis as apiDeleteAnalysis,
+  cancelAnalysis as apiCancelAnalysis,
   streamAnalysis,
   type AnalysisRecord,
   type WorkflowEvent,
@@ -18,6 +19,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const isRunning = ref(false)
   const workflowEvents = ref<WorkflowEvent[]>([])
   const loading = ref(false)
+  const detailLoading = ref(false)
+  const panelVisible = ref(false)
 
   let abortController: AbortController | null = null
 
@@ -37,10 +40,13 @@ export const useAnalysisStore = defineStore('analysis', () => {
     if (record && record.workflowStatus === 'RUNNING' && !isRunning.value) {
       // 尝试重新连接 SSE（MVP 不实现重连，直接加载详情）
     }
+    detailLoading.value = true
     try {
       selectedDetail.value = await getAnalysisDetail(id)
     } catch {
       selectedDetail.value = null
+    } finally {
+      detailLoading.value = false
     }
   }
 
@@ -108,11 +114,39 @@ export const useAnalysisStore = defineStore('analysis', () => {
     }
   }
 
-  function stopAnalysis() {
+  async function stopAnalysis() {
+    const id = selectedId.value
+    // 中断前端 SSE 连接
     if (abortController) {
       abortController.abort()
       abortController = null
-      isRunning.value = false
+    }
+    isRunning.value = false
+    workflowEvents.value = []
+    // 调用后端取消接口
+    if (id) {
+      try {
+        await apiCancelAnalysis(id)
+      } catch (e) {
+        console.error('取消分析失败:', e)
+      }
+      // 同步前端状态
+      const record = analyses.value.find((a) => a.id === id)
+      if (record && record.workflowStatus === 'RUNNING') {
+        record.workflowStatus = 'FAILED'
+        record.errorMessage = '用户手动停止'
+      }
+      if (selectedDetail.value && selectedDetail.value.workflowStatus === 'RUNNING') {
+        selectedDetail.value.workflowStatus = 'FAILED'
+        selectedDetail.value.errorMessage = '用户手动停止'
+      }
+    }
+  }
+
+  function togglePanel() {
+    panelVisible.value = !panelVisible.value
+    if (panelVisible.value) {
+      loadAnalyses()
     }
   }
 
@@ -123,10 +157,13 @@ export const useAnalysisStore = defineStore('analysis', () => {
     isRunning,
     workflowEvents,
     loading,
+    detailLoading,
+    panelVisible,
     loadAnalyses,
     selectAnalysis,
     handleStartAnalysis,
     handleDeleteAnalysis,
     stopAnalysis,
+    togglePanel,
   }
 })

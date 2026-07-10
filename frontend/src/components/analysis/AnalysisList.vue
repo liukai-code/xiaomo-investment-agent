@@ -72,7 +72,6 @@ function formatTime(dateStr: string | null) {
           <div class="item-time">{{ formatTime(item.createdAt) }}</div>
         </div>
         <button
-          v-if="item.workflowStatus !== 'RUNNING'"
           class="delete-btn"
           @click.stop="emit('delete', item.id)"
         >
@@ -85,9 +84,7 @@ function formatTime(dateStr: string | null) {
 
 <style scoped>
 .analysis-list {
-  width: 280px;
-  min-width: 280px;
-  border-right: 1px solid var(--border, #e2e8f0);
+  width: 100%;
   display: flex;
   flex-direction: column;
   background: var(--surface, #ffffff);

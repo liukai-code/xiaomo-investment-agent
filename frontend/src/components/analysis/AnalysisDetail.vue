@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Activity, CheckCircle2, AlertCircle, TrendingUp, TrendingDown, Minus, MessageSquare } from 'lucide-vue-next'
+import { Activity, CheckCircle2, AlertCircle, TrendingUp, TrendingDown, Minus, ArrowLeft, Loader2 } from 'lucide-vue-next'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
 import type { AnalysisRecord, WorkflowEvent } from '@/api/analysis'
 
@@ -8,11 +8,13 @@ const props = defineProps<{
   detail: AnalysisRecord | null
   events: WorkflowEvent[]
   isRunning: boolean
+  detailLoading: boolean
 }>()
 
 const emit = defineEmits<{
-  goToChat: []
+  back: []
 }>()
+
 
 // --- 从 WorkflowPanel 复用的逻辑 ---
 
@@ -101,16 +103,25 @@ function getPhaseStatus(phase: string) {
 <template>
   <div class="analysis-detail">
     <!-- 空态 -->
-    <div v-if="!detail && !isRunning" class="detail-empty">
+    <div v-if="!detail && !isRunning && !detailLoading" class="detail-empty">
       <Activity :size="48" />
-      <p>选择左侧分析记录查看详情</p>
+      <p>选择分析记录查看详情</p>
       <p class="sub">或在顶部输入标的开始新的分析</p>
+    </div>
+
+    <!-- 加载中 -->
+    <div v-else-if="detailLoading && !detail" class="detail-empty">
+      <Loader2 :size="32" class="spin" />
+      <p>加载中...</p>
     </div>
 
     <!-- 有内容时 -->
     <template v-else>
       <!-- 头部信息 -->
       <div class="detail-header">
+        <button class="back-btn" @click="emit('back')" title="返回列表">
+          <ArrowLeft :size="16" />
+        </button>
         <div class="header-stock">
           <h2>{{ detail?.resolvedStockName || detail?.originalQuery || '分析中...' }}</h2>
           <span class="stock-code">{{ detail?.resolvedStockCode }}</span>
@@ -162,9 +173,6 @@ function getPhaseStatus(phase: string) {
         <div v-if="finalDecision.summary" class="decision-summary">
           <MarkdownRenderer :text="finalDecision.summary" :is-streaming="false" />
         </div>
-        <button class="chat-btn" @click="emit('goToChat')">
-          <MessageSquare :size="14" /> 在对话中提问
-        </button>
       </div>
 
       <!-- Agent 内容区 -->
@@ -225,6 +233,24 @@ function getPhaseStatus(phase: string) {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+}
+.back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  color: var(--text-dim, #94a3b8);
+  cursor: pointer;
+  border-radius: 6px;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.back-btn:hover {
+  background: var(--surface-2, #f1f5f9);
+  color: var(--text, #1e293b);
 }
 .header-stock h2 { font-size: 20px; font-weight: 600; margin: 0; }
 .stock-code { font-size: 13px; color: var(--text-dim, #94a3b8); margin-left: 8px; }
@@ -291,20 +317,6 @@ function getPhaseStatus(phase: string) {
 .metric-label { font-size: 12px; color: var(--text-dim, #94a3b8); display: block; }
 .metric-value { font-size: 18px; font-weight: 600; }
 .decision-summary { font-size: 14px; line-height: 1.6; }
-.chat-btn {
-  margin-top: 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border: 1px solid var(--accent, #2563eb);
-  background: none;
-  color: var(--accent, #2563eb);
-  border-radius: 6px;
-  font-size: 13px;
-  cursor: pointer;
-}
-.chat-btn:hover { background: var(--accent-dim, #2563eb18); }
 
 .phases-content { display: flex; flex-direction: column; gap: 16px; }
 .phase-section {
