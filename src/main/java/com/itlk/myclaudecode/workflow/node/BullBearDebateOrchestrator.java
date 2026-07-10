@@ -58,7 +58,7 @@ public class BullBearDebateOrchestrator implements WorkflowNode {
                     return judge.makeJudgment(state, debateHistory, sink)
                             .doOnNext(event -> {
                                 if (event.type() == WorkflowEventType.AGENT_COMPLETE) {
-                                    state.setInvestmentPlan(event.content());
+                                    state.setInvestmentPlan(stripJsonBlock(event.content()));
                                     log.info("投资计划已生成");
                                 }
                             });
@@ -67,5 +67,11 @@ public class BullBearDebateOrchestrator implements WorkflowNode {
                     sink.tryEmitNext(WorkflowEvent.phaseComplete("BullBearDebate"));
                     log.info("多空辩论完成");
                 });
+    }
+
+    /** 剥离文本中的 ```json``` 代码块，只保留自然语言部分 */
+    private static String stripJsonBlock(String text) {
+        if (text == null) return null;
+        return text.replaceAll("```json\\s*[\\s\\S]*?```\\s*", "").trim();
     }
 }

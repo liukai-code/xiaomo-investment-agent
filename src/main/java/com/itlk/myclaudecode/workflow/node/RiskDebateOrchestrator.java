@@ -67,7 +67,8 @@ public class RiskDebateOrchestrator implements WorkflowNode {
                     return riskJudge.makeJudgment(state, riskDebateHistory, sink)
                             .doOnNext(event -> {
                                 if (event.type() == WorkflowEventType.AGENT_COMPLETE) {
-                                    FinalDecision decision = parseDecision(event.content());
+                                    // 用原始结果（含 JSON）解析决策，event.content() 已剥离 JSON
+                                    FinalDecision decision = parseDecision(riskJudge.getLastRawResult());
                                     state.setFinalDecision(decision);
                                     sink.tryEmitNext(WorkflowEvent.finalDecision(decision));
                                     log.info("最终裁决: action={}, confidence={}",

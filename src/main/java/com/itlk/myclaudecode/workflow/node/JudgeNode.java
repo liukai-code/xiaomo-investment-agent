@@ -23,11 +23,18 @@ public class JudgeNode implements WorkflowNode {
     private final String systemPrompt;
     private final UsageRecordService usageRecordService;
 
+    /** 最近一次裁决的原始结果（含 JSON），供 Orchestrator 解析决策用 */
+    private volatile String lastRawResult;
+
     public JudgeNode(ChatModel chatModel, String roleName, String systemPrompt, UsageRecordService usageRecordService) {
         this.chatModel = chatModel;
         this.roleName = roleName;
         this.systemPrompt = systemPrompt;
         this.usageRecordService = usageRecordService;
+    }
+
+    public String getLastRawResult() {
+        return lastRawResult;
     }
 
     @Override
@@ -83,7 +90,10 @@ public class JudgeNode implements WorkflowNode {
                 })
                 .doOnComplete(() -> {
                     String fullResult = sanitizeOutput(result.toString());
-                    sink.tryEmitNext(WorkflowEvent.agentComplete(roleName, fullResult));
+                    lastRawResult = fullResult;
+                    // 剥离 JSON 代码块，前端只显示自然语言部分
+                    String cleanResult = fullResult.replaceAll("```json\\s*[\\s\\S]*?```\\s*", "").trim();
+                    sink.tryEmitNext(WorkflowEvent.agentComplete(roleName, cleanResult));
                     log.info("[{}] 裁决完成", roleName);
                     // Record usage
                     try {
