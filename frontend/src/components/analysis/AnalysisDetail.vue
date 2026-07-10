@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Activity, CheckCircle2, AlertCircle, TrendingUp, TrendingDown, Minus, ArrowLeft, Loader2 } from 'lucide-vue-next'
+import { ref, computed, watch } from 'vue'
+import { Activity, CheckCircle2, AlertCircle, TrendingUp, TrendingDown, Minus, ArrowLeft, Loader2, ChevronDown, ChevronRight } from 'lucide-vue-next'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
 import type { AnalysisRecord, WorkflowEvent } from '@/api/analysis'
 
@@ -109,6 +109,32 @@ function getPhaseStatus(phase: string) {
   if (currentPhase.value === phase) return 'running'
   return 'pending'
 }
+
+// Agent 折叠状态：默认折叠已完成的 agent，运行中的自动展开
+const collapsedAgents = ref<Set<string>>(new Set())
+
+function isAgentCollapsed(agent: string): boolean {
+  // 运行中的 agent 不折叠
+  if (agentStates.value.get(agent)?.status === 'running') return false
+  return collapsedAgents.value.has(agent)
+}
+
+function toggleAgent(agent: string) {
+  if (collapsedAgents.value.has(agent)) {
+    collapsedAgents.value.delete(agent)
+  } else {
+    collapsedAgents.value.add(agent)
+  }
+}
+
+// 当 agent 完成时自动折叠（首次出现 done 状态时）
+watch(() => agentStates.value, (states) => {
+  for (const [name, state] of states) {
+    if (state.status === 'done' && !collapsedAgents.value.has(name)) {
+      collapsedAgents.value.add(name)
+    }
+  }
+}, { deep: true })
 </script>
 
 <template>
@@ -184,7 +210,7 @@ function getPhaseStatus(phase: string) {
             <span class="metric-value">¥{{ finalDecision.targetPrice }}</span>
           </div>
         </div>
-        <div v-if="finalDecision.summary" class="decision-summary">
+        <div v-if="finalDecision.summary" class="decision-summary markdown-body">
           <MarkdownRenderer :text="finalDecision.summary" :is-streaming="false" />
         </div>
       </div>
@@ -206,17 +232,20 @@ function getPhaseStatus(phase: string) {
               class="agent-card"
               :class="{
                 'agent-done': agentStates.get(agent)?.status === 'done',
-                'agent-running': agentStates.get(agent)?.status === 'running'
+                'agent-running': agentStates.get(agent)?.status === 'running',
+                'agent-collapsed': isAgentCollapsed(agent)
               }"
             >
-              <div class="agent-header">
+              <div class="agent-header" @click="agentStates.get(agent)?.content && toggleAgent(agent)">
                 <span class="agent-name">{{ agentLabels[agent] || agent }}</span>
                 <span class="agent-status">
                   <CheckCircle2 v-if="agentStates.get(agent)?.status === 'done'" :size="12" />
                   <Activity v-else-if="agentStates.get(agent)?.status === 'running'" :size="12" class="spin" />
                 </span>
+                <ChevronDown v-if="agentStates.get(agent)?.content && isAgentCollapsed(agent)" :size="14" class="toggle-icon" />
+                <ChevronRight v-else-if="agentStates.get(agent)?.content && !isAgentCollapsed(agent)" :size="14" class="toggle-icon" />
               </div>
-              <div v-if="agentStates.get(agent)?.content" class="agent-content">
+              <div v-if="agentStates.get(agent)?.content && !isAgentCollapsed(agent)" class="agent-content markdown-body">
                 <MarkdownRenderer :text="agentStates.get(agent)!.content" :is-streaming="false" />
               </div>
             </div>
@@ -367,10 +396,20 @@ function getPhaseStatus(phase: string) {
   border-color: #60a5fa;
   box-shadow: 0 0 0 1px #60a5fa40;
 }
-.agent-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.agent-name { font-size: 13px; font-weight: 500; }
-.agent-status { color: var(--green, #16a34a); }
-.agent-content { font-size: 13px; line-height: 1.6; max-height: 400px; overflow-y: auto; }
+.agent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+.agent-header:hover { background: var(--surface-2, #f1f5f9); border-radius: 4px; }
+.agent-name { font-size: 13px; font-weight: 500; flex: 1; }
+.agent-status { color: var(--green, #16a34a); margin-right: 4px; }
+.toggle-icon { color: var(--text-dim, #94a3b8); flex-shrink: 0; }
+.agent-content { font-size: 14px; line-height: 1.7; overflow-y: auto; }
+.agent-collapsed .agent-header { margin-bottom: 0; }
 
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

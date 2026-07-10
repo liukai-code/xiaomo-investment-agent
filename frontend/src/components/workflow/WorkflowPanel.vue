@@ -229,7 +229,7 @@ function formatAgentContent(agentName: string, content: string): string {
           </div>
           <div
             v-if="agentStates.get(agentName)?.content"
-            class="agent-content"
+            class="agent-content markdown-body"
           >
             <MarkdownRenderer
               :text="formatAgentContent(agentName, agentStates.get(agentName)?.content || '')"
@@ -261,7 +261,9 @@ function formatAgentContent(agentName: string, content: string): string {
           </div>
         </template>
         <template v-else>
-          <MarkdownRenderer :text="finalDecision.content || ''" :is-streaming="false" />
+          <div class="markdown-body">
+            <MarkdownRenderer :text="finalDecision.content || ''" :is-streaming="false" />
+          </div>
         </template>
       </div>
     </div>
@@ -426,7 +428,8 @@ function formatAgentContent(agentName: string, content: string): string {
 
 .agent-content {
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.7;
   max-height: 400px;
   overflow-y: auto;
   word-break: break-word;
@@ -484,7 +487,7 @@ function formatAgentContent(agentName: string, content: string): string {
 }
 
 .decision-summary {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.6;
   color: var(--text-secondary, #666);
   word-break: break-word;

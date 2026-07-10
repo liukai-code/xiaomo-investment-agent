@@ -61,7 +61,7 @@ onUnmounted(() => {
         </button>
         <button class="export-item" @click.stop="handleExport('md')">
           <FileText :size="14" />
-          <span>导出 Markdown</span>
+          <span>导出 MD</span>
         </button>
       </div>
     </Transition>
