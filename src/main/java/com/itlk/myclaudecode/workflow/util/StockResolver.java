@@ -62,6 +62,18 @@ public class StockResolver {
         if (codeMatcher.find()) {
             String code = codeMatcher.group(1);
             log.info("[StockResolver] 从查询中提取到数字代码: {}", code);
+            // 用代码查东财 API 获取股票名称
+            try {
+                List<ResolvedStock> results = searchEastMoneyAll(code, httpClientService);
+                for (ResolvedStock stock : results) {
+                    if (code.equals(stock.code()) && stock.name() != null) {
+                        log.info("[StockResolver] 代码反查名称成功: {} -> {}", code, stock.name());
+                        return stock;
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("[StockResolver] 代码反查名称失败: {}", e.getMessage());
+            }
             return new ResolvedStock(code, null);
         }
 

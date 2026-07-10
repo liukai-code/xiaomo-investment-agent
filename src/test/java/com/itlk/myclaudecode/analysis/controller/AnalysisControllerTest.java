@@ -14,8 +14,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import reactor.core.publisher.Flux;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -132,9 +130,7 @@ class AnalysisControllerTest {
             saved.setStartedAt(LocalDateTime.now());
             when(analysisService.createAnalysis(eq(userId), eq("分析600519贵州茅台"), eq("600519"), any()))
                     .thenReturn(saved);
-            // 异步工作流返回空 Flux（异步执行，可能不被调用，使用 lenient）
-            lenient().when(deepAnalysisWorkflow.executeWithAnalysisId(userId, 42L, "分析600519贵州茅台"))
-                    .thenReturn(Flux.empty());
+            // 异步工作流（void 方法，无需 mock 返回值）
 
             Result<Map<String, Object>> result = controller.startAnalysis(body, request);
 
@@ -155,9 +151,7 @@ class AnalysisControllerTest {
             saved.setStartedAt(LocalDateTime.now());
             when(analysisService.createAnalysis(eq(userId), eq("分析茅台行情走势"), any(), any()))
                     .thenReturn(saved);
-            // 异步工作流（可能不被调用，使用 lenient）
-            lenient().when(deepAnalysisWorkflow.executeWithAnalysisId(eq(userId), eq(43L), any()))
-                    .thenReturn(Flux.empty());
+            // 异步工作流（void 方法，无需 mock 返回值）
 
             Result<Map<String, Object>> result = controller.startAnalysis(body, request);
 

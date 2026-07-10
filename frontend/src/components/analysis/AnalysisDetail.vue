@@ -128,10 +128,13 @@ function getPhaseStatus(phase: string) {
         </div>
         <div class="header-status">
           <span v-if="isRunning" class="status running">
-            <Activity :size="14" class="spin" /> 运行中
+            <Activity :size="14" class="spin" /> 分析中
           </span>
           <span v-else-if="detail?.workflowStatus === 'COMPLETED'" class="status completed">
             <CheckCircle2 :size="14" /> 已完成
+          </span>
+          <span v-else-if="detail?.workflowStatus === 'CANCELLED'" class="status cancelled">
+            <Minus :size="14" /> 已停止
           </span>
           <span v-else-if="detail?.workflowStatus === 'FAILED'" class="status failed">
             <AlertCircle :size="14" /> 失败
@@ -264,6 +267,7 @@ function getPhaseStatus(phase: string) {
 }
 .status.running { background: var(--accent-dim, #2563eb18); color: var(--accent, #2563eb); }
 .status.completed { background: #dcfce7; color: var(--green, #16a34a); }
+.status.cancelled { background: #f5f5f5; color: #888; }
 .status.failed { background: #fef2f2; color: var(--danger, #dc2626); }
 
 .phase-progress {

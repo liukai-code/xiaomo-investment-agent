@@ -16,9 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
-import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 import java.util.Map;
@@ -73,19 +71,11 @@ public class AnalysisController {
 
         // 异步启动工作流（不阻塞响应）
         Long analysisId = analysis.getId();
-        Mono.fromRunnable(() -> {
-            try {
-                deepAnalysisWorkflow.executeWithAnalysisId(userId, analysisId, query)
-                        .subscribeOn(Schedulers.boundedElastic())
-                        .subscribe(
-                                event -> log.debug("分析事件: {}", event.type()),
-                                error -> log.error("分析失败: {}", error.getMessage()),
-                                () -> log.info("分析完成: {}", analysisId)
-                        );
-            } catch (Exception e) {
-                log.error("启动分析失败", e);
-            }
-        }).subscribeOn(Schedulers.boundedElastic()).subscribe();
+        try {
+            deepAnalysisWorkflow.executeWithAnalysisId(userId, analysisId, query);
+        } catch (Exception e) {
+            log.error("启动分析失败", e);
+        }
 
         return Result.success(Map.of(
                 "analysisId", analysisId,

@@ -29,8 +29,15 @@ public class WorkflowEngine {
         Duration totalBudget = Duration.ofSeconds(properties.timeoutSeconds());
         int stageMinSeconds = properties.stageMinSeconds();
 
-        return Flux.fromIterable(graph.resolveExecutionPath(state))
+        Flux<WorkflowEvent> pipeline = Flux.fromIterable(graph.resolveExecutionPath(state))
                 .concatMap(node -> {
+                    // 检查是否已取消
+                    if (state.isCancelled()) {
+                        log.info("工作流已取消，跳过剩余节点: {}", node.name());
+                        sink.tryEmitNext(WorkflowEvent.phaseSkipped(node.name(), "用户已停止"));
+                        return Flux.empty();
+                    }
+
                     Duration elapsed = Duration.between(pipelineStart, Instant.now());
                     Duration remaining = totalBudget.minus(elapsed);
 
@@ -68,5 +75,9 @@ public class WorkflowEngine {
                     sink.tryEmitComplete();
                     return Flux.empty();
                 });
+
+        // 用取消信号中断正在执行的节点
+        Sinks.One<Void> cancelSink = state.getOrCreateCancelSink();
+        return pipeline.takeUntilOther(cancelSink.asMono());
     }
 }

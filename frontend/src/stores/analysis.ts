@@ -133,11 +133,11 @@ export const useAnalysisStore = defineStore('analysis', () => {
       // 同步前端状态
       const record = analyses.value.find((a) => a.id === id)
       if (record && record.workflowStatus === 'RUNNING') {
-        record.workflowStatus = 'FAILED'
+        record.workflowStatus = 'CANCELLED'
         record.errorMessage = '用户手动停止'
       }
       if (selectedDetail.value && selectedDetail.value.workflowStatus === 'RUNNING') {
-        selectedDetail.value.workflowStatus = 'FAILED'
+        selectedDetail.value.workflowStatus = 'CANCELLED'
         selectedDetail.value.errorMessage = '用户手动停止'
       }
     }

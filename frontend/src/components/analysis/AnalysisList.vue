@@ -16,8 +16,9 @@ const emit = defineEmits<{
 function getStatusLabel(status: string) {
   const map: Record<string, string> = {
     PENDING: '等待中',
-    RUNNING: '运行中',
+    RUNNING: '分析中',
     COMPLETED: '已完成',
+    CANCELLED: '已停止',
     FAILED: '失败',
   }
   return map[status] || status
@@ -139,6 +140,7 @@ function formatTime(dateStr: string | null) {
 }
 .status-running { background: var(--accent-dim, #2563eb18); color: var(--accent, #2563eb); }
 .status-completed { background: #dcfce7; color: var(--green, #16a34a); }
+.status-cancelled { background: #f5f5f5; color: #888; }
 .status-failed { background: #fef2f2; color: var(--danger, #dc2626); }
 .status-pending { background: var(--surface-2, #f1f5f9); color: var(--text-dim, #94a3b8); }
 .action-badge {

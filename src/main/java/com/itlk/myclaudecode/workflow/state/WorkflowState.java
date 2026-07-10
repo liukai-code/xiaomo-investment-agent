@@ -46,4 +46,27 @@ public class WorkflowState {
     private volatile String currentPhase;
     private Instant startTime = Instant.now();
     private transient Sinks.Many<WorkflowEvent> eventSink;
+
+    // 取消检查回调（由 DeepAnalysisWorkflow 注入，引擎节点执行前调用）
+    private transient java.util.function.BooleanSupplier cancelledChecker;
+
+    // 取消信号 Sink（cancelAnalysis 时 emit，引擎 takeUntilOther 立即终止）
+    private transient Sinks.One<Void> cancelSink;
+
+    public boolean isCancelled() {
+        return cancelledChecker != null && cancelledChecker.getAsBoolean();
+    }
+
+    public Sinks.One<Void> getOrCreateCancelSink() {
+        if (cancelSink == null) {
+            cancelSink = Sinks.one();
+        }
+        return cancelSink;
+    }
+
+    public void signalCancel() {
+        if (cancelSink != null) {
+            cancelSink.tryEmitValue(null);
+        }
+    }
 }

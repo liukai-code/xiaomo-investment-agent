@@ -48,6 +48,12 @@ public class DeepAnalysisWorkflow {
     /** 已取消的分析 ID 集合（防止工作流完成后覆盖状态） */
     private final java.util.Set<Long> cancelledAnalyses = ConcurrentHashMap.newKeySet();
 
+    /** 正在运行的工作流 Disposable 映射（analysisId -> Disposable，取消时 dispose 用） */
+    private final ConcurrentHashMap<Long, reactor.core.Disposable> runningFluxes = new ConcurrentHashMap<>();
+
+    /** 正在运行的工作流状态映射（analysisId -> WorkflowState，取消时触发 cancelSink 用） */
+    private final ConcurrentHashMap<Long, com.itlk.myclaudecode.workflow.state.WorkflowState> runningStates = new ConcurrentHashMap<>();
+
     public DeepAnalysisWorkflow(WorkflowAgentFactory agentFactory,
                                  WorkflowEngine engine,
                                  WorkflowAnalysisRepository analysisRepository,
@@ -89,13 +95,28 @@ public class DeepAnalysisWorkflow {
      */
     public void cancelAnalysis(Long analysisId) {
         cancelledAnalyses.add(analysisId);
+
+        // 触发 cancel sink，让引擎的 takeUntilOther 立即终止
+        com.itlk.myclaudecode.workflow.state.WorkflowState state = runningStates.get(analysisId);
+        if (state != null) {
+            state.signalCancel();
+        }
+
+        // dispose 正在运行的 Flux 订阅
+        reactor.core.Disposable disposable = runningFluxes.remove(analysisId);
+        if (disposable != null && !disposable.isDisposed()) {
+            disposable.dispose();
+            log.info("已 dispose 工作流 Flux: analysisId={}", analysisId);
+        }
+
         removeEventSink(analysisId);
         analysisRepository.findById(analysisId).ifPresent(a -> {
-            a.setWorkflowStatus("FAILED");
+            a.setWorkflowStatus("CANCELLED");
             a.setErrorMessage("用户手动停止");
             a.setCompletedAt(java.time.LocalDateTime.now());
             analysisRepository.save(a);
         });
+        runningStates.remove(analysisId);
         log.info("分析已取消: analysisId={}", analysisId);
     }
 
@@ -132,6 +153,19 @@ public class DeepAnalysisWorkflow {
             }
         }
 
+        // 补充解析股票名称（数字代码路径 StockResolver 未被调用）
+        if (state.getResolvedStockName() == null && state.getResolvedStockCode() != null) {
+            try {
+                var resolved = StockResolver.resolve(state.getResolvedStockCode(), httpClientService);
+                if (resolved.name() != null) {
+                    state.setResolvedStockName(resolved.name());
+                    log.info("补充解析股票名称: {} -> {}", state.getResolvedStockCode(), resolved.name());
+                }
+            } catch (Exception e) {
+                log.warn("补充解析股票名称失败: {}", e.getMessage());
+            }
+        }
+
         // 解析用户级 ChatModel（Per-User API Key 路由）
         ChatModel userChatModel = null;
         try {
@@ -145,6 +179,12 @@ public class DeepAnalysisWorkflow {
 
         WorkflowGraph graph = buildGraph(userChatModel);
 
+        // 注入取消检查器（analysisId 可能后续才设置，用延迟检查）
+        state.setCancelledChecker(() -> {
+            Long aid = state.getAnalysisId();
+            return aid != null && cancelledAnalyses.contains(aid);
+        });
+
         return engine.execute(graph, state)
                 .doOnNext(event -> {
                     // 如果存在独立分析的 Sink，同步发布事件
@@ -157,18 +197,28 @@ public class DeepAnalysisWorkflow {
                     }
                 })
                 .doOnComplete(() -> {
-                    log.info("工作流完成，持久化结果");
-                    if (state.getAnalysisId() != null) {
-                        persistResultsWithId(state, state.getAnalysisId(), "COMPLETED", null);
-                        removeEventSink(state.getAnalysisId());
+                    Long aid = state.getAnalysisId();
+                    if (aid != null && cancelledAnalyses.contains(aid)) {
+                        log.info("工作流已被取消，不覆盖状态: analysisId={}", aid);
+                        removeEventSink(aid);
                     } else {
-                        persistResults(state, "COMPLETED", null);
+                        log.info("工作流完成，持久化结果");
+                        if (aid != null) {
+                            persistResultsWithId(state, aid, "COMPLETED", null);
+                            removeEventSink(aid);
+                        } else {
+                            persistResults(state, "COMPLETED", null);
+                        }
                     }
                 })
                 .doOnError(e -> {
                     log.error("工作流执行错误: {}", e.getMessage(), e);
-                    if (state.getAnalysisId() != null) {
-                        persistResultsWithId(state, state.getAnalysisId(), "FAILED", e.getMessage());
+                    Long aid = state.getAnalysisId();
+                    if (aid != null && cancelledAnalyses.contains(aid)) {
+                        log.info("已取消的工作流错误，忽略: analysisId={}, error={}", aid, e.getMessage());
+                        removeEventSink(aid);
+                    } else if (aid != null) {
+                        persistResultsWithId(state, aid, "FAILED", e.getMessage());
                         Sinks.Many<WorkflowEvent> sink = analysisEventSinks.get(state.getAnalysisId());
                         if (sink != null) {
                             sink.tryEmitNext(WorkflowEvent.error("工作流执行失败: " + e.getMessage()));
@@ -183,7 +233,7 @@ public class DeepAnalysisWorkflow {
     /**
      * 使用预创建的分析记录执行工作流（独立分析模式，不关联对话）
      */
-    public Flux<WorkflowEvent> executeWithAnalysisId(Long userId, Long analysisId, String query) {
+    public void executeWithAnalysisId(Long userId, Long analysisId, String query) {
         log.info("启动独立分析工作流: userId={}, analysisId={}, query={}", userId, analysisId, query);
 
         // 创建事件 Sink
@@ -217,8 +267,23 @@ public class DeepAnalysisWorkflow {
                 log.info("标的解析成功: {}({})", resolved.name(), resolved.code());
             } catch (IllegalArgumentException e) {
                 log.warn("标的解析失败: {}", e.getMessage());
+                sink.tryEmitNext(WorkflowEvent.error("标的解析失败: " + e.getMessage()));
+                sink.tryEmitComplete();
                 removeEventSink(analysisId);
-                return Flux.just(WorkflowEvent.error("标的解析失败: " + e.getMessage()));
+                return;
+            }
+        }
+
+        // 补充解析股票名称（数字代码路径 StockResolver 未被调用）
+        if (state.getResolvedStockName() == null && state.getResolvedStockCode() != null) {
+            try {
+                var resolved = StockResolver.resolve(state.getResolvedStockCode(), httpClientService);
+                if (resolved.name() != null) {
+                    state.setResolvedStockName(resolved.name());
+                    log.info("补充解析股票名称: {} -> {}", state.getResolvedStockCode(), resolved.name());
+                }
+            } catch (Exception e) {
+                log.warn("补充解析股票名称失败: {}", e.getMessage());
             }
         }
 
@@ -235,7 +300,14 @@ public class DeepAnalysisWorkflow {
 
         WorkflowGraph graph = buildGraph(userChatModel);
 
-        return engine.execute(graph, state)
+        // 注入取消检查器
+        state.setCancelledChecker(() -> cancelledAnalyses.contains(analysisId));
+
+        // 保存 state 引用，供取消时触发 cancelSink
+        runningStates.put(analysisId, state);
+
+        // 内部订阅并保存 Disposable，供取消时 dispose
+        reactor.core.Disposable disposable = engine.execute(graph, state)
                 .doOnNext(event -> {
                     Sinks.Many<WorkflowEvent> s = analysisEventSinks.get(analysisId);
                     if (s != null && s.currentSubscriberCount() > 0) {
@@ -243,17 +315,34 @@ public class DeepAnalysisWorkflow {
                     }
                 })
                 .doOnComplete(() -> {
-                    persistResultsWithId(state, analysisId, "COMPLETED", null);
-                    removeEventSink(analysisId);
+                    runningFluxes.remove(analysisId);
+                    runningStates.remove(analysisId);
+                    if (cancelledAnalyses.contains(analysisId)) {
+                        log.info("工作流已被取消，不覆盖状态: analysisId={}", analysisId);
+                        removeEventSink(analysisId);
+                    } else {
+                        persistResultsWithId(state, analysisId, "COMPLETED", null);
+                        removeEventSink(analysisId);
+                    }
                 })
                 .doOnError(e -> {
-                    persistResultsWithId(state, analysisId, "FAILED", e.getMessage());
-                    Sinks.Many<WorkflowEvent> s = analysisEventSinks.get(analysisId);
-                    if (s != null) {
-                        s.tryEmitNext(WorkflowEvent.error("工作流执行失败: " + e.getMessage()));
+                    runningFluxes.remove(analysisId);
+                    runningStates.remove(analysisId);
+                    if (cancelledAnalyses.contains(analysisId)) {
+                        log.info("已取消的工作流错误，忽略: analysisId={}, error={}", analysisId, e.getMessage());
+                        removeEventSink(analysisId);
+                    } else {
+                        persistResultsWithId(state, analysisId, "FAILED", e.getMessage());
+                        Sinks.Many<WorkflowEvent> s = analysisEventSinks.get(analysisId);
+                        if (s != null) {
+                            s.tryEmitNext(WorkflowEvent.error("工作流执行失败: " + e.getMessage()));
+                        }
+                        removeEventSink(analysisId);
                     }
-                    removeEventSink(analysisId);
-                });
+                })
+                .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+                .subscribe();
+        runningFluxes.put(analysisId, disposable);
     }
 
     private WorkflowGraph buildGraph(ChatModel userChatModel) {
