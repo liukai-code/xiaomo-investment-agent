@@ -110,7 +110,7 @@ function getPhaseStatus(phase: string) {
     </div>
 
     <!-- 加载中 -->
-    <div v-else-if="detailLoading && !detail" class="detail-empty">
+    <div v-else-if="detailLoading" class="detail-empty">
       <Loader2 :size="32" class="spin" />
       <p>加载中...</p>
     </div>

@@ -5,6 +5,7 @@ import com.itlk.myclaudecode.analysis.service.AnalysisService;
 import com.itlk.myclaudecode.common.entity.Result;
 import com.itlk.myclaudecode.workflow.event.WorkflowEvent;
 import com.itlk.myclaudecode.workflow.persist.WorkflowAnalysis;
+import com.itlk.myclaudecode.workflow.state.FinalDecision;
 import com.itlk.myclaudecode.workflow.service.DeepAnalysisWorkflow;
 import com.itlk.myclaudecode.workflow.util.StockCodeExtractor;
 import com.itlk.myclaudecode.workflow.util.StockResolver;
@@ -105,12 +106,8 @@ public class AnalysisController {
                 if (sink != null) break;
             }
             if (sink == null) {
-                return Flux.just(
-                        ServerSentEvent.<String>builder()
-                                .event("done")
-                                .data("{\"analysisId\":" + id + "}")
-                                .build()
-                );
+                // 分析已完成，从数据库重建事件流
+                return buildEventsFromAnalysis(id, userId);
             }
         }
 
@@ -134,6 +131,119 @@ public class AnalysisController {
                                 .data("{\"analysisId\":" + id + "}")
                                 .build()
                 ));
+    }
+
+    /**
+     * 从已完成的分析记录重建事件流
+     */
+    private Flux<ServerSentEvent<String>> buildEventsFromAnalysis(Long analysisId, Long userId) {
+        WorkflowAnalysis analysis = analysisService.getAnalysis(analysisId, userId);
+        if (analysis == null || analysis.getWorkflowStatus() == null) {
+            return Flux.just(doneEvent(analysisId));
+        }
+
+        List<WorkflowEvent> events = new java.util.ArrayList<>();
+
+        // Layer 1: 分析师报告
+        events.add(WorkflowEvent.phaseStart("Layer1_DataCollection"));
+        if (analysis.getAnalystReportsJson() != null) {
+            try {
+                Map<String, String> reports = objectMapper.readValue(
+                        analysis.getAnalystReportsJson(),
+                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {});
+                reports.forEach((name, content) -> {
+                    events.add(WorkflowEvent.agentStart(name));
+                    events.add(WorkflowEvent.agentComplete(name, content));
+                });
+            } catch (Exception ignored) {}
+        }
+        events.add(WorkflowEvent.phaseComplete("Layer1_DataCollection"));
+
+        // Layer 2: 多空辩论
+        events.add(WorkflowEvent.phaseStart("BullBearDebate"));
+        if (analysis.getBullBearDebateJson() != null) {
+            try {
+                List<Map<String, Object>> debate = objectMapper.readValue(
+                        analysis.getBullBearDebateJson(),
+                        new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {});
+                int round = 1;
+                for (Map<String, Object> msg : debate) {
+                    String speaker = (String) msg.get("speakerName");
+                    String argument = (String) msg.get("argument");
+                    if (speaker != null) {
+                        events.add(WorkflowEvent.debateStart(speaker, round));
+                        events.add(WorkflowEvent.debateComplete(speaker, argument));
+                        round++;
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+        if (analysis.getInvestmentPlan() != null) {
+            events.add(WorkflowEvent.agentStart("ResearchManager"));
+            events.add(WorkflowEvent.agentComplete("ResearchManager", analysis.getInvestmentPlan()));
+        }
+        events.add(WorkflowEvent.phaseComplete("BullBearDebate"));
+
+        // Layer 3: 交易决策
+        events.add(WorkflowEvent.phaseStart("Trader"));
+        if (analysis.getTradingProposal() != null) {
+            events.add(WorkflowEvent.agentStart("Trader"));
+            events.add(WorkflowEvent.agentComplete("Trader", analysis.getTradingProposal()));
+        }
+        events.add(WorkflowEvent.phaseComplete("Trader"));
+
+        // Layer 4: 风险评估
+        events.add(WorkflowEvent.phaseStart("RiskDebate"));
+        if (analysis.getRiskDebateJson() != null) {
+            try {
+                List<Map<String, Object>> debate = objectMapper.readValue(
+                        analysis.getRiskDebateJson(),
+                        new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {});
+                int round = 1;
+                for (Map<String, Object> msg : debate) {
+                    String speaker = (String) msg.get("speakerName");
+                    String argument = (String) msg.get("argument");
+                    if (speaker != null) {
+                        events.add(WorkflowEvent.debateStart(speaker, round));
+                        events.add(WorkflowEvent.debateComplete(speaker, argument));
+                        round++;
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+        if (analysis.getAction() != null) {
+            FinalDecision decision = new FinalDecision(
+                    analysis.getAction(),
+                    analysis.getConfidence() != null ? analysis.getConfidence() : 0.0,
+                    analysis.getTargetPrice() != null ? analysis.getTargetPrice() : 0.0,
+                    analysis.getSummary(),
+                    null);
+            events.add(WorkflowEvent.agentStart("RiskJudge"));
+            events.add(WorkflowEvent.agentComplete("RiskJudge", analysis.getSummary()));
+            events.add(WorkflowEvent.finalDecision(decision));
+        }
+        events.add(WorkflowEvent.phaseComplete("RiskDebate"));
+
+        Flux<ServerSentEvent<String>> eventFlux = Flux.fromIterable(events)
+                .map(event -> {
+                    try {
+                        return ServerSentEvent.<String>builder()
+                                .event("workflow")
+                                .data(objectMapper.writeValueAsString(event))
+                                .build();
+                    } catch (Exception e) {
+                        return doneEvent(analysisId);
+                    }
+                });
+
+        return eventFlux.concatWith(Flux.just(doneEvent(analysisId)));
+    }
+
+    private ServerSentEvent<String> doneEvent(Long analysisId) {
+        return ServerSentEvent.<String>builder()
+                .event("done")
+                .data("{\"analysisId\":" + analysisId + "}")
+                .build();
     }
 
     /**

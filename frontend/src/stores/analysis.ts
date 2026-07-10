@@ -33,19 +33,37 @@ export const useAnalysisStore = defineStore('analysis', () => {
     }
   }
 
-  async function selectAnalysis(id: number) {
+  async function selectAnalysis(id: number, reconnect = true) {
     selectedId.value = id
-    // 检查是否正在运行中（有事件流）
-    const record = analyses.value.find((a) => a.id === id)
-    if (record && record.workflowStatus === 'RUNNING' && !isRunning.value) {
-      // 尝试重新连接 SSE（MVP 不实现重连，直接加载详情）
-    }
     detailLoading.value = true
     try {
       selectedDetail.value = await getAnalysisDetail(id)
     } catch {
       selectedDetail.value = null
-    } finally {
+    }
+
+    // 连接 SSE 流回放事件（已完成的分析从数据库重建事件）
+    if (reconnect) {
+      if (abortController) {
+        abortController.abort()
+        abortController = null
+      }
+      workflowEvents.value = []
+      const authStore = useAuthStore()
+      abortController = streamAnalysis(id, authStore.token, {
+        onEvent(event) {
+          workflowEvents.value.push(event)
+        },
+        onDone() {
+          abortController = null
+          detailLoading.value = false
+        },
+        onError() {
+          abortController = null
+          detailLoading.value = false
+        },
+      })
+    } else {
       detailLoading.value = false
     }
   }
@@ -91,9 +109,9 @@ export const useAnalysisStore = defineStore('analysis', () => {
       onDone() {
         isRunning.value = false
         abortController = null
-        // 刷新分析详情
-        selectAnalysis(result.analysisId)
+        // 刷新列表和详情，不重连 SSE（事件已在 workflowEvents 中）
         loadAnalyses()
+        selectAnalysis(result.analysisId, false)
       },
       onError(msg) {
         isRunning.value = false
