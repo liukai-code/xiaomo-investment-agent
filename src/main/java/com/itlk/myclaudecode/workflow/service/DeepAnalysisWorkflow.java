@@ -191,7 +191,7 @@ public class DeepAnalysisWorkflow {
                     Long analysisId = state.getAnalysisId();
                     if (analysisId != null) {
                         Sinks.Many<WorkflowEvent> sink = analysisEventSinks.get(analysisId);
-                        if (sink != null && sink.currentSubscriberCount() > 0) {
+                        if (sink != null) {
                             sink.tryEmitNext(event);
                         }
                     }
@@ -310,7 +310,7 @@ public class DeepAnalysisWorkflow {
         reactor.core.Disposable disposable = engine.execute(graph, state)
                 .doOnNext(event -> {
                     Sinks.Many<WorkflowEvent> s = analysisEventSinks.get(analysisId);
-                    if (s != null && s.currentSubscriberCount() > 0) {
+                    if (s != null) {
                         s.tryEmitNext(event);
                     }
                 })

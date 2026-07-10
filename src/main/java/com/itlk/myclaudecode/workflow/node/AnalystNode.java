@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
@@ -146,13 +147,26 @@ public class AnalystNode implements WorkflowNode {
                 .user(userPrompt)
                 .options(options)
                 .stream()
-                .content()
-                .filter(chunk -> !isGuardTag(chunk))
-                .map(chunk -> {
-                    report.append(chunk);
-                    completenessChecker.appendChunk(chunk);
-                    return WorkflowEvent.agentChunk(roleName, chunk);
+                .chatResponse()
+                .filter(resp -> resp != null && resp.getResult() != null && resp.getResult().getOutput() != null)
+                .map(resp -> {
+                    var output = resp.getResult().getOutput();
+                    // 工具调用轮次：发送进度事件，让前端实时感知
+                    if (output.hasToolCalls()) {
+                        String toolNames = output.getToolCalls().stream()
+                                .map(tc -> tc.name())
+                                .collect(java.util.stream.Collectors.joining(", "));
+                        sink.tryEmitNext(WorkflowEvent.agentChunk(roleName, "🔧 正在调用工具: " + toolNames + "\n"));
+                        return (WorkflowEvent) null;
+                    }
+                    // 文本 chunk：累积到报告
+                    String text = output.getText();
+                    if (text == null || text.isEmpty() || isGuardTag(text)) return null;
+                    report.append(text);
+                    completenessChecker.appendChunk(text);
+                    return WorkflowEvent.agentChunk(roleName, text);
                 })
+                .filter(event -> event != null)
                 .doOnComplete(() -> {
                     String rawReport = report.toString();
                     // 先提取结构化数据（需要原始 JSON）

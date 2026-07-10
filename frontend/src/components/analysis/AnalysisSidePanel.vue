@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Brain, X, ChevronDown, Square } from 'lucide-vue-next'
+import { Brain, X, Square } from 'lucide-vue-next'
 import { useAnalysisStore } from '@/stores/analysis'
 import AnalysisInput from '@/components/analysis/AnalysisInput.vue'
 import AnalysisList from '@/components/analysis/AnalysisList.vue'
@@ -59,7 +59,7 @@ function handleBack() {
     <div class="panel-list-section">
       <div class="list-toggle" @click="listCollapsed = !listCollapsed">
         <span>分析记录 ({{ analysisStore.analyses.length }})</span>
-        <ChevronDown :size="14" :class="{ rotated: listCollapsed }" />
+        <span class="toggle-text">{{ listCollapsed ? '展开列表' : '收起列表' }}</span>
       </div>
       <Transition name="list-collapse">
         <div v-if="!listCollapsed" class="list-body">
@@ -183,13 +183,10 @@ function handleBack() {
   background: var(--surface-2, #f1f5f9);
 }
 
-.list-toggle .rotated {
-  transform: rotate(-90deg);
-}
-
-.list-toggle svg {
-  transition: transform 0.2s ease;
-  color: var(--text, #1e293b);
+.toggle-text {
+  font-size: 12px;
+  color: var(--accent, #2563eb);
+  font-weight: 500;
 }
 
 .list-body {
