@@ -173,6 +173,14 @@ function scrollToBottomIfNear() {
 }
 
 async function handleCreateConversation() {
+  // 新建会话前，中断当前正在进行的流式输出
+  if (abortController) {
+    abortController.abort()
+    abortController = null
+    chatStore.isGenerating = false
+    statusText.value = 'READY'
+    currentStatus.value = null
+  }
   chatStore.currentConvId = null
   chatStore.messages = []
 }
@@ -279,14 +287,21 @@ async function handleSend() {
 
   const { schedule, cancel: cancelRaf } = useRafThrottle()
 
-  abortController = streamChat(chatStore.currentConvId!, text, authStore.token, {
+  // 捕获当前会话 ID，防止回调在会话切换后更新错误的消息
+  const convId = chatStore.currentConvId!
+
+  abortController = streamChat(convId, text, authStore.token, {
     onStatus(event: StatusEvent) {
+      // 会话已切换，忽略回调
+      if (chatStore.currentConvId !== convId) return
       // TOOL_RESULT 没有有用信息，跳过，保持显示 TOOL_CALL 标签
       if (event.type !== 'TOOL_RESULT') {
         currentStatus.value = event
       }
     },
     onChunk(fullText: string) {
+      // 会话已切换，忽略回调
+      if (chatStore.currentConvId !== convId) return
       schedule(() => {
         chatStore.updateLastAiMessage(fullText)
         scrollToBottomIfNear()
@@ -294,6 +309,12 @@ async function handleSend() {
     },
     onDone(fullText: string) {
       cancelRaf()
+      // 会话已切换，只清理状态，不更新消息
+      if (chatStore.currentConvId !== convId) {
+        chatStore.isGenerating = false
+        abortController = null
+        return
+      }
       chatStore.updateLastAiMessage(fullText || '(empty)')
       chatStore.isGenerating = false
       statusText.value = 'READY'
@@ -301,10 +322,16 @@ async function handleSend() {
       abortController = null
       scrollToBottom()
       chatStore.loadConversations()
-      chatStore.generateTitle(chatStore.currentConvId!)
+      chatStore.generateTitle(convId)
     },
     onError(err: Error) {
       cancelRaf()
+      // 会话已切换，只清理状态，不更新消息
+      if (chatStore.currentConvId !== convId) {
+        chatStore.isGenerating = false
+        abortController = null
+        return
+      }
       chatStore.updateLastAiMessage(`ERROR: ${err.message}`)
       chatStore.isGenerating = false
       statusText.value = 'READY'
