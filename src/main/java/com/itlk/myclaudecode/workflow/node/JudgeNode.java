@@ -89,10 +89,11 @@ public class JudgeNode implements WorkflowNode {
                     return WorkflowEvent.agentChunk(roleName, chunk);
                 })
                 .doOnComplete(() -> {
-                    String fullResult = sanitizeOutput(result.toString());
-                    lastRawResult = fullResult;
-                    // 剥离 JSON 代码块，前端只显示自然语言部分
-                    String cleanResult = fullResult.replaceAll("```json\\s*[\\s\\S]*?```\\s*", "").trim();
+                    String rawResult = result.toString();
+                    lastRawResult = rawResult.replaceAll("\\n*\\[GUARD:[\\s\\S]*?\\[/GUARD]\\n*", "")
+                            .replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "").trim();
+                    // 剥离 JSON 并提取关键决策信息追加到末尾
+                    String cleanResult = sanitizeAndExtractDecision(rawResult);
                     sink.tryEmitNext(WorkflowEvent.agentComplete(roleName, cleanResult));
                     log.info("[{}] 裁决完成", roleName);
                     // Record usage
@@ -111,6 +112,97 @@ public class JudgeNode implements WorkflowNode {
                 .replaceAll("\\n*\\[GUARD:[\\s\\S]*?\\[/GUARD]\\n*", "")
                 .replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "")
                 .trim();
+    }
+
+    /**
+     * 清理 GUARD 标签，剥离 JSON，提取关键决策信息追加到末尾
+     */
+    private static String sanitizeAndExtractDecision(String text) {
+        if (text == null) return "";
+        // 先清理 GUARD 标签
+        String cleaned = text
+                .replaceAll("\\n*\\[GUARD:[\\s\\S]*?\\[/GUARD]\\n*", "")
+                .replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "")
+                .trim();
+
+        // 剥离 ```json 代码块
+        cleaned = cleaned.replaceAll("```json\\s*[\\s\\S]*?```\\s*", "").trim();
+
+        // 用状态机扫描并剥离末尾的裸 JSON 对象（支持嵌套花括号）
+        String jsonStr = extractAndRemoveTrailingJson(cleaned);
+        cleaned = cleaned.trim();
+
+        // 如果提取到了 JSON，解析关键字段追加到末尾
+        if (jsonStr != null) {
+            try {
+                com.fasterxml.jackson.databind.JsonNode node =
+                        new com.fasterxml.jackson.databind.ObjectMapper().readTree(jsonStr);
+                StringBuilder sb = new StringBuilder();
+                String action = node.has("action") ? node.get("action").asText("") : "";
+                double confidence = node.has("confidence") ? node.get("confidence").asDouble(0) : 0;
+                double targetPrice = node.has("target_price") ? node.get("target_price").asDouble(0) : 0;
+                String summary = node.has("summary") ? node.get("summary").asText("") : "";
+
+                if (!action.isEmpty()) {
+                    sb.append("**裁决：").append(action).append("**");
+                    if (confidence > 0) sb.append(" | 置信度：").append(Math.round(confidence * 100)).append("%");
+                    if (targetPrice > 0) sb.append(" | 目标价：¥").append(targetPrice);
+                }
+                if (!summary.isEmpty()) {
+                    if (sb.length() > 0) sb.append("\n\n");
+                    sb.append(summary);
+                }
+                if (sb.length() > 0) {
+                    cleaned = cleaned + "\n\n" + sb;
+                }
+            } catch (Exception e) {
+                log.debug("[JudgeNode] 解析决策 JSON 失败: {}", e.getMessage());
+            }
+        }
+        return cleaned;
+    }
+
+    /**
+     * 用状态机从文本末尾扫描并提取裸 JSON 对象（正确处理嵌套花括号）
+     */
+    private static String extractAndRemoveTrailingJson(String text) {
+        if (text == null || text.isEmpty()) return null;
+        // 从末尾往前找最后一个 }
+        int end = text.lastIndexOf('}');
+        if (end < 0) return null;
+        // 从 end 往前扫描，用括号计数找到匹配的 {
+        int depth = 0;
+        int start = -1;
+        for (int i = end; i >= 0; i--) {
+            char c = text.charAt(i);
+            if (c == '}') depth++;
+            else if (c == '{') {
+                depth--;
+                if (depth == 0) {
+                    start = i;
+                    break;
+                }
+            }
+        }
+        if (start < 0) return null;
+        // 确认 start 前面是换行或空白（避免误匹配文本中间的花括号）
+        if (start > 0) {
+            char before = text.charAt(start - 1);
+            if (before != '\n' && before != '\r' && !Character.isWhitespace(before)) return null;
+        }
+        String jsonCandidate = text.substring(start, end + 1).trim();
+        // 验证是有效 JSON 且包含决策相关字段
+        try {
+            com.fasterxml.jackson.databind.JsonNode node =
+                    new com.fasterxml.jackson.databind.ObjectMapper().readTree(jsonCandidate);
+            // 必须包含 action 字段才算决策 JSON
+            if (node.has("action") || node.has("position_stance") || node.has("arguments")) {
+                return jsonCandidate;
+            }
+        } catch (Exception e) {
+            // 不是有效 JSON，忽略
+        }
+        return null;
     }
 
     private static boolean isGuardTag(String chunk) {

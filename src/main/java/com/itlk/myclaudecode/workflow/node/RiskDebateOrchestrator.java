@@ -96,7 +96,17 @@ public class RiskDebateOrchestrator implements WorkflowNode {
                 String summary = node.has("summary") ? node.get("summary").asText("") : "";
 
                 if (summary.isEmpty()) {
-                    summary = content.substring(0, Math.min(content.length(), 200));
+                    // 尝试从已知字段提取可读摘要，避免直接使用原始 JSON
+                    if (node.has("key_argument")) {
+                        summary = node.get("key_argument").asText("");
+                    }
+                    if (summary.isEmpty() && node.has("position_stance")) {
+                        summary = "仓位建议: " + node.get("recommended_position_pct").asInt(0)
+                                + "%, 立场: " + node.get("position_stance").asText("N/A");
+                    }
+                    if (summary.isEmpty()) {
+                        summary = content.substring(0, Math.min(content.length(), 200));
+                    }
                 }
 
                 return new FinalDecision(action, confidence, targetPrice, summary, Instant.now());
@@ -114,7 +124,13 @@ public class RiskDebateOrchestrator implements WorkflowNode {
             action = "SELL";
         }
 
-        return new FinalDecision(action, 0.5, 0.0,
-                content.substring(0, Math.min(content.length(), 200)), Instant.now());
+        // 剥离 JSON 代码块，只保留自然语言部分作为摘要
+        String textOnly = content.replaceAll("```json\\s*[\\s\\S]*?```\\s*", "")
+                .replaceAll("\\{[\\s\\S]*?}", "").trim();
+        String fallbackSummary = textOnly.isEmpty()
+                ? "裁决结果: " + action
+                : textOnly.substring(0, Math.min(textOnly.length(), 200));
+
+        return new FinalDecision(action, 0.5, 0.0, fallbackSummary, Instant.now());
     }
 }

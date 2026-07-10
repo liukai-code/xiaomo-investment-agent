@@ -61,15 +61,17 @@ function handleBack() {
         <span>分析记录 ({{ analysisStore.analyses.length }})</span>
         <ChevronDown :size="14" :class="{ rotated: listCollapsed }" />
       </div>
-      <div v-show="!listCollapsed" class="list-body">
-        <AnalysisList
-          :analyses="analysisStore.analyses"
-          :selected-id="analysisStore.selectedId"
-          :loading="analysisStore.loading"
-          @select="handleSelect"
-          @delete="analysisStore.handleDeleteAnalysis"
-        />
-      </div>
+      <Transition name="list-collapse">
+        <div v-if="!listCollapsed" class="list-body">
+          <AnalysisList
+            :analyses="analysisStore.analyses"
+            :selected-id="analysisStore.selectedId"
+            :loading="analysisStore.loading"
+            @select="handleSelect"
+            @delete="analysisStore.handleDeleteAnalysis"
+          />
+        </div>
+      </Transition>
     </div>
 
     <!-- 分析详情 -->
@@ -192,4 +194,10 @@ function handleBack() {
   max-height: 240px;
   overflow-y: auto;
 }
+.list-collapse-enter-active { transition: all 0.25s ease-out; }
+.list-collapse-leave-active { transition: all 0.2s ease-in; }
+.list-collapse-enter-from,
+.list-collapse-leave-to { opacity: 0; max-height: 0; }
+.list-collapse-enter-to,
+.list-collapse-leave-from { opacity: 1; max-height: 240px; }
 </style>

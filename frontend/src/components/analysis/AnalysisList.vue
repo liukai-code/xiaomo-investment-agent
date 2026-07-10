@@ -47,7 +47,7 @@ function formatTime(dateStr: string | null) {
       <Loader2 :size="20" class="spin" />
     </div>
     <div v-else-if="analyses.length === 0" class="list-empty">暂无分析记录</div>
-    <div v-else class="list-items">
+    <TransitionGroup v-else name="list-item" tag="div" class="list-items">
       <div
         v-for="item in analyses"
         :key="item.id"
@@ -79,7 +79,7 @@ function formatTime(dateStr: string | null) {
           <Trash2 :size="14" />
         </button>
       </div>
-    </div>
+    </TransitionGroup>
   </div>
 </template>
 
@@ -166,6 +166,11 @@ function formatTime(dateStr: string | null) {
 }
 .list-item:hover .delete-btn { opacity: 1; }
 .delete-btn:hover { color: var(--danger, #dc2626); background: #fef2f2; }
+.list-item-enter-active { transition: all 0.25s ease-out; }
+.list-item-leave-active { transition: all 0.2s ease-in; position: absolute; width: 100%; }
+.list-item-enter-from { opacity: 0; transform: translateY(-8px); }
+.list-item-leave-to { opacity: 0; transform: translateX(20px); }
+.list-item-move { transition: transform 0.25s ease; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>

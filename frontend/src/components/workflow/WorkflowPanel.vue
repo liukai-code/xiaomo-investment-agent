@@ -67,8 +67,8 @@ const agentStates = computed(() => {
     } else if (event.type === 'AGENT_CHUNK' || event.type === 'DEBATE_CHUNK') {
       const existing = states.get(agent)
       if (existing) {
-        // 累积内容：取最新的完整内容
-        existing.content = event.content || ''
+        // 累积内容：追加每个增量 chunk
+        existing.content += event.content || ''
       }
     } else if (event.type === 'AGENT_COMPLETE' || event.type === 'DEBATE_COMPLETE') {
       const existing = states.get(agent)

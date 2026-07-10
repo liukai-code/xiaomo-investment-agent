@@ -50,8 +50,20 @@ public record WorkflowEvent(
     }
 
     public static WorkflowEvent finalDecision(FinalDecision decision) {
-        return new WorkflowEvent(WorkflowEventType.FINAL_DECISION, "RiskJudge",
-                decision.summary(), "layer4", Instant.now());
+        try {
+            String json = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .writeValueAsString(java.util.Map.of(
+                            "action", decision.action(),
+                            "confidence", decision.confidence(),
+                            "targetPrice", decision.targetPrice(),
+                            "summary", decision.summary() != null ? decision.summary() : ""
+                    ));
+            return new WorkflowEvent(WorkflowEventType.FINAL_DECISION, "RiskJudge",
+                    json, "layer4", Instant.now());
+        } catch (Exception e) {
+            return new WorkflowEvent(WorkflowEventType.FINAL_DECISION, "RiskJudge",
+                    decision.summary(), "layer4", Instant.now());
+        }
     }
 
     public static WorkflowEvent error(String message) {

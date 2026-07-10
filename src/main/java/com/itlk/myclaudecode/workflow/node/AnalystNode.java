@@ -154,14 +154,17 @@ public class AnalystNode implements WorkflowNode {
                     return WorkflowEvent.agentChunk(roleName, chunk);
                 })
                 .doOnComplete(() -> {
-                    String fullReport = sanitizeOutput(report.toString());
-                    state.getAnalystReports().put(roleName,
-                            new AgentReport(roleName, fullReport, Instant.now()));
-                    state.getCachedData().put(roleName + "_opinion", fullReport);
-                    extractStructuredData(fullReport).ifPresent(json ->
+                    String rawReport = report.toString();
+                    // 先提取结构化数据（需要原始 JSON）
+                    extractStructuredData(rawReport).ifPresent(json ->
                             state.getCachedData().put(roleName + "_structured", json));
-                    sink.tryEmitNext(WorkflowEvent.agentComplete(roleName, fullReport));
-                    log.info("[{}] 数据采集完成，报告长度: {}", roleName, fullReport.length());
+                    // 再剥离 JSON，只保留自然语言部分
+                    String cleanReport = sanitizeOutput(rawReport);
+                    state.getAnalystReports().put(roleName,
+                            new AgentReport(roleName, cleanReport, Instant.now()));
+                    state.getCachedData().put(roleName + "_opinion", cleanReport);
+                    sink.tryEmitNext(WorkflowEvent.agentComplete(roleName, cleanReport));
+                    log.info("[{}] 数据采集完成，报告长度: {}", roleName, cleanReport.length());
                     // Record usage
                     try {
                         AtomicInteger toolCounter = (AtomicInteger) toolCtx.get(MaxToolCallManager.TOOL_CALL_COUNTER_KEY);
@@ -180,6 +183,10 @@ public class AnalystNode implements WorkflowNode {
         return text
                 .replaceAll("\\n*\\[GUARD:[\\s\\S]*?\\[/GUARD]\\n*", "")
                 .replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "")
+                // 剥离 ```json 代码块
+                .replaceAll("```json\\s*[\\s\\S]*?```\\s*", "")
+                // 剥离末尾裸 JSON 对象
+                .replaceAll("\\n\\s*\\{[\\s\\S]*?}\\s*$", "")
                 .trim();
     }
 

@@ -148,6 +148,10 @@ public class TraderNode implements WorkflowNode {
         return text
                 .replaceAll("\\n*\\[GUARD:[\\s\\S]*?\\[/GUARD]\\n*", "")
                 .replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "")
+                // 剥离 ```json 代码块
+                .replaceAll("```json\\s*[\\s\\S]*?```\\s*", "")
+                // 剥离末尾裸 JSON 对象（如 {"position_stance":"..."}）
+                .replaceAll("\\n\\s*\\{[\\s\\S]*?}\\s*$", "")
                 .trim();
     }
 

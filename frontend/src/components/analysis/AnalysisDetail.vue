@@ -57,7 +57,7 @@ const agentStates = computed(() => {
       states.set(name, { status: 'running', content: '', round: 0 })
     } else if (event.type === 'AGENT_CHUNK' || event.type === 'DEBATE_CHUNK') {
       const existing = states.get(name)
-      if (existing) existing.content = event.content || ''
+      if (existing) existing.content += event.content || ''
     } else if (event.type === 'AGENT_COMPLETE' || event.type === 'DEBATE_COMPLETE') {
       const existing = states.get(name)
       if (existing) {
@@ -79,7 +79,18 @@ const finalDecision = computed(() => {
   const event = props.events.find((e) => e.type === 'FINAL_DECISION')
   if (!event?.content) return null
   try {
-    return JSON.parse(event.content)
+    const parsed = JSON.parse(event.content)
+    // 确保包含必要字段，过滤掉非预期的 JSON 结构
+    if (parsed.action || parsed.summary) {
+      return {
+        action: parsed.action || 'HOLD',
+        confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
+        targetPrice: parsed.targetPrice || parsed.target_price || 0,
+        summary: parsed.summary || ''
+      }
+    }
+    // JSON 不含预期字段，当作纯文本摘要
+    return { summary: event.content }
   } catch {
     return { summary: event.content }
   }
@@ -193,7 +204,10 @@ function getPhaseStatus(phase: string) {
               v-for="agent in phaseAgents[phase]"
               :key="agent"
               class="agent-card"
-              :class="{ 'agent-done': agentStates.get(agent)?.status === 'done' }"
+              :class="{
+                'agent-done': agentStates.get(agent)?.status === 'done',
+                'agent-running': agentStates.get(agent)?.status === 'running'
+              }"
             >
               <div class="agent-header">
                 <span class="agent-name">{{ agentLabels[agent] || agent }}</span>
@@ -342,10 +356,17 @@ function getPhaseStatus(phase: string) {
 .agent-cards { padding: 8px; }
 .agent-card {
   padding: 10px 12px;
-  border-radius: 6px;
-  margin-bottom: 4px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: var(--surface, #ffffff);
 }
-.agent-card.agent-done { background: var(--surface-2, #f1f5f9); }
+.agent-card:last-child { margin-bottom: 0; }
+.agent-card.agent-done { border-color: #22c55e66; }
+.agent-card.agent-running {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 1px #60a5fa40;
+}
 .agent-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
 .agent-name { font-size: 13px; font-weight: 500; }
 .agent-status { color: var(--green, #16a34a); }
