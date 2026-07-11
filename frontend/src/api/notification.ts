@@ -7,16 +7,19 @@ export interface Notification {
   createdAt: string
 }
 
-export function getNotifications() {
-  return request.get<any, { code: number; data: Notification[] }>('/api/notifications')
+export async function getNotifications() {
+  const { data } = await request.get('/api/notifications')
+  return data as { code: number; data: Notification[] }
 }
 
-export function getUnreadCount() {
-  return request.get<any, { code: number; data: { count: number } }>('/api/notifications/unread-count')
+export async function getUnreadCount() {
+  const { data } = await request.get('/api/notifications/unread-count')
+  return data as { code: number; data: { count: number } }
 }
 
-export function markAsRead(id: number) {
-  return request.post<any, { code: number }>(`/api/notifications/${id}/read`)
+export async function markAsRead(id: number) {
+  const { data } = await request.post(`/api/notifications/${id}/read`)
+  return data as { code: number }
 }
 
 export function connectNotificationSSE(
@@ -64,7 +67,6 @@ export function connectNotificationSSE(
         if (err.name !== 'AbortError') {
           console.error('通知 SSE 连接断开:', err)
           onError?.()
-          // 5 秒后重连
           if (!controller.signal.aborted) {
             setTimeout(connect, 5000)
           }
