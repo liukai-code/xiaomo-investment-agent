@@ -22,6 +22,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     private static final String REDIS_CHANNEL = "notification:broadcast";
     private static final String READ_SET_PREFIX = "notification:read:";
+    private static final String HIDDEN_SET_PREFIX = "notification:hidden:";
 
     @Resource
     private NotificationRepository notificationRepository;
@@ -85,5 +86,25 @@ public class NotificationServiceImpl implements NotificationService {
         Set<String> members = stringRedisTemplate.opsForSet().members(READ_SET_PREFIX + userId);
         if (members == null) return Set.of();
         return members.stream().map(Long::valueOf).collect(Collectors.toSet());
+    }
+
+    @Override
+    public void hideNotification(Long userId, Long notificationId) {
+        stringRedisTemplate.opsForSet().add(HIDDEN_SET_PREFIX + userId, String.valueOf(notificationId));
+    }
+
+    @Override
+    public Set<Long> getHiddenIds(Long userId) {
+        Set<String> members = stringRedisTemplate.opsForSet().members(HIDDEN_SET_PREFIX + userId);
+        if (members == null) return Set.of();
+        return members.stream().map(Long::valueOf).collect(Collectors.toSet());
+    }
+
+    @Override
+    public List<Notification> listRecentForUser(Long userId, int limit) {
+        List<Notification> all = listRecent(limit);
+        Set<Long> hiddenIds = getHiddenIds(userId);
+        if (hiddenIds.isEmpty()) return all;
+        return all.stream().filter(n -> !hiddenIds.contains(n.getId())).collect(Collectors.toList());
     }
 }

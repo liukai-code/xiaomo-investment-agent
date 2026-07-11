@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useNotificationStore } from '@/stores/notification'
-import { Bell, Check, CheckCheck, X } from 'lucide-vue-next'
+import { Bell, Check, CheckCheck, X, Trash2 } from 'lucide-vue-next'
 
 const notificationStore = useNotificationStore()
 
@@ -71,6 +71,13 @@ function truncate(text: string, maxLen: number): string {
           <div class="notification-item-body">{{ truncate(item.content, 80) }}</div>
           <div class="notification-item-time">{{ formatTime(item.createdAt) }}</div>
         </div>
+        <button
+          class="notification-delete-btn"
+          title="删除"
+          @click.stop="notificationStore.deleteNotification(item.id)"
+        >
+          <Trash2 :size="14" />
+        </button>
       </div>
     </div>
   </div>
@@ -232,5 +239,31 @@ function truncate(text: string, maxLen: number): string {
 .notification-item-time {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+.notification-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.notification-item:hover .notification-delete-btn {
+  opacity: 1;
+}
+
+.notification-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #F87171;
 }
 </style>

@@ -17,8 +17,18 @@ export async function getUnreadCount() {
   return data as { code: number; data: { count: number } }
 }
 
+export async function getReadIds() {
+  const { data } = await request.get('/api/notifications/read-ids')
+  return data as { code: number; data: number[] }
+}
+
 export async function markAsRead(id: number) {
   const { data } = await request.post(`/api/notifications/${id}/read`)
+  return data as { code: number }
+}
+
+export async function hideNotification(id: number) {
+  const { data } = await request.post(`/api/notifications/${id}/hide`)
   return data as { code: number }
 }
 

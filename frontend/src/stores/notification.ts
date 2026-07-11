@@ -3,7 +3,9 @@ import { ref, computed } from 'vue'
 import {
   getNotifications,
   getUnreadCount,
+  getReadIds,
   markAsRead as apiMarkAsRead,
+  hideNotification as apiHideNotification,
   connectNotificationSSE,
   type Notification
 } from '@/api/notification'
@@ -13,6 +15,7 @@ export const useNotificationStore = defineStore('notification', () => {
   const unreadCount = ref(0)
   const panelOpen = ref(false)
   const readIds = ref<Set<number>>(new Set())
+  const error = ref<string | null>(null)
   let sseController: AbortController | null = null
 
   const unreadNotifications = computed(() =>
@@ -21,11 +24,15 @@ export const useNotificationStore = defineStore('notification', () => {
 
   async function loadNotifications() {
     try {
+      error.value = null
       const res = await getNotifications()
       if (res.code === 1) {
         notifications.value = res.data
+      } else {
+        error.value = res.msg || '加载失败'
       }
-    } catch (e) {
+    } catch (e: any) {
+      error.value = e?.message || '网络错误'
       console.error('加载通知失败:', e)
     }
   }
@@ -38,6 +45,17 @@ export const useNotificationStore = defineStore('notification', () => {
       }
     } catch (e) {
       console.error('加载未读数失败:', e)
+    }
+  }
+
+  async function loadReadIds() {
+    try {
+      const res = await getReadIds()
+      if (res.code === 1) {
+        readIds.value = new Set(res.data)
+      }
+    } catch (e) {
+      console.error('加载已读状态失败:', e)
     }
   }
 
@@ -91,13 +109,28 @@ export const useNotificationStore = defineStore('notification', () => {
   function init(token: string) {
     loadNotifications()
     loadUnreadCount()
+    loadReadIds()
     startSSE(token)
+  }
+
+  async function deleteNotification(id: number) {
+    const item = notifications.value.find(n => n.id === id)
+    notifications.value = notifications.value.filter(n => n.id !== id)
+    if (item && !readIds.value.has(id)) {
+      unreadCount.value = Math.max(0, unreadCount.value - 1)
+    }
+    try {
+      await apiHideNotification(id)
+    } catch (e) {
+      console.error('隐藏通知失败:', e)
+    }
   }
 
   function reset() {
     notifications.value = []
     unreadCount.value = 0
     readIds.value = new Set()
+    error.value = null
     panelOpen.value = false
     stopSSE()
   }
@@ -107,11 +140,13 @@ export const useNotificationStore = defineStore('notification', () => {
     unreadCount,
     panelOpen,
     readIds,
+    error,
     unreadNotifications,
     loadNotifications,
     loadUnreadCount,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
     togglePanel,
     closePanel,
     init,

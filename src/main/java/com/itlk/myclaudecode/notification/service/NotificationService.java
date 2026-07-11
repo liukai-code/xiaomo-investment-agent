@@ -20,4 +20,10 @@ public interface NotificationService {
     void markAsRead(Long userId, Long notificationId);
 
     Set<Long> getReadIds(Long userId);
+
+    void hideNotification(Long userId, Long notificationId);
+
+    Set<Long> getHiddenIds(Long userId);
+
+    List<Notification> listRecentForUser(Long userId, int limit);
 }
