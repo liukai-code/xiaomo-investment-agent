@@ -9,16 +9,19 @@ import { useRafThrottle } from '@/composables/useMarkdownBlocks'
 import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen, Bell, Square, Loader2, Brain } from 'lucide-vue-next'
 import { useYangjibaoStore } from '@/stores/yangjibao'
 import { useAnalysisStore } from '@/stores/analysis'
+import { useNotificationStore } from '@/stores/notification'
 import AnalysisSidePanel from '@/components/analysis/AnalysisSidePanel.vue'
 import YjbQrLogin from '@/components/yangjibao/YjbQrLogin.vue'
 import YjbHoldingsCard from '@/components/yangjibao/YjbHoldingsCard.vue'
 import SettingsDialog from '@/components/SettingsDialog.vue'
+import NotificationPanel from '@/components/NotificationPanel.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const chatStore = useChatStore()
 const yjbStore = useYangjibaoStore()
 const analysisStore = useAnalysisStore()
+const notificationStore = useNotificationStore()
 
 const messagesEl = ref<HTMLDivElement>()
 const inputEl = ref<HTMLTextAreaElement>()
@@ -243,6 +246,7 @@ function cancelDelete() {
 function onDocumentClick() {
   closeMenu()
   showUserMenu.value = false
+  notificationStore.closePanel()
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -377,10 +381,14 @@ function handleStop() {
 onMounted(async () => {
   await chatStore.loadConversations()
   document.addEventListener('click', onDocumentClick)
+  if (authStore.token) {
+    notificationStore.init(authStore.token)
+  }
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', onDocumentClick)
+  notificationStore.reset()
 })
 
 watch(() => yjbStore.cardVisible, (visible) => {
@@ -481,9 +489,17 @@ watch(() => yjbStore.cardVisible, (visible) => {
               @close="yjbStore.qrModalVisible = false"
             />
           </div>
-          <button class="notify-btn" title="通知">
-            <Bell :size="18" />
-          </button>
+          <div class="notify-wrapper">
+            <button class="notify-btn" title="通知" @click.stop="notificationStore.togglePanel()">
+              <Bell :size="18" />
+              <span v-if="notificationStore.unreadCount > 0" class="notify-badge">
+                {{ notificationStore.unreadCount > 99 ? '99+' : notificationStore.unreadCount }}
+              </span>
+            </button>
+            <Transition name="notify-fade">
+              <NotificationPanel v-if="notificationStore.panelOpen" />
+            </Transition>
+          </div>
           <div class="user-menu-wrapper">
             <button class="user-avatar-btn" @click.stop="showUserMenu = !showUserMenu">
               <User :size="20" />
@@ -686,6 +702,39 @@ watch(() => yjbStore.cardVisible, (visible) => {
 
 .notify-btn:hover {
   background: var(--border);
+}
+
+.notify-wrapper {
+  position: relative;
+}
+
+.notify-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: #ef4444;
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.notify-fade-enter-active,
+.notify-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.notify-fade-enter-from,
+.notify-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
 .chat-main-area {

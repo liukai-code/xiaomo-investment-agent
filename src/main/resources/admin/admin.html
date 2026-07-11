@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>工具管理 - 小墨 AI 助手</title>
+    <title>管理后台 - 小墨 AI 助手</title>
     <link rel="icon" type="image/png" href="logo1.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -574,6 +574,236 @@
                 transition-duration: 0.01ms !important;
             }
         }
+
+        /* Tab navigation */
+        .nav-tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 3px;
+        }
+        .nav-tab {
+            font-size: 13px;
+            font-weight: 500;
+            padding: 7px 16px;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font-sans);
+            white-space: nowrap;
+        }
+        .nav-tab:hover { color: var(--text-secondary); }
+        .nav-tab.active {
+            background: rgba(34, 197, 94, 0.12);
+            color: var(--accent);
+        }
+
+        /* Notification styles */
+
+        .login-card {
+            max-width: 400px;
+            margin: 80px auto;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px;
+            text-align: center;
+        }
+        .login-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .login-sub {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .login-input {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: var(--font-sans);
+            outline: none;
+            transition: border-color 0.2s;
+            margin-bottom: 16px;
+        }
+        .login-input:focus { border-color: var(--accent); }
+        .login-btn {
+            width: 100%;
+            padding: 10px;
+            background: var(--accent);
+            color: #000;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font-sans);
+        }
+        .login-btn:hover { filter: brightness(1.1); }
+        .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .notify-form {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .notify-form-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .form-row {
+            margin-bottom: 12px;
+        }
+        .form-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            display: block;
+        }
+        .form-input {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+            font-size: 13px;
+            font-family: var(--font-sans);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .form-input:focus { border-color: var(--accent); }
+        .form-textarea {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+            font-size: 13px;
+            font-family: var(--font-sans);
+            outline: none;
+            transition: border-color 0.2s;
+            min-height: 100px;
+            resize: vertical;
+        }
+        .form-textarea:focus { border-color: var(--accent); }
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        .btn-send {
+            padding: 8px 20px;
+            background: var(--accent);
+            color: #000;
+            font-size: 13px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font-sans);
+        }
+        .btn-send:hover { filter: brightness(1.1); }
+        .btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-logout {
+            padding: 8px 16px;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font-sans);
+        }
+        .btn-logout:hover { border-color: var(--danger); color: var(--danger); }
+
+        .notify-list-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+        .notify-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .notify-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 14px 16px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            transition: border-color 0.2s;
+        }
+        .notify-item:hover { border-color: var(--border-hover); }
+        .notify-item-info { flex: 1; min-width: 0; }
+        .notify-item-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        .notify-item-content {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            line-height: 1.5;
+            word-break: break-all;
+        }
+        .notify-item-time {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .btn-delete {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .btn-delete:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-glow); }
+        .btn-delete svg { width: 16px; height: 16px; }
+        .notify-empty {
+            text-align: center;
+            padding: 48px 24px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
@@ -586,8 +816,8 @@
                     </svg>
                 </div>
                 <div>
-                    <div class="header-title">工具管理</div>
-                    <div class="header-sub">AI Agent 工具开关控制台</div>
+                    <div class="header-title">管理后台</div>
+                    <div class="header-sub">AI Agent 管理控制台</div>
                 </div>
             </div>
             <a href="/" class="back-btn">
@@ -598,6 +828,15 @@
             </a>
         </header>
 
+        <div style="max-width:960px;margin:16px auto 0;padding:0 32px;">
+            <nav class="nav-tabs">
+                <button class="nav-tab active" data-tab="tools" onclick="switchTab('tools')">工具管理</button>
+                <button class="nav-tab" data-tab="notify" onclick="switchTab('notify')">通知管理</button>
+            </nav>
+        </div>
+
+        <!-- 工具管理区域 -->
+        <div id="toolsSection">
         <div class="stats-bar" id="statsBar" style="display:none">
             <div class="stat-card">
                 <div class="stat-icon total">
@@ -653,6 +892,44 @@
                     <div class="skeleton-card"><div class="skeleton-info"><div class="skeleton-icon"></div><div><div class="skeleton-text w-32"></div><div class="skeleton-text w-20"></div></div></div><div class="skeleton-toggle"></div></div>
                     <div class="skeleton-card"><div class="skeleton-info"><div class="skeleton-icon"></div><div><div class="skeleton-text w-32"></div><div class="skeleton-text w-20"></div></div></div><div class="skeleton-toggle"></div></div>
                     <div class="skeleton-card"><div class="skeleton-info"><div class="skeleton-icon"></div><div><div class="skeleton-text w-32"></div><div class="skeleton-text w-20"></div></div></div><div class="skeleton-toggle"></div></div>
+                </div>
+            </div>
+        </div>
+        </div><!-- end toolsSection -->
+
+        <!-- 通知管理区域 -->
+        <div id="notifySection" style="display:none">
+            <div class="container">
+                <!-- 登录表单 -->
+                <div id="notifyLogin" class="login-card">
+                    <div class="login-title">通知管理</div>
+                    <div class="login-sub">请输入管理员密码登录</div>
+                    <input class="login-input" id="adminPassword" type="password" placeholder="管理员密码">
+                    <button class="login-btn" id="loginBtn" onclick="adminLogin()">登录</button>
+                </div>
+
+                <!-- 已登录后的通知管理界面 -->
+                <div id="notifyDashboard" style="display:none">
+                    <div class="notify-form">
+                        <div class="notify-form-title">发送通知</div>
+                        <div class="form-row">
+                            <label class="form-label">标题</label>
+                            <input class="form-input" id="notifyTitle" type="text" placeholder="通知标题">
+                        </div>
+                        <div class="form-row">
+                            <label class="form-label">内容</label>
+                            <textarea class="form-textarea" id="notifyContent" placeholder="通知正文内容..."></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn-logout" onclick="adminLogout()">退出登录</button>
+                            <button class="btn-send" id="sendBtn" onclick="sendNotification()">发送通知</button>
+                        </div>
+                    </div>
+
+                    <div class="notify-list-title">已发通知</div>
+                    <div class="notify-list" id="notifyList">
+                        <div class="notify-empty">加载中...</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -998,6 +1275,201 @@
         });
 
         loadTools();
+
+        // ==================== 通知管理 ====================
+        const NOTIFY_API = '/api/admin/notifications';
+        let adminToken = localStorage.getItem('adminToken') || '';
+
+        function switchTab(tab) {
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.nav-tab[data-tab="${tab}"]`).classList.add('active');
+
+            document.getElementById('toolsSection').style.display = tab === 'tools' ? '' : 'none';
+            document.getElementById('notifySection').style.display = tab === 'notify' ? 'block' : 'none';
+
+            if (tab === 'notify') {
+                checkAdminAuth();
+            }
+        }
+
+        function checkAdminAuth() {
+            if (adminToken) {
+                document.getElementById('notifyLogin').style.display = 'none';
+                document.getElementById('notifyDashboard').style.display = '';
+                loadNotifications();
+            } else {
+                document.getElementById('notifyLogin').style.display = '';
+                document.getElementById('notifyDashboard').style.display = 'none';
+            }
+        }
+
+        async function adminLogin() {
+            const password = document.getElementById('adminPassword').value;
+            if (!password) {
+                showToast('请输入密码', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('loginBtn');
+            btn.disabled = true;
+            btn.textContent = '登录中...';
+
+            try {
+                const resp = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                const json = await resp.json();
+                if (json.code !== 1) throw new Error(json.msg || '登录失败');
+
+                adminToken = json.data.token;
+                localStorage.setItem('adminToken', adminToken);
+                checkAdminAuth();
+                showToast('登录成功');
+            } catch (e) {
+                showToast(e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '登录';
+            }
+        }
+
+        function adminLogout() {
+            adminToken = '';
+            localStorage.removeItem('adminToken');
+            checkAdminAuth();
+            showToast('已退出登录');
+        }
+
+        function notifyHeaders() {
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${adminToken}`
+            };
+        }
+
+        async function loadNotifications() {
+            const listEl = document.getElementById('notifyList');
+            listEl.innerHTML = '<div class="notify-empty">加载中...</div>';
+
+            try {
+                const resp = await fetch(NOTIFY_API, { headers: notifyHeaders() });
+                if (resp.status === 401) {
+                    adminLogout();
+                    return;
+                }
+                const json = await resp.json();
+                if (json.code !== 1) throw new Error(json.msg);
+
+                if (json.data.length === 0) {
+                    listEl.innerHTML = '<div class="notify-empty">暂无通知</div>';
+                    return;
+                }
+
+                listEl.innerHTML = json.data.map(n => `
+                    <div class="notify-item" id="notify-${n.id}">
+                        <div class="notify-item-info">
+                            <div class="notify-item-title">${escapeHtml(n.title)}</div>
+                            <div class="notify-item-content">${escapeHtml(n.content)}</div>
+                            <div class="notify-item-time">${formatTime(n.createdAt)}</div>
+                        </div>
+                        <button class="btn-delete" onclick="deleteNotification(${n.id})" title="删除">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        </button>
+                    </div>
+                `).join('');
+            } catch (e) {
+                listEl.innerHTML = `<div class="notify-empty">加载失败: ${e.message}</div>`;
+            }
+        }
+
+        async function sendNotification() {
+            const title = document.getElementById('notifyTitle').value.trim();
+            const content = document.getElementById('notifyContent').value.trim();
+
+            if (!title) { showToast('请输入标题', 'error'); return; }
+            if (!content) { showToast('请输入内容', 'error'); return; }
+
+            const btn = document.getElementById('sendBtn');
+            btn.disabled = true;
+            btn.textContent = '发送中...';
+
+            try {
+                const resp = await fetch(NOTIFY_API, {
+                    method: 'POST',
+                    headers: notifyHeaders(),
+                    body: JSON.stringify({ title, content })
+                });
+                if (resp.status === 401) { adminLogout(); return; }
+                const json = await resp.json();
+                if (json.code !== 1) throw new Error(json.msg);
+
+                document.getElementById('notifyTitle').value = '';
+                document.getElementById('notifyContent').value = '';
+                showToast('通知已发送');
+                loadNotifications();
+            } catch (e) {
+                showToast(`发送失败: ${e.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '发送通知';
+            }
+        }
+
+        async function deleteNotification(id) {
+            try {
+                const resp = await fetch(`${NOTIFY_API}/${id}`, {
+                    method: 'DELETE',
+                    headers: notifyHeaders()
+                });
+                if (resp.status === 401) { adminLogout(); return; }
+                const json = await resp.json();
+                if (json.code !== 1) throw new Error(json.msg);
+
+                const el = document.getElementById(`notify-${id}`);
+                if (el) el.remove();
+                showToast('已删除');
+
+                // 如果列表为空了，重新加载显示空状态
+                if (document.querySelectorAll('.notify-item').length === 0) {
+                    loadNotifications();
+                }
+            } catch (e) {
+                showToast(`删除失败: ${e.message}`, 'error');
+            }
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function formatTime(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            const now = new Date();
+            const diff = now - d;
+            const min = Math.floor(diff / 60000);
+            const hour = Math.floor(diff / 3600000);
+            const day = Math.floor(diff / 86400000);
+            if (min < 1) return '刚刚';
+            if (min < 60) return `${min}分钟前`;
+            if (hour < 24) return `${hour}小时前`;
+            if (day < 30) return `${day}天前`;
+            return d.toLocaleDateString('zh-CN');
+        }
+
+        // 回车登录
+        document.getElementById('adminPassword').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') adminLogin();
+        });
+
+        // 如果有保存的 token，切换到通知 tab 时自动登录
+        if (adminToken) {
+            // 延迟检查，避免页面加载时闪烁
+        }
     </script>
 </body>
 </html>

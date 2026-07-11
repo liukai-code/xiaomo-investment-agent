@@ -1,6 +1,7 @@
 package com.itlk.myclaudecode.common.config;
 
 import com.itlk.myclaudecode.auth.interceptor.AuthInterceptor;
+import com.itlk.myclaudecode.notification.interceptor.AdminAuthInterceptor;
 import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -13,6 +14,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Resource
     private AuthInterceptor authInterceptor;
+
+    @Resource
+    private AdminAuthInterceptor adminAuthInterceptor;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
@@ -31,6 +35,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/error",
                         "/assets/**"
                 );
+
+        registry.addInterceptor(adminAuthInterceptor)
+                .addPathPatterns("/api/admin/**")
+                .excludePathPatterns("/api/admin/login");
     }
 
     @Override

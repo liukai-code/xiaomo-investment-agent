@@ -62,6 +62,10 @@ sql-tool:
   default-max-rows: 100
   query-timeout-seconds: 30
 
+# 管理员密码
+admin:
+  password: ${ADMIN_PASSWORD:admin123}
+
 # Agent 工具调用守护
 agent:
   tool:
