@@ -20,7 +20,7 @@ const router = useRouter()
       <div v-animate class="portal-cta-inner">
         <h2 class="portal-serif">开启智能投资之旅</h2>
 
-        <p>加入数千名投资者的行列，让 AI 为你的投资决策赋能</p>
+        <p>立即体验 AI Agent 驱动的投资研究</p>
 
         <button
           class="portal-btn-cta"

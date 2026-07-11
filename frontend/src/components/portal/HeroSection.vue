@@ -18,17 +18,17 @@ const router = useRouter()
       <!-- Badge -->
       <div v-animate class="portal-badge">
         <Sparkles :size="16" />
-        <span>AI 驱动的智能投资助手</span>
+        <span>AI Agent · 实时行情 · 多源数据 · 深度分析</span>
       </div>
 
       <!-- Title -->
       <h1 v-animate="100" class="portal-hero-title portal-serif">
-        你的专属金融 AI 导师
+        让复杂的金融分析变得简单
       </h1>
 
       <!-- Subtitle -->
       <p v-animate="200" class="portal-hero-subtitle">
-        基于大语言模型与实时金融数据，为投资者提供智能问答、深度分析、行情监控一站式服务
+        自动规划分析流程，融合实时数据与专业工具，帮助你完成行情分析、估值研判与投资研究
       </p>
 
       <!-- CTA Buttons -->
@@ -47,7 +47,7 @@ const router = useRouter()
       <div v-animate="400" class="portal-hero-screenshot">
         <div class="portal-hero-screenshot-glow" />
         <div class="portal-hero-screenshot-card">
-          <img src="/portal/hero-screenshot.svg" alt="小墨 AI 对话界面" />
+          <img src="/portal/Hero_img.png" alt="小墨 AI 对话界面" />
         </div>
       </div>
     </div>
