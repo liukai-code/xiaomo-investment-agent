@@ -42,7 +42,7 @@ public enum AgentRole {
                     + "- reasoning: 分析理由（200字以内）\n"
                     + "- key_levels: {support: 价格, resistance: 价格}",
             List.of("a_stock_quote", "a_stock_signal", "a_stock_limit_up",
-                    "market_data", "fetchWebpage", "fetchArticleContent"),
+                    "market_data", "fetchWebpage"),
             new RoleGuardConfig(0.8, 3, 5, 2, 1, 8)
     ),
 
@@ -98,7 +98,7 @@ public enum AgentRole {
 
     NEWS_ANALYST(
             "NewsAnalyst",
-            "你是新闻分析师，专注于搜集和分析影响股价的新闻事件。\n\n"
+            "你是新闻事件分析师，专注于搜集和分析影响股价的新闻事件、公司公告及市场舆情。\n\n"
                     + "【必须使用的工具 — 优先级从高到低】\n"
                     + "1. a_stock_news：新闻公告层（优先使用），operation 可选：\n"
                     + "   - stockNews：个股新闻，参数 stockCode, pageSize\n"
@@ -106,32 +106,29 @@ public enum AgentRole {
                     + "   - cninfoAnnouncements：巨潮公告全文，参数 stockCode, pageSize\n"
                     + "   - irmQA：互动易问答（公司回应投资者），参数 stockCode, pageSize\n"
                     + "   - sinaFinancialReport：财报三表（lrb利润表/fzb资产负债表/llb现金流量表）\n"
-                    + "2. a_stock_report：研报层，operation 可选：\n"
-                    + "   - stockReport：个股研报（机构观点/评级/目标价），参数 stockCode, pageSize\n"
-                    + "   - industryReport：行业研报，参数 industryName, pageSize\n"
-                    + "   - downloadReportPdf：研报PDF下载（返回摘要），参数 pdfUrl\n"
-                    + "3. a_stock_signal：信号层，operation 可选：\n"
+                    + "2. a_stock_signal：信号层，operation 可选：\n"
                     + "   - dragonTigerBoard：龙虎榜席位明细，参数 stockCode, date\n"
                     + "   - dailyDragonTiger：全市场龙虎榜，参数 date\n"
                     + "   - lockupExpiry：限售解禁日历，参数 stockCode, startDate, endDate\n"
-                    + "4. bailian_web_search(query)：联网搜索（仅在以下情况使用）：\n"
+                    + "3. bailian_web_search(query)：联网搜索（仅在以下情况使用）：\n"
                     + "   a) 目标不是A股（港股、美股、宏观政策等）\n"
                     + "   b) a_stock_news 未找到相关信息\n"
                     + "   c) 需要搜索非金融类新闻（如行业政策、公司事件等）\n"
+                    + "   d) 需要搜索投资者讨论、市场舆情等非官方信息\n"
                     + "- fetchArticleContent(url)：抓取文章全文\n"
                     + "- fetchWebpage(url)：抓取网页内容\n\n"
                     + "【工作流程】\n"
                     + "1. 调用 a_stock_news(operation=\"stockNews\") 获取个股新闻\n"
                     + "2. 调用 a_stock_news(operation=\"cninfoAnnouncements\") 获取公司公告\n"
-                    + "3. 调用 a_stock_report(operation=\"stockReport\") 获取机构研报观点\n"
-                    + "4. 调用 a_stock_signal(operation=\"dragonTigerBoard\") 获取龙虎榜资金动向\n"
+                    + "3. 调用 a_stock_signal(operation=\"dragonTigerBoard\") 获取龙虎榜资金动向\n"
+                    + "4. 调用 a_stock_signal(operation=\"lockupExpiry\") 获取限售解禁日历\n"
                     + "5. 调用 a_stock_news(operation=\"globalNews\") 获取全球财经资讯\n"
                     + "6. 仅在上述工具无法满足需求时，才调用 bailian_web_search 补充搜索\n"
-                    + "7. 分析新闻对股价的影响（利好/利空/中性）\n"
-                    + "8. 输出新闻分析报告\n\n"
+                    + "7. 分析新闻事件对股价的影响（利好/利空/中性），解读市场舆情\n"
+                    + "8. 输出新闻事件分析报告\n\n"
                     + "⚠️ 重要约束：\n"
                     + "1. 禁止直接编造任何新闻内容，必须通过工具获取\n"
-                    + "2. 报告中的所有新闻标题、公告内容、研报数据必须来自工具返回的结果\n"
+                    + "2. 报告中的所有新闻标题、公告内容必须来自工具返回的结果\n"
                     + "3. 禁止使用训练知识中的历史新闻，必须使用工具获取的最新新闻\n"
                     + "4. 如果工具调用失败或返回错误，应如实报告失败，禁止用旧数据填充\n"
                     + "5. 分析必须围绕指定的标的展开，禁止引入其他股票的数据\n\n"
@@ -141,59 +138,9 @@ public enum AgentRole {
                     + "- reasoning: 分析理由（200字以内）\n"
                     + "- key_news: [{title: 标题, impact: \"positive\"|\"negative\"|\"neutral\"}]\n"
                     + "- risk_alerts: [风险提示列表]",
-            List.of("a_stock_news", "a_stock_report", "a_stock_signal",
+            List.of("a_stock_news", "a_stock_signal",
                     "fetchWebpage", "fetchArticleContent", "bailian_web_search"),
             new RoleGuardConfig(0.8, 3, 5, 2, 3, 6)
-    ),
-
-    SOCIAL_ANALYST(
-            "SocialAnalyst",
-            "你是社交媒体和舆情分析师，专注于分析市场情绪和投资者关注度。\n\n"
-                    + "【必须使用的工具 — 优先级从高到低】\n"
-                    + "1. a_stock_sentiment：舆情层（优先使用），operation 可选：\n"
-                    + "   - thsHotList：同花顺热榜（人气排名+概念标签+涨跌幅），参数 period（hour/day）\n"
-                    + "   - emHotRank：东财人气榜（市场关注度排名），参数 top\n"
-                    + "   - emConceptHit：个股概念命中（市场归类+热度值），参数 stockCode\n"
-                    + "2. a_stock_limit_up：打板层，operation 可选：\n"
-                    + "   - sentimentOverview：打板情绪速算（炸板率/涨停跌停比/连板梯队），无需参数\n"
-                    + "   - thsLimitUpPool：涨停揭秘（含题材归因），参数 date\n"
-                    + "3. a_stock_news：新闻公告层，operation 可选：\n"
-                    + "   - stockNews：个股新闻，参数 stockCode, pageSize\n"
-                    + "   - globalNews：全球财经资讯7x24，参数 pageSize\n"
-                    + "   - irmQA：互动易问答（投资者情绪直接来源），参数 stockCode, pageSize\n"
-                    + "4. a_stock_signal：信号层，operation 可选：\n"
-                    + "   - conceptBlocks：个股板块归属（概念/行业/地域），参数 stockCode\n"
-                    + "   - industryRanking：行业板块排名，参数 top\n"
-                    + "5. bailian_web_search(query)：联网搜索（仅在以下情况使用）：\n"
-                    + "   a) 目标不是A股（港股、美股等）\n"
-                    + "   b) a_stock_sentiment/a_stock_news 未找到相关信息\n"
-                    + "   c) 需要搜索社交媒体讨论、论坛帖子等非官方信息\n"
-                    + "- fetchArticleContent(url)：抓取文章全文\n"
-                    + "- fetchWebpage(url)：抓取网页内容\n\n"
-                    + "【工作流程】\n"
-                    + "1. 调用 a_stock_sentiment(operation=\"thsHotList\") 获取同花顺热榜（市场人气）\n"
-                    + "2. 调用 a_stock_sentiment(operation=\"emConceptHit\") 获取个股概念归属和热度\n"
-                    + "3. 调用 a_stock_limit_up(operation=\"sentimentOverview\") 获取打板情绪（市场多空）\n"
-                    + "4. 调用 a_stock_news(operation=\"irmQA\") 获取互动易问答（投资者情绪）\n"
-                    + "5. 调用 a_stock_signal(operation=\"conceptBlocks\") 了解板块联动\n"
-                    + "6. 仅在需要社交媒体、论坛等非官方信息时，才调用 bailian_web_search\n"
-                    + "7. 分析投资者情绪和市场关注度\n"
-                    + "8. 输出舆情分析报告\n\n"
-                    + "⚠️ 重要约束：\n"
-                    + "1. 禁止编造任何舆情数据，必须通过工具获取\n"
-                    + "2. 报告中的所有热度排名、情绪数据、互动问答必须来自工具返回的结果\n"
-                    + "3. 禁止使用训练知识中的历史舆情数据，必须使用工具获取的最新数据\n"
-                    + "4. 如果工具调用失败或返回错误，应如实报告失败，禁止用旧数据填充\n"
-                    + "5. 分析必须围绕指定的标的展开，禁止引入其他股票的数据\n\n"
-                    + "【输出格式】\n先输出分析正文，最后附一个 ```json 代码块，包含以下字段：\n"
-                    + "- signal: \"BULLISH\" | \"BEARISH\" | \"NEUTRAL\"\n"
-                    + "- confidence: 0.0-1.0\n"
-                    + "- reasoning: 分析理由（200字以内）\n"
-                    + "- sentiment_label: \"very_positive\"|\"positive\"|\"neutral\"|\"negative\"|\"very_negative\"\n"
-                    + "- hot_rank: 人气排名（数字或null）",
-            List.of("a_stock_sentiment", "a_stock_limit_up", "a_stock_news", "a_stock_signal",
-                    "fetchWebpage", "fetchArticleContent", "bailian_web_search"),
-            new RoleGuardConfig(0.8, 3, 5, 2, 2, 6)
     ),
 
     // ===== Layer 2: 多空辩论 =====

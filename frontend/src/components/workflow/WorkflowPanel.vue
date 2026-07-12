@@ -25,10 +25,9 @@ const phaseNames: Record<string, string> = {
 }
 
 const agentLabels: Record<string, string> = {
-  MarketAnalyst: '技术分析师',
+  MarketAnalyst: '技术面分析师',
   FundamentalsAnalyst: '基本面分析师',
-  NewsAnalyst: '新闻分析师',
-  SocialAnalyst: '舆情分析师',
+  NewsAnalyst: '新闻事件分析师',
   BullResearcher: '看多研究员',
   BearResearcher: '看空研究员',
   ResearchManager: '研究主管',
@@ -140,7 +139,7 @@ function parseJudgeJson(content: string): { action: string; confidence: number; 
 
 // 按阶段分组的 Agent
 const phaseAgents: Record<string, string[]> = {
-  Layer1_DataCollection: ['MarketAnalyst', 'FundamentalsAnalyst', 'NewsAnalyst', 'SocialAnalyst'],
+  Layer1_DataCollection: ['MarketAnalyst', 'FundamentalsAnalyst', 'NewsAnalyst'],
   BullBearDebate: ['BullResearcher', 'BearResearcher', 'ResearchManager'],
   Trader: ['Trader'],
   RiskDebate: ['AggressiveAnalyst', 'ConservativeAnalyst', 'NeutralAnalyst', 'RiskJudge'],

@@ -7,10 +7,9 @@ type ExportFormat = 'pdf' | 'word' | 'md'
 
 // 代理名称映射
 const agentNameMap: Record<string, string> = {
-  MarketAnalyst: '技术分析师',
+  MarketAnalyst: '技术面分析师',
   FundamentalsAnalyst: '基本面分析师',
-  NewsAnalyst: '新闻分析师',
-  SocialAnalyst: '舆情分析师',
+  NewsAnalyst: '新闻事件分析师',
   BullResearcher: '看多研究员',
   BearResearcher: '看空研究员',
   ResearchManager: '研究主管',
@@ -122,7 +121,7 @@ export function buildMarkdownReport(
   const agentGroups: { phase: string; agents: string[] }[] = [
     {
       phase: 'Layer1_DataCollection',
-      agents: ['MarketAnalyst', 'FundamentalsAnalyst', 'NewsAnalyst', 'SocialAnalyst'],
+      agents: ['MarketAnalyst', 'FundamentalsAnalyst', 'NewsAnalyst'],
     },
     {
       phase: 'BullBearDebate',

@@ -346,13 +346,12 @@ public class DeepAnalysisWorkflow {
     }
 
     private WorkflowGraph buildGraph(ChatModel userChatModel) {
-        // Layer 1: 4 个并行分析师
+        // Layer 1: 3 个并行分析师
         ParallelFanOutNode layer1 = new ParallelFanOutNode("Layer1_DataCollection",
                 List.of(
                         agentFactory.createAnalyst(AgentRole.MARKET_ANALYST, userChatModel),
                         agentFactory.createAnalyst(AgentRole.FUNDAMENTALS_ANALYST, userChatModel),
-                        agentFactory.createAnalyst(AgentRole.NEWS_ANALYST, userChatModel),
-                        agentFactory.createAnalyst(AgentRole.SOCIAL_ANALYST, userChatModel)
+                        agentFactory.createAnalyst(AgentRole.NEWS_ANALYST, userChatModel)
                 ));
 
         // Layer 2: 多空辩论
