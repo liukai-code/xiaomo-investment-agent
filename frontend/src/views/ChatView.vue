@@ -22,6 +22,7 @@ const chatStore = useChatStore()
 const yjbStore = useYangjibaoStore()
 const analysisStore = useAnalysisStore()
 const notificationStore = useNotificationStore()
+const { schedule, cancel: cancelRaf } = useRafThrottle()
 
 const messagesEl = ref<HTMLDivElement>()
 const inputEl = ref<HTMLTextAreaElement>()
@@ -288,8 +289,6 @@ async function handleSend() {
 
   chatStore.addStreamingAiMessage()
   scrollToBottom()
-
-  const { schedule, cancel: cancelRaf } = useRafThrottle()
 
   // 捕获当前会话 ID，防止回调在会话切换后更新错误的消息
   const convId = chatStore.currentConvId!
