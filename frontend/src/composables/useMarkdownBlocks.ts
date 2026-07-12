@@ -199,7 +199,7 @@ export function parseBlocks(text: string): MarkdownBlock[] {
       flushBlockquote(true)
       flushList(true)
       flushTable(true)
-      blocks.push({ type: 'hr', closed: true, key: 'hr' })
+      blocks.push({ type: 'hr', closed: true, key: blockKey('hr', `hr-${blocks.length}`) })
       continue
     }
 
