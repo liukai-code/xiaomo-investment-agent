@@ -129,13 +129,20 @@ class RuleBasedIntentClassifierTest {
                 "炸板率多少",
                 "连板梯队",
                 "龙虎榜",
-                "涨停揭秘"
+                "涨停揭秘",
+                "查一下热榜",
+                "热榜",
+                "人气榜",
+                "热搜",
+                "市场情绪怎么样",
+                "情绪面分析"
         })
         void 打板情绪查询应分类为TRADING_SENTIMENT(String msg) {
             IntentResult result = classifier.classify(msg);
             assertEquals(IntentType.TRADING_SENTIMENT, result.intent(), "消息: " + msg);
             assertNotNull(result.suggestedTools());
             assertTrue(result.suggestedTools().contains("a_stock_limit_up"));
+            assertTrue(result.suggestedTools().contains("a_stock_sentiment"));
         }
     }
 
@@ -246,6 +253,42 @@ class RuleBasedIntentClassifierTest {
             assertTrue(result.suggestedTools().contains("a_stock_report"));
             assertTrue(result.suggestedTools().contains("a_stock_news"));
             assertTrue(result.suggestedTools().contains("a_stock_capital"));
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {
+                "600519的期权",
+                "茅台的融资融券",
+                "茅台大宗交易",
+                "茅台北向资金",
+                "600519解禁日期",
+                "茅台分红历史",
+                "茅台股东户数",
+                "茅台利润表",
+                "茅台资产负债表",
+                "茅台现金流量表",
+                "茅台财报",
+                "茅台互动易"
+        })
+        void 金融数据查询带标的应分类为STOCK_ANALYSIS(String msg) throws Exception {
+            when(httpClientService.get(anyString(), any())).thenReturn(
+                    "{\"QuotationCodeTable\":{\"Data\":[{\"Code\":\"600519\",\"Name\":\"贵州茅台\",\"MktNum\":\"1\"}]}}");
+            IntentResult result = classifier.classify(msg);
+            assertEquals(IntentType.STOCK_ANALYSIS, result.intent(), "消息: " + msg);
+            assertNotNull(result.suggestedTools());
+            assertTrue(result.suggestedTools().contains("a_stock_capital"));
+            assertTrue(result.suggestedTools().contains("a_stock_news"));
+        }
+
+        @Test
+        void 概念热度带标的应分类为SECTOR_ANALYSIS() throws Exception {
+            // "概念"在SECTOR_KEYWORDS中优先级更高，且SECTOR_TOOLS包含a_stock_sentiment
+            when(httpClientService.get(anyString(), any())).thenReturn(
+                    "{\"QuotationCodeTable\":{\"Data\":[{\"Code\":\"600519\",\"Name\":\"贵州茅台\",\"MktNum\":\"1\"}]}}");
+            IntentResult result = classifier.classify("茅台概念热度");
+            assertEquals(IntentType.SECTOR_ANALYSIS, result.intent());
+            assertNotNull(result.suggestedTools());
+            assertTrue(result.suggestedTools().contains("a_stock_sentiment"));
         }
     }
 

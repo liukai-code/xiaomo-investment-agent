@@ -297,7 +297,9 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
 
     private static final String[] SENTIMENT_KEYWORDS = {
             "涨停", "跌停", "炸板", "连板", "打板", "情绪", "龙虎榜",
-            "涨停池", "跌停池", "封板", "炸板率", "涨停揭秘"
+            "涨停池", "跌停池", "封板", "炸板率", "涨停揭秘",
+            "热榜", "人气榜", "热度", "热门股票", "热搜",
+            "市场情绪", "情绪面"
     };
 
     private static final String[] CALC_KEYWORDS = {
@@ -314,7 +316,10 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
             "如何", "值得入手吗", "值得买吗", "可以买吗", "能买吗",
             "值得投资吗", "值得持有吗", "现在能买吗", "目前怎么样",
             "看好", "有前途吗", "前景如何", "还能涨吗", "还能买吗",
-            "研报", "现在", "目前"
+            "研报", "现在", "目前",
+            "期权", "融资融券", "大宗交易", "北向资金", "解禁",
+            "分红", "股东户数", "利润表", "资产负债表", "现金流量表",
+            "财报", "互动易", "概念热度"
     };
 
     private static final String[] STRIP_KEYWORDS = {
@@ -326,6 +331,9 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
             "可以买吗", "可以入手吗", "能买吗", "值得投资吗", "值得持有吗",
             "现在能买吗", "现在可以买吗", "目前怎么样", "可以买", "看好",
             "看好吗", "有前途吗", "前景如何", "还能涨吗", "还能买吗",
-            "研报", "现在", "目前"
+            "研报", "现在", "目前",
+            "期权", "融资融券", "大宗交易", "北向资金", "解禁",
+            "分红", "股东户数", "利润表", "资产负债表", "现金流量表",
+            "财报", "互动易", "概念热度"
     };
 }
