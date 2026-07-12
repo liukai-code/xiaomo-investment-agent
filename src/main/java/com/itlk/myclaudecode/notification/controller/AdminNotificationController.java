@@ -16,23 +16,39 @@ public class AdminNotificationController {
     @Resource
     private NotificationService notificationService;
 
+    @SuppressWarnings("unchecked")
     @PostMapping
-    public Result<Notification> create(@RequestBody Map<String, String> body) {
-        String title = body.get("title");
-        String content = body.get("content");
+    public Result<Notification> create(@RequestBody Map<String, Object> body) {
+        String title = (String) body.get("title");
+        String content = (String) body.get("content");
         if (title == null || title.isBlank()) {
             return Result.error("标题不能为空");
         }
         if (content == null || content.isBlank()) {
             return Result.error("内容不能为空");
         }
-        Notification notification = notificationService.create(title, content);
+
+        // 解析 targetUserIds（可选）
+        List<Long> targetUserIds = null;
+        Object targetObj = body.get("targetUserIds");
+        if (targetObj instanceof List<?> targetList && !targetList.isEmpty()) {
+            targetUserIds = targetList.stream()
+                    .map(item -> item instanceof Number ? ((Number) item).longValue() : Long.parseLong(item.toString()))
+                    .toList();
+        }
+
+        Notification notification = notificationService.create(title, content, targetUserIds);
         return Result.success(notification);
     }
 
     @GetMapping
     public Result<List<Notification>> list() {
         return Result.success(notificationService.listAll());
+    }
+
+    @GetMapping("/{id}/recipients")
+    public Result<List<Long>> recipients(@PathVariable Long id) {
+        return Result.success(notificationService.getTargetUsers(id));
     }
 
     @DeleteMapping("/{id}")

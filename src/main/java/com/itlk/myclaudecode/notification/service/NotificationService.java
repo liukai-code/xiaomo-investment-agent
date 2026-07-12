@@ -9,6 +9,10 @@ public interface NotificationService {
 
     Notification create(String title, String content);
 
+    Notification create(String title, String content, List<Long> targetUserIds);
+
+    List<Long> getTargetUsers(Long notificationId);
+
     List<Notification> listAll();
 
     List<Notification> listRecent(int limit);

@@ -23,6 +23,9 @@ public class Notification {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private Boolean broadcast = true;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

@@ -1,5 +1,7 @@
 package com.itlk.myclaudecode.notification.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
@@ -24,6 +26,9 @@ public class NotificationSseService implements MessageListener {
     @Resource
     private RedisMessageListenerContainer redisMessageListenerContainer;
 
+    @Resource
+    private ObjectMapper objectMapper;
+
     @PostConstruct
     public void init() {
         redisMessageListenerContainer.addMessageListener(
@@ -39,7 +44,28 @@ public class NotificationSseService implements MessageListener {
         sink.tryEmitNext(body);
     }
 
-    public Flux<String> getNotificationStream() {
-        return sink.asFlux();
+    /**
+     * 获取按用户过滤的通知流
+     * 广播通知推送给所有人，定向通知只推送给目标用户
+     */
+    public Flux<String> getNotificationStream(Long userId) {
+        return sink.asFlux().filter(body -> {
+            try {
+                JsonNode node = objectMapper.readTree(body);
+                boolean broadcast = node.has("broadcast") && node.get("broadcast").asBoolean(true);
+                if (broadcast) return true;
+
+                // 定向通知：检查 userId 是否在 targetUserIds 中
+                JsonNode targetNode = node.get("targetUserIds");
+                if (targetNode == null || !targetNode.isArray()) return false;
+                for (JsonNode id : targetNode) {
+                    if (id.asLong() == userId) return true;
+                }
+                return false;
+            } catch (Exception e) {
+                log.warn("解析通知消息失败: {}", e.getMessage());
+                return false;
+            }
+        });
     }
 }

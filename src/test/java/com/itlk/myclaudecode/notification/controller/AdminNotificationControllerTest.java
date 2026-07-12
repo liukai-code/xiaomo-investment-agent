@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -38,6 +39,7 @@ class AdminNotificationControllerTest {
         testNotification.setTitle("系统维护");
         testNotification.setContent("今晚22:00-23:00系统维护");
         testNotification.setCreatedAt(LocalDateTime.of(2026, 7, 11, 10, 0));
+        testNotification.setBroadcast(true);
     }
 
     // ==================== create ====================
@@ -47,34 +49,65 @@ class AdminNotificationControllerTest {
     class CreateTest {
 
         @Test
-        @DisplayName("正常创建通知")
+        @DisplayName("正常创建广播通知")
         void createSuccess() {
-            when(notificationService.create("系统维护", "今晚维护")).thenReturn(testNotification);
+            when(notificationService.create("系统维护", "今晚维护", null)).thenReturn(testNotification);
 
-            Result<Notification> result = controller.create(Map.of(
-                    "title", "系统维护",
-                    "content", "今晚维护"
-            ));
+            Map<String, Object> body = new HashMap<>();
+            body.put("title", "系统维护");
+            body.put("content", "今晚维护");
+
+            Result<Notification> result = controller.create(body);
 
             assertEquals(1, result.getCode());
             assertNotNull(result.getData());
             assertEquals("系统维护", result.getData().getTitle());
+            assertTrue(result.getData().getBroadcast());
+        }
+
+        @Test
+        @DisplayName("创建定向通知")
+        void createTargetedSuccess() {
+            Notification targeted = new Notification();
+            targeted.setId(2L);
+            targeted.setTitle("定向通知");
+            targeted.setContent("仅发给指定用户");
+            targeted.setBroadcast(false);
+
+            when(notificationService.create("定向通知", "仅发给指定用户", List.of(100L, 200L))).thenReturn(targeted);
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("title", "定向通知");
+            body.put("content", "仅发给指定用户");
+            body.put("targetUserIds", List.of(100, 200)); // JSON 中数字通常是 Integer
+
+            Result<Notification> result = controller.create(body);
+
+            assertEquals(1, result.getCode());
+            assertFalse(result.getData().getBroadcast());
         }
 
         @Test
         @DisplayName("标题为空时返回错误")
         void createWithEmptyTitle() {
-            Result<Notification> result = controller.create(Map.of("title", "", "content", "内容"));
+            Map<String, Object> body = new HashMap<>();
+            body.put("title", "");
+            body.put("content", "内容");
+
+            Result<Notification> result = controller.create(body);
 
             assertEquals(0, result.getCode());
             assertEquals("标题不能为空", result.getMsg());
-            verify(notificationService, never()).create(any(), any());
+            verify(notificationService, never()).create(any(), any(), any());
         }
 
         @Test
         @DisplayName("标题为 null 时返回错误")
         void createWithNullTitle() {
-            Result<Notification> result = controller.create(Map.of("content", "内容"));
+            Map<String, Object> body = new HashMap<>();
+            body.put("content", "内容");
+
+            Result<Notification> result = controller.create(body);
 
             assertEquals(0, result.getCode());
             assertEquals("标题不能为空", result.getMsg());
@@ -83,11 +116,15 @@ class AdminNotificationControllerTest {
         @Test
         @DisplayName("内容为空时返回错误")
         void createWithEmptyContent() {
-            Result<Notification> result = controller.create(Map.of("title", "标题", "content", ""));
+            Map<String, Object> body = new HashMap<>();
+            body.put("title", "标题");
+            body.put("content", "");
+
+            Result<Notification> result = controller.create(body);
 
             assertEquals(0, result.getCode());
             assertEquals("内容不能为空", result.getMsg());
-            verify(notificationService, never()).create(any(), any());
+            verify(notificationService, never()).create(any(), any(), any());
         }
     }
 
@@ -115,6 +152,37 @@ class AdminNotificationControllerTest {
             when(notificationService.listAll()).thenReturn(List.of());
 
             Result<List<Notification>> result = controller.list();
+
+            assertEquals(1, result.getCode());
+            assertTrue(result.getData().isEmpty());
+        }
+    }
+
+    // ==================== recipients ====================
+
+    @Nested
+    @DisplayName("recipients 获取接收人")
+    class RecipientsTest {
+
+        @Test
+        @DisplayName("返回定向通知的接收人列表")
+        void returnsRecipients() {
+            when(notificationService.getTargetUsers(1L)).thenReturn(List.of(100L, 200L));
+
+            Result<List<Long>> result = controller.recipients(1L);
+
+            assertEquals(1, result.getCode());
+            assertEquals(2, result.getData().size());
+            assertTrue(result.getData().contains(100L));
+            assertTrue(result.getData().contains(200L));
+        }
+
+        @Test
+        @DisplayName("广播通知返回空列表")
+        void returnsEmptyForBroadcast() {
+            when(notificationService.getTargetUsers(1L)).thenReturn(List.of());
+
+            Result<List<Long>> result = controller.recipients(1L);
 
             assertEquals(1, result.getCode());
             assertTrue(result.getData().isEmpty());
