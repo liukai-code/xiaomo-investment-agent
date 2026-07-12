@@ -82,6 +82,8 @@ agent:
     tool-timeout-seconds: 60
     report-min-length: 500
     report-min-sections: 2
+  intent:
+    enabled: true
 
 # 多智能体深度分析工作流
 workflow:

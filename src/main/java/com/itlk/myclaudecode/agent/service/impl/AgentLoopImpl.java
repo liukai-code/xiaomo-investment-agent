@@ -3,6 +3,9 @@ package com.itlk.myclaudecode.agent.service.impl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itlk.myclaudecode.agent.config.ToolGuardProperties;
+import com.itlk.myclaudecode.agent.intent.IntentClassifier;
+import com.itlk.myclaudecode.agent.intent.IntentResult;
+import com.itlk.myclaudecode.agent.intent.IntentType;
 import com.itlk.myclaudecode.agent.service.AgentLoop;
 import com.itlk.myclaudecode.agent.service.ChatStreamEvent;
 import com.itlk.myclaudecode.conversation.entity.*;
@@ -83,7 +86,10 @@ public class AgentLoopImpl implements AgentLoop {
     private final ToolConfigService toolConfigService;
     private final HttpClientService httpClientService;
     private final UserConfigService userConfigService;
+    private final IntentClassifier intentClassifier;
     private List<ToolCallback> allWrappedCallbacks;
+    /** MCP 工具名集合，意图过滤时始终保留 */
+    private Set<String> mcpToolNames = Set.of();
 
     /**
      * 根据用户配置解析对应的 ChatClient。
@@ -149,12 +155,14 @@ public class AgentLoopImpl implements AgentLoop {
                          ToolConfigService toolConfigService,
                          HttpClientService httpClientService,
                          UserConfigService userConfigService,
+                         IntentClassifier intentClassifier,
                          @Value("${system-default-prompt}") String systemPrompt) {
         this.systemPrompt = systemPrompt;
         this.toolGuardProperties = toolGuardProperties;
         this.toolConfigService = toolConfigService;
         this.httpClientService = httpClientService;
         this.userConfigService = userConfigService;
+        this.intentClassifier = intentClassifier;
 
         // 将工具对象转为 ToolCallback，再用拦截器包装
         try {
@@ -175,12 +183,15 @@ public class AgentLoopImpl implements AgentLoop {
                 toolNames.add(cb.getToolDefinition().name());
             }
 
-            // 注册 MCP 工具（同样包装）
+            // 注册 MCP 工具（同样包装），并记录 MCP 工具名（意图过滤时始终保留）
             if (toolCallbackProvider != null) {
+                Set<String> mcpNames = new java.util.HashSet<>();
                 for (ToolCallback mcp : toolCallbackProvider.getToolCallbacks()) {
                     wrappedCallbacks.add(new ToolEnabledCheckWrapper(mcp, toolConfigService));
                     toolNames.add(mcp.getToolDefinition().name());
+                    mcpNames.add(mcp.getToolDefinition().name());
                 }
+                this.mcpToolNames = Set.copyOf(mcpNames);
                 log.info("已注册 MCP 工具: {}", (Object) toolCallbackProvider.getToolCallbacks());
             }
 
@@ -220,9 +231,22 @@ public class AgentLoopImpl implements AgentLoop {
 
         chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
 
-        ResolvedTarget target = resolveStockFromMessage(message);
-        DebugFileLogger.logBuildContext("CHAT_SYNC", "message=\"" + message + "\" | target=" + (target != null ? target.code() + "(" + target.name() + ")" : "null"));
-        List<Message> context = buildContext(conversation.getId(), userId, target);
+        // 意图分类（替代 resolveStockFromMessage）
+        IntentResult intentResult = intentClassifier.classify(message);
+        IntentResult.ResolvedTarget target = intentResult.target();
+        log.info("[Chat] 意图分类: intent={}, confidence={}, target={}",
+                intentResult.intent(), intentResult.confidence(),
+                target != null ? target.code() : "null");
+        DebugFileLogger.logBuildContext("CHAT_SYNC",
+                "message=\"" + message + "\" | intent=" + intentResult.intent()
+                        + " | target=" + (target != null ? target.code() + "(" + target.name() + ")" : "null"));
+
+        // 如果意图分类器未启用（返回 confidence=0 且 suggestedTools=null），回退到原有逻辑
+        if (intentResult.confidence() == 0 && intentResult.suggestedTools() == null) {
+            target = toResolvedTarget(resolveStockFromMessage(message));
+        }
+
+        List<Message> context = buildContext(conversation.getId(), userId, target, intentResult.intent());
 
         Long convId = conversation.getId();
 
@@ -261,8 +285,15 @@ public class AgentLoopImpl implements AgentLoop {
                 .filter(Map.Entry::getValue)
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
+        Set<String> intentToolWhitelist = intentResult.suggestedTools();
         List<ToolCallback> enabledTools = allWrappedCallbacks.stream()
-                .filter(cb -> enabledNames.contains(cb.getToolDefinition().name()))
+                .filter(cb -> {
+                    String name = cb.getToolDefinition().name();
+                    if (!enabledNames.contains(name)) return false;
+                    if (mcpToolNames.contains(name)) return true;
+                    if (intentToolWhitelist != null && !intentToolWhitelist.contains(name)) return false;
+                    return true;
+                })
                 .<ToolCallback>map(cb -> new ToolCallbackContextWrapper(cb))
                 .toList();
 
@@ -322,9 +353,22 @@ public class AgentLoopImpl implements AgentLoop {
 
         chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
 
-        ResolvedTarget target = resolveStockFromMessage(message);
-        DebugFileLogger.logBuildContext("CHAT_STREAM", "message=\"" + message + "\" | target=" + (target != null ? target.code() + "(" + target.name() + ")" : "null"));
-        List<Message> context = buildContext(conversation.getId(), userId, target);
+        // 意图分类（替代 resolveStockFromMessage）
+        IntentResult intentResult = intentClassifier.classify(message);
+        IntentResult.ResolvedTarget target = intentResult.target();
+        log.info("[ChatStream] 意图分类: intent={}, confidence={}, target={}",
+                intentResult.intent(), intentResult.confidence(),
+                target != null ? target.code() : "null");
+        DebugFileLogger.logBuildContext("CHAT_STREAM",
+                "message=\"" + message + "\" | intent=" + intentResult.intent()
+                        + " | target=" + (target != null ? target.code() + "(" + target.name() + ")" : "null"));
+
+        // 如果意图分类器未启用（返回 confidence=0 且 suggestedTools=null），回退到原有逻辑
+        if (intentResult.confidence() == 0 && intentResult.suggestedTools() == null) {
+            target = toResolvedTarget(resolveStockFromMessage(message));
+        }
+
+        List<Message> context = buildContext(conversation.getId(), userId, target, intentResult.intent());
         Long convId = conversation.getId();
 
         StringBuilder accumulated = new StringBuilder();
@@ -368,8 +412,15 @@ public class AgentLoopImpl implements AgentLoop {
                 .filter(Map.Entry::getValue)
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
+        Set<String> intentToolWhitelist = intentResult.suggestedTools();
         List<ToolCallback> enabledTools = allWrappedCallbacks.stream()
-                .filter(cb -> enabledNames.contains(cb.getToolDefinition().name()))
+                .filter(cb -> {
+                    String name = cb.getToolDefinition().name();
+                    if (!enabledNames.contains(name)) return false;
+                    if (mcpToolNames.contains(name)) return true;
+                    if (intentToolWhitelist != null && !intentToolWhitelist.contains(name)) return false;
+                    return true;
+                })
                 .<ToolCallback>map(cb -> new ToolCallbackContextWrapper(cb))
                 .toList();
 
@@ -549,6 +600,14 @@ public class AgentLoopImpl implements AgentLoop {
 
     private record ResolvedTarget(String code, String name) {}
 
+    /** 将内部 ResolvedTarget 转换为 IntentResult.ResolvedTarget */
+    private static IntentResult.ResolvedTarget toResolvedTarget(ResolvedTarget t) {
+        return t == null ? null : new IntentResult.ResolvedTarget(t.code(), t.name());
+    }
+
+    /**
+     * 原有的标的解析逻辑，作为 IntentClassifier 禁用时的 fallback。
+     */
     private ResolvedTarget resolveStockFromMessage(String message) {
         DebugFileLogger.logResolveStock("START", message, "-");
         if (message == null || message.isBlank()) return null;
@@ -616,7 +675,7 @@ public class AgentLoopImpl implements AgentLoop {
         }
     }
 
-    private List<Message> buildContext(Long conversationId, Long userId, ResolvedTarget target) {
+    private List<Message> buildContext(Long conversationId, Long userId, IntentResult.ResolvedTarget target, IntentType intent) {
         List<Message> context = new ArrayList<>();
 
         String enrichedPrompt = systemPrompt;
@@ -644,6 +703,26 @@ public class AgentLoopImpl implements AgentLoop {
                     + "7. 用户问的是单个标的，回答也必须是单个标的的分析，不要扩展到投资组合层面";
         } else {
             DebugFileLogger.logBuildContext("NO_TARGET", "标的解析失败或未触发，未设置标的锁");
+        }
+
+        // 意图提示：在 system prompt 中追加任务类型约束
+        if (intent != null) {
+            enrichedPrompt += switch (intent) {
+                case MARKET_NEWS -> "\n\n[当前任务类型]\n用户请求的是市场新闻资讯分析，"
+                        + "请使用新闻搜索工具获取最新资讯，然后基于资讯内容回答用户。"
+                        + "如果用户提到了某个具体标的的新闻，可以查询该标的的个股新闻，"
+                        + "但不要展开成完整的个股分析报告。";
+                case SECTOR_ANALYSIS -> "\n\n[当前任务类型]\n用户请求的是板块/行业层面的分析，"
+                        + "请使用行业排名、行业研报、概念板块等工具获取板块数据。"
+                        + "不需要锁定个股标的，分析整个板块/行业的趋势和机会。";
+                case TRADING_SENTIMENT -> "\n\n[当前任务类型]\n用户请求的是打板/情绪面分析，"
+                        + "请使用涨停池、龙虎榜、情绪速算等工具获取市场情绪数据。";
+                case HOLDINGS_QUERY -> "\n\n[当前任务类型]\n用户请求查询自己的持仓信息，"
+                        + "请使用持仓查询工具获取数据。";
+                case FINANCIAL_CALC -> "\n\n[当前任务类型]\n用户请求金融计算，"
+                        + "请使用金融计算器工具完成计算。";
+                default -> "";
+            };
         }
 
         context.add(new SystemMessage(enrichedPrompt));
