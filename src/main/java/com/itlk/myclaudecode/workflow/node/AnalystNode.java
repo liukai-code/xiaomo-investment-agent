@@ -149,7 +149,7 @@ public class AnalystNode implements WorkflowNode {
                 .stream()
                 .chatResponse()
                 .filter(resp -> resp != null && resp.getResult() != null && resp.getResult().getOutput() != null)
-                .map(resp -> {
+                .flatMap(resp -> {
                     var output = resp.getResult().getOutput();
                     // 工具调用轮次：发送进度事件，让前端实时感知
                     if (output.hasToolCalls()) {
@@ -157,16 +157,15 @@ public class AnalystNode implements WorkflowNode {
                                 .map(tc -> tc.name())
                                 .collect(java.util.stream.Collectors.joining(", "));
                         sink.tryEmitNext(WorkflowEvent.agentChunk(roleName, "🔧 正在调用工具: " + toolNames + "\n"));
-                        return (WorkflowEvent) null;
+                        return reactor.core.publisher.Mono.<WorkflowEvent>empty();
                     }
                     // 文本 chunk：累积到报告
                     String text = output.getText();
-                    if (text == null || text.isEmpty() || isGuardTag(text)) return null;
+                    if (text == null || text.isEmpty() || isGuardTag(text)) return reactor.core.publisher.Mono.empty();
                     report.append(text);
                     completenessChecker.appendChunk(text);
-                    return WorkflowEvent.agentChunk(roleName, text);
+                    return reactor.core.publisher.Mono.just(WorkflowEvent.agentChunk(roleName, text));
                 })
-                .filter(event -> event != null)
                 .doOnComplete(() -> {
                     String rawReport = report.toString();
                     // 先提取结构化数据（需要原始 JSON）
