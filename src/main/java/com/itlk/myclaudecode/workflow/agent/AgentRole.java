@@ -43,7 +43,7 @@ public enum AgentRole {
                     + "- key_levels: {support: 价格, resistance: 价格}",
             List.of("a_stock_quote", "a_stock_signal", "a_stock_limit_up",
                     "market_data", "fetchWebpage"),
-            new RoleGuardConfig(0.8, 3, 5, 2, 1, 8)
+            new RoleGuardConfig(0.8, 3, 5, 2, 2, 8)
     ),
 
     FUNDAMENTALS_ANALYST(
@@ -93,7 +93,7 @@ public enum AgentRole {
             List.of("a_stock_quote", "a_stock_report", "a_stock_news", "a_stock_capital",
                     "market_data", "financial_calculator", "getDatabaseSchema", "executeQuery",
                     "fetchWebpage", "fetchArticleContent"),
-            new RoleGuardConfig(0.8, 3, 5, 2, 1, 8)
+            new RoleGuardConfig(0.8, 3, 5, 2, 2, 8)
     ),
 
     NEWS_ANALYST(
@@ -140,7 +140,7 @@ public enum AgentRole {
                     + "- risk_alerts: [风险提示列表]",
             List.of("a_stock_news", "a_stock_signal",
                     "fetchWebpage", "fetchArticleContent", "bailian_web_search"),
-            new RoleGuardConfig(0.8, 3, 5, 2, 3, 6)
+            new RoleGuardConfig(0.8, 3, 7, 2, 5, 8)
     ),
 
     // ===== Layer 2: 多空辩论 =====
