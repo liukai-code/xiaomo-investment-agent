@@ -2,7 +2,6 @@ package com.itlk.myclaudecode.workflow.node;
 
 import com.itlk.myclaudecode.workflow.engine.WorkflowNode;
 import com.itlk.myclaudecode.workflow.event.WorkflowEvent;
-import com.itlk.myclaudecode.workflow.event.WorkflowEventType;
 import com.itlk.myclaudecode.workflow.state.DebateMessage;
 import com.itlk.myclaudecode.workflow.state.WorkflowState;
 import lombok.extern.slf4j.Slf4j;
@@ -56,11 +55,10 @@ public class BullBearDebateOrchestrator implements WorkflowNode {
                     state.getBullBearDebate().addAll(debateHistory);
                     log.info("辩论记录已写入状态，共 {} 条", debateHistory.size());
                     return judge.makeJudgment(state, debateHistory, sink)
-                            .doOnNext(event -> {
-                                if (event.type() == WorkflowEventType.AGENT_COMPLETE) {
-                                    state.setInvestmentPlan(stripJsonBlock(event.content()));
-                                    log.info("投资计划已生成");
-                                }
+                            .doOnComplete(() -> {
+                                // AGENT_COMPLETE 通过 sink 副作用发出，不经过 Flux，必须在 doOnComplete 中捕获
+                                state.setInvestmentPlan(stripJsonBlock(judge.getLastRawResult()));
+                                log.info("投资计划已生成");
                             });
                 }))
                 .doOnComplete(() -> {

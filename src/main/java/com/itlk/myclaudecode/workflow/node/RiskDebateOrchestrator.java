@@ -2,7 +2,6 @@ package com.itlk.myclaudecode.workflow.node;
 
 import com.itlk.myclaudecode.workflow.engine.WorkflowNode;
 import com.itlk.myclaudecode.workflow.event.WorkflowEvent;
-import com.itlk.myclaudecode.workflow.event.WorkflowEventType;
 import com.itlk.myclaudecode.workflow.state.DebateMessage;
 import com.itlk.myclaudecode.workflow.state.FinalDecision;
 import com.itlk.myclaudecode.workflow.state.WorkflowState;
@@ -65,15 +64,13 @@ public class RiskDebateOrchestrator implements WorkflowNode {
                 .concatWith(Flux.defer(() -> {
                     state.getRiskDebate().addAll(riskDebateHistory);
                     return riskJudge.makeJudgment(state, riskDebateHistory, sink)
-                            .doOnNext(event -> {
-                                if (event.type() == WorkflowEventType.AGENT_COMPLETE) {
-                                    // 用原始结果（含 JSON）解析决策，event.content() 已剥离 JSON
-                                    FinalDecision decision = parseDecision(riskJudge.getLastRawResult());
-                                    state.setFinalDecision(decision);
-                                    sink.tryEmitNext(WorkflowEvent.finalDecision(decision));
-                                    log.info("最终裁决: action={}, confidence={}",
-                                            decision.action(), decision.confidence());
-                                }
+                            .doOnComplete(() -> {
+                                // AGENT_COMPLETE 通过 sink 副作用发出，不经过 Flux，必须在 doOnComplete 中捕获
+                                FinalDecision decision = parseDecision(riskJudge.getLastRawResult());
+                                state.setFinalDecision(decision);
+                                sink.tryEmitNext(WorkflowEvent.finalDecision(decision));
+                                log.info("最终裁决: action={}, confidence={}",
+                                        decision.action(), decision.confidence());
                             });
                 }))
                 .doOnComplete(() -> {
