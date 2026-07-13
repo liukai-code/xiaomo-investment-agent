@@ -48,9 +48,6 @@ frontend/.vite/
 frontend/*.tsbuildinfo
 src/main/resources/static/
 
-### RAG ###
-RAG/
-
 ### Docs - external repos ###
 docs/a-stock-data/
 docs/门户网站示例/
