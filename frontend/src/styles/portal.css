@@ -1,3 +1,6 @@
+/* -- Google Fonts -- */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap');
+
 /* ========== Portal 专用样式 ========== */
 
 /* -- 门户配色变量 -- */
@@ -10,9 +13,6 @@
   --portal-accent: #2563eb;
   --portal-accent-fg: #ffffff;
 }
-
-/* -- Google Fonts -- */
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap');
 
 /* -- 滚动动画基础类 -- */
 .portal-animate {
