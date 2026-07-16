@@ -33,6 +33,8 @@ const deleteConfirmConvId = ref<number | null>(null)
 const showUserMenu = ref(false)
 const sidebarCollapsed = ref(false)
 const showSettings = ref(false)
+const logoutConfirming = ref(false)
+let logoutTimer: ReturnType<typeof setTimeout> | null = null
 
 // 侧面板互斥切换
 function toggleAnalysisPanel() {
@@ -200,8 +202,18 @@ async function handleSwitchConversation(id: number) {
 }
 
 async function handleLogout() {
-  await authStore.logout()
-  router.push('/login')
+  if (logoutConfirming.value) {
+    if (logoutTimer) clearTimeout(logoutTimer)
+    logoutConfirming.value = false
+    await authStore.logout()
+    router.push('/login')
+    return
+  }
+  logoutConfirming.value = true
+  if (logoutTimer) clearTimeout(logoutTimer)
+  logoutTimer = setTimeout(() => {
+    logoutConfirming.value = false
+  }, 3000)
 }
 
 function onSettingsSaved() {
@@ -449,9 +461,14 @@ watch(() => yjbStore.cardVisible, (visible) => {
           <Settings :size="18" />
           <span class="footer-label">设置</span>
         </div>
-        <div class="footer-item" @click="handleLogout()" title="退出登录">
+        <div
+          class="footer-item logout-btn"
+          :class="{ 'logout-confirming': logoutConfirming }"
+          @click="handleLogout()"
+          :title="logoutConfirming ? '再次点击确认退出' : '退出登录'"
+        >
           <LogOut :size="18" />
-          <span class="footer-label">退出登录</span>
+          <span class="footer-label">{{ logoutConfirming ? '确认退出' : '退出登录' }}</span>
         </div>
       </div>
     </div>
@@ -828,5 +845,42 @@ watch(() => yjbStore.cardVisible, (visible) => {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* 退出登录滑动确认 */
+.logout-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.logout-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #ef4444;
+  border-radius: 8px;
+  transform: translateX(-100%);
+  transition: transform 0.35s ease;
+  z-index: 0;
+}
+
+.logout-btn > * {
+  position: relative;
+  z-index: 1;
+}
+
+.logout-confirming::before {
+  transform: translateX(0);
+}
+
+.logout-confirming {
+  color: #fff !important;
+}
+
+.logout-confirming .footer-label {
+  font-weight: 600;
 }
 </style>

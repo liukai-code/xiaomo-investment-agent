@@ -1,6 +1,7 @@
 <!-- frontend/src/components/SettingsDialog.vue -->
 <template>
-  <div class="settings-overlay" v-if="visible" @click.self="close">
+  <Transition name="settings-fade">
+    <div class="settings-overlay" v-if="visible" @click.self="close">
     <div class="settings-dialog">
       <div class="settings-header">
         <h3><Settings :size="18" /> 设置</h3>
@@ -259,6 +260,7 @@
       </div>
     </div>
   </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">
@@ -1093,5 +1095,33 @@ button:disabled {
 
 .stats-chart-half {
   margin-bottom: 0;
+}
+
+/* 淡入淡出动画 */
+.settings-fade-enter-active {
+  transition: opacity 0.2s ease;
+}
+.settings-fade-enter-active .settings-dialog {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.settings-fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+.settings-fade-leave-active .settings-dialog {
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.settings-fade-enter-from {
+  opacity: 0;
+}
+.settings-fade-enter-from .settings-dialog {
+  opacity: 0;
+  transform: scale(0.95);
+}
+.settings-fade-leave-to {
+  opacity: 0;
+}
+.settings-fade-leave-to .settings-dialog {
+  opacity: 0;
+  transform: scale(0.95);
 }
 </style>
