@@ -4,6 +4,7 @@ import com.itlk.myclaudecode.conversation.entity.UsageRecord;
 import com.itlk.myclaudecode.conversation.repository.ChatMessageRepository;
 import com.itlk.myclaudecode.conversation.repository.ConversationRepository;
 import com.itlk.myclaudecode.conversation.repository.UsageRecordRepository;
+import com.itlk.myclaudecode.conversation.service.DailyUsageDTO;
 import com.itlk.myclaudecode.conversation.service.UsageRecordService;
 import com.itlk.myclaudecode.conversation.service.UsageStatsDTO;
 import com.itlk.myclaudecode.user.config.UserConfig;
@@ -12,7 +13,10 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -87,5 +91,31 @@ public class UsageRecordServiceImpl implements UsageRecordService {
                 userConfigRepository.save(cfg);
             }
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DailyUsageDTO> getDailyStats(Long userId) {
+        Optional<UserConfig> config = userConfigRepository.findByUserIdAndIsActiveTrue(userId);
+        LocalDateTime since = config.map(UserConfig::getStatsResetAt).orElse(null);
+
+        List<Object[]> rows;
+        if (since != null) {
+            rows = usageRecordRepository.dailyStatsByUserIdSince(userId, since);
+        } else {
+            rows = usageRecordRepository.dailyStatsByUserId(userId);
+        }
+
+        List<DailyUsageDTO> result = new ArrayList<>();
+        for (Object[] row : rows) {
+            DailyUsageDTO dto = new DailyUsageDTO();
+            dto.setDate(((LocalDate) row[0]).toString());
+            dto.setInputTokens(((Number) row[1]).longValue());
+            dto.setOutputTokens(((Number) row[2]).longValue());
+            dto.setToolCalls(((Number) row[3]).longValue());
+            dto.setRequestCount(((Number) row[4]).longValue());
+            result.add(dto);
+        }
+        return result;
     }
 }

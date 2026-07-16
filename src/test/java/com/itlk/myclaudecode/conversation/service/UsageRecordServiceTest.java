@@ -15,7 +15,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -153,6 +155,76 @@ class UsageRecordServiceTest {
 
             assertDoesNotThrow(() -> usageRecordService.resetStats(400L));
             verify(userConfigRepository, never()).save(any());
+        }
+    }
+
+    // ==================== getDailyStats ====================
+
+    @Nested
+    @DisplayName("getDailyStats 按天统计")
+    class GetDailyStatsTest {
+
+        @Test
+        @DisplayName("无重置记录时返回全量按天数据")
+        void dailyStatsWithoutReset() {
+            when(userConfigRepository.findByUserIdAndIsActiveTrue(200L))
+                    .thenReturn(Optional.of(configWithoutReset));
+
+            List<Object[]> rows = new ArrayList<>();
+            rows.add(new Object[]{LocalDate.of(2026, 7, 14), 500L, 300L, 5L, 2L});
+            rows.add(new Object[]{LocalDate.of(2026, 7, 15), 800L, 600L, 8L, 3L});
+            when(usageRecordRepository.dailyStatsByUserId(200L)).thenReturn(rows);
+
+            List<DailyUsageDTO> result = usageRecordService.getDailyStats(200L);
+
+            assertEquals(2, result.size());
+
+            assertEquals("2026-07-14", result.get(0).getDate());
+            assertEquals(500L, result.get(0).getInputTokens());
+            assertEquals(300L, result.get(0).getOutputTokens());
+            assertEquals(5L, result.get(0).getToolCalls());
+            assertEquals(2L, result.get(0).getRequestCount());
+
+            assertEquals("2026-07-15", result.get(1).getDate());
+            assertEquals(800L, result.get(1).getInputTokens());
+
+            verify(usageRecordRepository).dailyStatsByUserId(200L);
+            verify(usageRecordRepository, never()).dailyStatsByUserIdSince(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("有重置记录时只统计重置后的数据")
+        void dailyStatsWithReset() {
+            LocalDateTime since = configWithReset.getStatsResetAt();
+            when(userConfigRepository.findByUserIdAndIsActiveTrue(100L))
+                    .thenReturn(Optional.of(configWithReset));
+
+            List<Object[]> rows = new ArrayList<>();
+            rows.add(new Object[]{LocalDate.of(2026, 7, 15), 1000L, 700L, 10L, 4L});
+            when(usageRecordRepository.dailyStatsByUserIdSince(100L, since)).thenReturn(rows);
+
+            List<DailyUsageDTO> result = usageRecordService.getDailyStats(100L);
+
+            assertEquals(1, result.size());
+            assertEquals("2026-07-15", result.get(0).getDate());
+            assertEquals(1000L, result.get(0).getInputTokens());
+            assertEquals(700L, result.get(0).getOutputTokens());
+
+            verify(usageRecordRepository).dailyStatsByUserIdSince(100L, since);
+            verify(usageRecordRepository, never()).dailyStatsByUserId(anyLong());
+        }
+
+        @Test
+        @DisplayName("无数据时返回空列表")
+        void dailyStatsEmpty() {
+            when(userConfigRepository.findByUserIdAndIsActiveTrue(200L))
+                    .thenReturn(Optional.of(configWithoutReset));
+            when(usageRecordRepository.dailyStatsByUserId(200L)).thenReturn(Collections.emptyList());
+
+            List<DailyUsageDTO> result = usageRecordService.getDailyStats(200L);
+
+            assertNotNull(result);
+            assertTrue(result.isEmpty());
         }
     }
 }

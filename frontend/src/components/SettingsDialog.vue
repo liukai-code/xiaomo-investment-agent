@@ -211,6 +211,24 @@
                 </div>
               </div>
 
+              <!-- 每日 Token 趋势 -->
+              <div v-if="tokenTrendOption" class="stats-group">
+                <h5>每日 Token 消耗趋势</h5>
+                <v-chart :option="tokenTrendOption" autoresize style="height: 220px" />
+              </div>
+
+              <!-- 底部双图表 -->
+              <div v-if="requestBarOption || tokenPieOption" class="stats-charts-row">
+                <div v-if="requestBarOption" class="stats-group stats-chart-half">
+                  <h5>每日请求数</h5>
+                  <v-chart :option="requestBarOption" autoresize style="height: 200px" />
+                </div>
+                <div v-if="tokenPieOption" class="stats-group stats-chart-half">
+                  <h5>Token 构成</h5>
+                  <v-chart :option="tokenPieOption" autoresize style="height: 240px" />
+                </div>
+              </div>
+
               <div class="section-actions">
                 <button class="reset-btn" @click="handleResetStats" :disabled="statsLoading">
                   <RotateCcw :size="14" />
@@ -244,13 +262,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue';
+import { ref, reactive, computed, watch } from 'vue';
 import {
   getConfig, saveConfig, testConfig, TestConnectionResult, UserConfig,
   getUsageStats, resetUsageStats, UsageStats,
+  getDailyUsage, DailyUsage,
   getChannels, createChannel, updateChannel, deleteChannel, activateChannel,
   ApiChannel, ApiChannelList,
 } from '../api/config';
+import { use } from 'echarts/core';
+import { CanvasRenderer } from 'echarts/renderers';
+import { LineChart, BarChart, PieChart } from 'echarts/charts';
+import {
+  GridComponent, TooltipComponent, LegendComponent, DataZoomComponent
+} from 'echarts/components';
+import VChart from 'vue-echarts';
+
+use([
+  CanvasRenderer,
+  LineChart, BarChart, PieChart,
+  GridComponent, TooltipComponent, LegendComponent, DataZoomComponent
+]);
 import {
   Settings, X, Key, Globe, Cpu, Eye, EyeOff, Plug, Save, Loader2,
   CheckCircle2, XCircle, Info, BarChart3, Plus, Trash2, Check, RadioTower, RotateCcw,
@@ -274,6 +306,7 @@ const testing = ref(false);
 const testResult = ref<TestConnectionResult | null>(null);
 const testError = ref('');
 const usageStats = ref<UsageStats | null>(null);
+const dailyData = ref<DailyUsage[]>([]);
 const statsLoading = ref(false);
 const statsError = ref('');
 
@@ -375,7 +408,9 @@ async function loadStats() {
   statsLoading.value = true;
   statsError.value = '';
   try {
-    usageStats.value = await getUsageStats();
+    const [s, d] = await Promise.all([getUsageStats(), getDailyUsage()]);
+    usageStats.value = s;
+    dailyData.value = d;
   } catch (error) {
     console.error('加载统计数据失败:', error);
     statsError.value = (error as Error).message || '加载失败';
@@ -383,6 +418,102 @@ async function loadStats() {
     statsLoading.value = false;
   }
 }
+
+// ECharts 图表配置
+const tokenTrendOption = computed(() => {
+  if (!dailyData.value.length) return null;
+  return {
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: any[]) => {
+        const date = params[0]?.name || '';
+        let html = `<div style="font-weight:600;margin-bottom:4px">${date}</div>`;
+        for (const p of params) {
+          html += `<div>${p.marker} ${p.seriesName}: ${(p.value as number).toLocaleString()}</div>`;
+        }
+        return html;
+      }
+    },
+    legend: { data: ['输入 Token', '输出 Token'], top: 4 },
+    grid: { left: 60, right: 20, top: 40, bottom: 60 },
+    dataZoom: [{ type: 'inside' }, { type: 'slider', height: 20, bottom: 8 }],
+    xAxis: {
+      type: 'category',
+      data: dailyData.value.map(d => d.date),
+      axisLabel: { fontSize: 11 }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: {
+        fontSize: 11,
+        formatter: (v: number) => v >= 1000 ? (v / 1000).toFixed(0) + 'k' : String(v)
+      }
+    },
+    series: [
+      {
+        name: '输入 Token',
+        type: 'line',
+        stack: 'total',
+        areaStyle: { opacity: 0.3 },
+        data: dailyData.value.map(d => d.inputTokens),
+        itemStyle: { color: '#1890ff' }
+      },
+      {
+        name: '输出 Token',
+        type: 'line',
+        stack: 'total',
+        areaStyle: { opacity: 0.3 },
+        data: dailyData.value.map(d => d.outputTokens),
+        itemStyle: { color: '#52c41a' }
+      }
+    ]
+  };
+});
+
+const requestBarOption = computed(() => {
+  if (!dailyData.value.length) return null;
+  return {
+    tooltip: { trigger: 'axis' },
+    grid: { left: 50, right: 20, top: 20, bottom: 40 },
+    xAxis: {
+      type: 'category',
+      data: dailyData.value.map(d => d.date),
+      axisLabel: { fontSize: 11 }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { fontSize: 11 }
+    },
+    series: [{
+      type: 'bar',
+      data: dailyData.value.map(d => d.requestCount),
+      itemStyle: { color: '#1890ff', borderRadius: [4, 4, 0, 0] },
+      barMaxWidth: 24
+    }]
+  };
+});
+
+const tokenPieOption = computed(() => {
+  const totalInput = usageStats.value?.totalInputTokens || 0;
+  const totalOutput = usageStats.value?.totalOutputTokens || 0;
+  if (totalInput === 0 && totalOutput === 0) return null;
+  return {
+    tooltip: {
+      formatter: (p: any) => `${p.name}: ${p.value.toLocaleString()} (${p.percent}%)`
+    },
+    legend: { bottom: 0, textStyle: { fontSize: 12 } },
+    series: [{
+      type: 'pie',
+      radius: ['35%', '58%'],
+      center: ['50%', '45%'],
+      data: [
+        { value: totalInput, name: '输入 Token', itemStyle: { color: '#1890ff' } },
+        { value: totalOutput, name: '输出 Token', itemStyle: { color: '#52c41a' } }
+      ],
+      label: { formatter: '{b}\n{d}%', fontSize: 12 }
+    }]
+  };
+});
 
 async function handleResetStats() {
   if (!confirm('确定要重置用量统计吗？对话记录不会被删除。')) {
@@ -597,7 +728,7 @@ function close() {
 .settings-body {
   flex: 1;
   padding: 20px;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .section h4 {
@@ -952,5 +1083,15 @@ button:disabled {
 
 .about-info p {
   margin: 8px 0;
+}
+
+.stats-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.stats-chart-half {
+  margin-bottom: 0;
 }
 </style>

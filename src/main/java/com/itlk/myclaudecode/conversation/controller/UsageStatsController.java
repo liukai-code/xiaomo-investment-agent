@@ -1,6 +1,7 @@
 package com.itlk.myclaudecode.conversation.controller;
 
 import com.itlk.myclaudecode.common.entity.Result;
+import com.itlk.myclaudecode.conversation.service.DailyUsageDTO;
 import com.itlk.myclaudecode.conversation.service.UsageRecordService;
 import com.itlk.myclaudecode.conversation.service.UsageStatsDTO;
 import jakarta.annotation.Resource;
@@ -9,6 +10,8 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/usage")
@@ -25,6 +28,16 @@ public class UsageStatsController {
         }
         UsageStatsDTO stats = usageRecordService.getStats(userId);
         return Result.success(stats);
+    }
+
+    @GetMapping("/daily")
+    public Result<List<DailyUsageDTO>> getDailyStats(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.error("用户未登录");
+        }
+        List<DailyUsageDTO> dailyStats = usageRecordService.getDailyStats(userId);
+        return Result.success(dailyStats);
     }
 
     @DeleteMapping("/stats")

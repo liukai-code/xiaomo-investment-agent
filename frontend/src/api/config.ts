@@ -177,6 +177,38 @@ export async function resetUsageStats(): Promise<void> {
   }
 }
 
+export interface DailyUsage {
+  date: string;
+  inputTokens: number;
+  outputTokens: number;
+  toolCalls: number;
+  requestCount: number;
+}
+
+export async function getDailyUsage(): Promise<DailyUsage[]> {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('用户未登录');
+  }
+
+  const response = await fetch('/api/usage/daily', {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('获取每日统计数据失败');
+  }
+
+  const result = await response.json();
+  if (result.code === 1) {
+    return result.data;
+  }
+  throw new Error(result.msg || '获取每日统计数据失败');
+}
+
 // ==================== 多渠道管理 ====================
 
 export async function getChannels(): Promise<ApiChannelList> {
