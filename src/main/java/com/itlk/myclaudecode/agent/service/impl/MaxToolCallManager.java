@@ -17,6 +17,7 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.DefaultToolCallingManager;
@@ -278,6 +279,10 @@ public class MaxToolCallManager implements ToolCallingManager {
                         log.info("[MaxToolCallManager] 自动注入 stockCode={}: {} → {}", targetCode, tc.arguments(), injected);
                         DebugFileLogger.logGuard("STOCK_SCOPE", tc.name(), "AUTO_INJECT | code=" + targetCode);
                         tc = new AssistantMessage.ToolCall(tc.id(), tc.type(), tc.name(), injected);
+                        toolCalls = new ArrayList<>(toolCalls);
+                        toolCalls.set(0, tc);
+                        chatResponse = rebuildChatResponse(chatResponse, assistantWithTools, toolCalls);
+                        assistantWithTools = findAssistantWithToolCalls(chatResponse);
                     }
                 }
             }
@@ -288,6 +293,10 @@ public class MaxToolCallManager implements ToolCallingManager {
                 if (!injected.equals(tc.arguments())) {
                     log.info("[MaxToolCallManager] 自动注入当前日期: {} → {}", tc.arguments(), injected);
                     tc = new AssistantMessage.ToolCall(tc.id(), tc.type(), tc.name(), injected);
+                    toolCalls = new ArrayList<>(toolCalls);
+                    toolCalls.set(0, tc);
+                    chatResponse = rebuildChatResponse(chatResponse, assistantWithTools, toolCalls);
+                    assistantWithTools = findAssistantWithToolCalls(chatResponse);
                 }
             }
 
@@ -486,6 +495,19 @@ public class MaxToolCallManager implements ToolCallingManager {
                 .filter(assistant -> assistant != null && !assistant.getToolCalls().isEmpty())
                 .findFirst()
                 .orElseGet(() -> chatResponse.getResult().getOutput());
+    }
+
+    /**
+     * 重建 ChatResponse，将修改后的 toolCalls 反映到 Generation 中。
+     */
+    private ChatResponse rebuildChatResponse(ChatResponse original, AssistantMessage oldAssistant,
+                                              List<AssistantMessage.ToolCall> newToolCalls) {
+        AssistantMessage newAssistant = new AssistantMessage(
+                oldAssistant.getText() != null ? oldAssistant.getText() : "",
+                oldAssistant.getMetadata() != null ? oldAssistant.getMetadata() : Map.of(),
+                newToolCalls);
+        Generation newGen = new Generation(newAssistant);
+        return new ChatResponse(List.of(newGen), original.getMetadata());
     }
 
     private String extractResultText(ToolExecutionResult result) {
