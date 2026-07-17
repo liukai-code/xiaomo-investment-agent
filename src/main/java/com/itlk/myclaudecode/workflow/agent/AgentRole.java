@@ -66,8 +66,7 @@ public enum AgentRole {
                     + "   - dividendHistory：分红送转历史，参数 stockCode\n"
                     + "   - marginTrading：融资融券明细，参数 stockCode, startDate, endDate\n"
                     + "5. market_data：基础行情（港股/美股/基金时使用）\n"
-                    + "- financial_calculator：金融计算，operation 可选 peRatio、pbRatio、dividendYield 等\n"
-                    + "- executeQuery：SQL查询数据库（仅在需要查询历史数据时使用）\n\n"
+                    + "- financial_calculator：金融计算，operation 可选 peRatio、pbRatio、dividendYield 等\n\n"
                     + "【工作流程】\n"
                     + "1. 调用 a_stock_quote(operation=\"tencentQuote\") 获取股价和估值数据\n"
                     + "2. 调用 a_stock_report(operation=\"stockReport\") 获取机构研报和评级\n"
@@ -91,9 +90,8 @@ public enum AgentRole {
                     + "- valuation: {pe: 数字, pb: 数字, target_price: 数字}\n"
                     + "- financial_health: \"HEALTHY\" | \"CAUTION\" | \"RISKY\"",
             List.of("a_stock_quote", "a_stock_report", "a_stock_news", "a_stock_capital",
-                    "market_data", "financial_calculator", "getDatabaseSchema", "executeQuery",
-                    "fetchWebpage", "fetchArticleContent"),
-            new RoleGuardConfig(0.8, 3, 5, 2, 2, 8)
+                    "market_data", "financial_calculator"),
+            new RoleGuardConfig(0.8, 3, 5, 2, 2, 10)
     ),
 
     NEWS_ANALYST(

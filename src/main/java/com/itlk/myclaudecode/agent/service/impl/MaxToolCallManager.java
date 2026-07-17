@@ -554,7 +554,8 @@ public class MaxToolCallManager implements ToolCallingManager {
     }
 
     private boolean isAStockTool(String toolName) {
-        return toolName.startsWith("a_stock_") || toolName.equals("market_data");
+        return toolName.startsWith("a_stock_") || toolName.equals("market_data")
+                || toolName.equals("financial_calculator");
     }
 
     private java.util.Set<String> extractStockCodesFromArgs(String args) {
