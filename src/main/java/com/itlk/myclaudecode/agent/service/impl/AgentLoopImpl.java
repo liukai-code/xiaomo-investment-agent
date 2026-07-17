@@ -1,25 +1,16 @@
 package com.itlk.myclaudecode.agent.service.impl;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itlk.myclaudecode.agent.config.ToolGuardProperties;
 import com.itlk.myclaudecode.agent.intent.IntentClassifier;
 import com.itlk.myclaudecode.agent.intent.IntentResult;
-import com.itlk.myclaudecode.agent.intent.IntentType;
 import com.itlk.myclaudecode.agent.service.AgentLoop;
 import com.itlk.myclaudecode.agent.service.ChatStreamEvent;
+import com.itlk.myclaudecode.common.config.HttpClientService;
+import com.itlk.myclaudecode.common.util.DebugFileLogger;
 import com.itlk.myclaudecode.conversation.entity.*;
 import com.itlk.myclaudecode.conversation.repository.ChatMessageRepository;
 import com.itlk.myclaudecode.conversation.service.*;
-import com.itlk.myclaudecode.user.entity.User;
-import com.itlk.myclaudecode.user.repository.UserRepository;
-import com.itlk.myclaudecode.user.config.UserConfigService;
-import com.itlk.myclaudecode.user.config.UserConfigDTO;
 import com.itlk.myclaudecode.tool.FileListTool;
-import com.itlk.myclaudecode.tool.guard.FetchSessionTracker;
-import com.itlk.myclaudecode.tool.guard.InfoGainTracker;
-import com.itlk.myclaudecode.tool.guard.RepetitionDetector;
-import com.itlk.myclaudecode.tool.guard.SearchSessionTracker;
 import com.itlk.myclaudecode.tool.FileReadTool;
 import com.itlk.myclaudecode.tool.FileWriteTool;
 import com.itlk.myclaudecode.tool.FinancialCalcRouterTool;
@@ -29,17 +20,14 @@ import com.itlk.myclaudecode.tool.WebFetchTool;
 import com.itlk.myclaudecode.tool.YangJiBaoTool;
 import com.itlk.myclaudecode.tool.GetAnalysisReportTool;
 import com.itlk.myclaudecode.tool.astock.*;
-import com.itlk.myclaudecode.common.config.HttpClientService;
-import com.itlk.myclaudecode.workflow.util.StockResolver;
+import com.itlk.myclaudecode.user.config.UserConfigDTO;
+import com.itlk.myclaudecode.user.config.UserConfigService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.metadata.Usage;
@@ -47,25 +35,21 @@ import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import com.itlk.myclaudecode.tool.config.ToolCallbackContextWrapper;
 import com.itlk.myclaudecode.tool.config.ToolConfigService;
 import com.itlk.myclaudecode.tool.config.ToolEnabledCheckWrapper;
-import com.itlk.myclaudecode.common.util.DebugFileLogger;
-import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -73,43 +57,15 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AgentLoopImpl implements AgentLoop {
 
-    private static final int MAX_CONTEXT_MESSAGES = 50;
-
-    /** 标的锁定时主动过滤的持仓工具，防止任务漂移 */
-    private static final Set<String> HOLDINGS_TOOL_NAMES = Set.of(
-            "getMyHoldings", "getMyAccountSummary"
-    );
-
     private final String systemPrompt;
     private ChatClient chatClient;
     private final ToolGuardProperties toolGuardProperties;
     private final ToolConfigService toolConfigService;
-    private final HttpClientService httpClientService;
     private final UserConfigService userConfigService;
     private final IntentClassifier intentClassifier;
     private List<ToolCallback> allWrappedCallbacks;
     /** MCP 工具名集合，意图过滤时始终保留 */
     private Set<String> mcpToolNames = Set.of();
-
-    /**
-     * 根据用户配置解析对应的 ChatClient。
-     * 用户有自定义 API Key 配置时，使用用户级 ChatModel；否则使用全局默认。
-     */
-    private ChatClient resolveChatClient(Long userId) {
-        try {
-            ChatModel userChatModel = userConfigService.getUserChatModel(userId);
-            if (userChatModel != null) {
-                log.info("[resolveChatClient] 使用用户自定义配置, userId={}", userId);
-                return ChatClient.builder(userChatModel).build();
-            }
-        } catch (Exception e) {
-            log.warn("[resolveChatClient] 创建用户级 ChatClient 失败, 回退全局配置, userId={}: {}", userId, e.getMessage());
-        }
-        return this.chatClient;
-    }
-
-    @Resource
-    private UserRepository userRepository;
 
     @Resource
     private ConversationService conversationService;
@@ -127,10 +83,36 @@ public class AgentLoopImpl implements AgentLoop {
     private MaxToolCallManager maxToolCallManager;
 
     @Resource
-    private ObjectMapper objectMapper;
+    private UsageRecordService usageRecordService;
 
     @Resource
-    private UsageRecordService usageRecordService;
+    private ToolContextBuilder toolContextBuilder;
+
+    @Resource
+    private ToolFilter toolFilter;
+
+    @Resource
+    private ContextBuilder contextBuilder;
+
+    @Resource
+    private StreamHandler streamHandler;
+
+    /**
+     * 根据用户配置解析对应的 ChatClient。
+     * 用户有自定义 API Key 配置时，使用用户级 ChatModel；否则使用全局默认。
+     */
+    private ChatClient resolveChatClient(Long userId) {
+        try {
+            ChatModel userChatModel = userConfigService.getUserChatModel(userId);
+            if (userChatModel != null) {
+                log.info("[resolveChatClient] 使用用户自定义配置, userId={}", userId);
+                return ChatClient.builder(userChatModel).build();
+            }
+        } catch (Exception e) {
+            log.warn("[resolveChatClient] 创建用户级 ChatClient 失败, 回退全局配置, userId={}: {}", userId, e.getMessage());
+        }
+        return this.chatClient;
+    }
 
     public AgentLoopImpl(ChatModel chatModel,
                          FileReadTool fileReadTool,
@@ -160,7 +142,6 @@ public class AgentLoopImpl implements AgentLoop {
         this.systemPrompt = systemPrompt;
         this.toolGuardProperties = toolGuardProperties;
         this.toolConfigService = toolConfigService;
-        this.httpClientService = httpClientService;
         this.userConfigService = userConfigService;
         this.intentClassifier = intentClassifier;
 
@@ -231,7 +212,7 @@ public class AgentLoopImpl implements AgentLoop {
 
         chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
 
-        // 意图分类（替代 resolveStockFromMessage）
+        // 意图分类
         IntentResult intentResult = intentClassifier.classify(message);
         IntentResult.ResolvedTarget target = intentResult.target();
         log.info("[Chat] 意图分类: intent={}, confidence={}, target={}",
@@ -241,68 +222,27 @@ public class AgentLoopImpl implements AgentLoop {
                 "message=\"" + message + "\" | intent=" + intentResult.intent()
                         + " | target=" + (target != null ? target.code() + "(" + target.name() + ")" : "null"));
 
-        // 如果意图分类器未启用（返回 confidence=0 且 suggestedTools=null），回退到原有逻辑
+        // 如果意图分类器未启用，回退到原有逻辑
         if (intentResult.confidence() == 0 && intentResult.suggestedTools() == null) {
-            target = toResolvedTarget(resolveStockFromMessage(message));
+            target = ContextBuilder.toResolvedTarget(contextBuilder.resolveStockFromMessage(message));
         }
 
-        List<Message> context = buildContext(conversation.getId(), userId, target, intentResult.intent());
-
+        List<Message> context = contextBuilder.buildContext(conversation.getId(), userId, target, intentResult.intent());
         Long convId = conversation.getId();
 
-        Map<String, Object> toolCtx = new HashMap<>();
-        toolCtx.put("conversationId", convId.toString());
-        toolCtx.put("userId", userId);
-        toolCtx.put(MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0));
-        toolCtx.put(MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(toolGuardProperties.infoGainWindow(), toolGuardProperties.infoGainThreshold()));
-        toolCtx.put(MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold()));
-        toolCtx.put(MaxToolCallManager.FETCH_SESSION_TRACKER_KEY, new FetchSessionTracker(toolGuardProperties.maxFetches(), toolGuardProperties.maxConsecutiveNoNewInfo()));
-        toolCtx.put(MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY, new SearchSessionTracker(toolGuardProperties.maxSearchRounds()));
-        toolCtx.put(MaxToolCallManager.MAX_FETCHES_KEY, toolGuardProperties.maxFetches());
-        toolCtx.put(MaxToolCallManager.DUPLICATE_CACHE_KEY, new LinkedHashMap<String, java.util.List<Message>>(16, 0.75f, true) {
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<String, java.util.List<Message>> eldest) {
-                return size() > 50;
-            }
-        });
-        toolCtx.put(MaxToolCallManager.NON_RETRIABLE_CACHE_KEY, new ConcurrentHashMap<String, String>());
-        toolCtx.put(MaxToolCallManager.PER_TOOL_CALL_COUNT_KEY, new ConcurrentHashMap<String, AtomicInteger>());
-        if (target != null) {
-            toolCtx.put(MaxToolCallManager.ALLOWED_STOCK_CODES_KEY, Set.of(target.code()));
-            if (target.name() != null) {
-                toolCtx.put(MaxToolCallManager.RESOLVED_STOCK_NAME_KEY, target.name());
-            }
-            log.info("[Chat] 股票范围守卫已激活: code={}, name={}", target.code(), target.name());
-        }
+        // 构建工具上下文
+        Map<String, Object> toolCtx = toolContextBuilder.build(userId, convId, target, null);
 
+        // 过滤工具
+        Set<String> intentToolWhitelist = intentResult.suggestedTools();
+        List<ToolCallback> enabledTools = toolFilter.filter(allWrappedCallbacks, mcpToolNames, intentToolWhitelist, target);
+
+        // 构建选项
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
                 .temperature(0.3)
                 .toolContext(toolCtx)
                 .build();
-
-        Set<String> enabledNames = toolConfigService.listAll().entrySet().stream()
-                .filter(Map.Entry::getValue)
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toSet());
-        Set<String> intentToolWhitelist = intentResult.suggestedTools();
-        List<ToolCallback> enabledTools = allWrappedCallbacks.stream()
-                .filter(cb -> {
-                    String name = cb.getToolDefinition().name();
-                    if (!enabledNames.contains(name)) return false;
-                    if (mcpToolNames.contains(name)) return true;
-                    if (intentToolWhitelist != null && !intentToolWhitelist.contains(name)) return false;
-                    return true;
-                })
-                .<ToolCallback>map(cb -> new ToolCallbackContextWrapper(cb))
-                .toList();
-
-        // 标的锁定时，主动移除持仓工具，防止任务漂移
-        if (target != null) {
-            enabledTools = enabledTools.stream()
-                    .filter(cb -> !HOLDINGS_TOOL_NAMES.contains(cb.getToolDefinition().name()))
-                    .toList();
-        }
 
         try {
             ChatClient activeChatClient = resolveChatClient(userId);
@@ -314,7 +254,7 @@ public class AgentLoopImpl implements AgentLoop {
                     .chatResponse();
 
             String response = chatResponse.getResult().getOutput().getText();
-            String sanitized = sanitizeOutput(response);
+            String sanitized = streamHandler.sanitizeOutput(response);
             chatMessageService.saveMessage(conversation, MessageRole.ASSISTANT, sanitized, null, null);
 
             // Record token usage
@@ -353,7 +293,7 @@ public class AgentLoopImpl implements AgentLoop {
 
         chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
 
-        // 意图分类（替代 resolveStockFromMessage）
+        // 意图分类
         IntentResult intentResult = intentClassifier.classify(message);
         IntentResult.ResolvedTarget target = intentResult.target();
         log.info("[ChatStream] 意图分类: intent={}, confidence={}, target={}",
@@ -363,165 +303,34 @@ public class AgentLoopImpl implements AgentLoop {
                 "message=\"" + message + "\" | intent=" + intentResult.intent()
                         + " | target=" + (target != null ? target.code() + "(" + target.name() + ")" : "null"));
 
-        // 如果意图分类器未启用（返回 confidence=0 且 suggestedTools=null），回退到原有逻辑
+        // 如果意图分类器未启用，回退到原有逻辑
         if (intentResult.confidence() == 0 && intentResult.suggestedTools() == null) {
-            target = toResolvedTarget(resolveStockFromMessage(message));
+            target = ContextBuilder.toResolvedTarget(contextBuilder.resolveStockFromMessage(message));
         }
 
-        List<Message> context = buildContext(conversation.getId(), userId, target, intentResult.intent());
+        List<Message> context = contextBuilder.buildContext(conversation.getId(), userId, target, intentResult.intent());
         Long convId = conversation.getId();
 
-        StringBuilder accumulated = new StringBuilder();
-
-        // 创建状态事件 Sink，用于工具调用状态推送
+        // 创建状态事件 Sink
         Sinks.Many<ChatStreamEvent> statusSink = Sinks.many().multicast().onBackpressureBuffer();
 
-        Map<String, Object> streamToolCtx = new HashMap<>();
-        streamToolCtx.put("conversationId", convId.toString());
-        streamToolCtx.put("userId", userId);
-        streamToolCtx.put(MaxToolCallManager.TOOL_CALL_COUNTER_KEY, new AtomicInteger(0));
-        streamToolCtx.put(MaxToolCallManager.INFO_GAIN_TRACKER_KEY, new InfoGainTracker(toolGuardProperties.infoGainWindow(), toolGuardProperties.infoGainThreshold()));
-        streamToolCtx.put(MaxToolCallManager.REPETITION_DETECTOR_KEY, new RepetitionDetector(toolGuardProperties.repetitionThreshold()));
-        streamToolCtx.put(MaxToolCallManager.FETCH_SESSION_TRACKER_KEY, new FetchSessionTracker(toolGuardProperties.maxFetches(), toolGuardProperties.maxConsecutiveNoNewInfo()));
-        streamToolCtx.put(MaxToolCallManager.SEARCH_SESSION_TRACKER_KEY, new SearchSessionTracker(toolGuardProperties.maxSearchRounds()));
-        streamToolCtx.put(MaxToolCallManager.MAX_FETCHES_KEY, toolGuardProperties.maxFetches());
-        streamToolCtx.put(MaxToolCallManager.DUPLICATE_CACHE_KEY, new LinkedHashMap<String, java.util.List<Message>>(16, 0.75f, true) {
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<String, java.util.List<Message>> eldest) {
-                return size() > 50;
-            }
-        });
-        streamToolCtx.put(MaxToolCallManager.NON_RETRIABLE_CACHE_KEY, new ConcurrentHashMap<String, String>());
-        streamToolCtx.put(MaxToolCallManager.PER_TOOL_CALL_COUNT_KEY, new ConcurrentHashMap<String, AtomicInteger>());
-        streamToolCtx.put(MaxToolCallManager.STATUS_SINK_KEY, statusSink);
-        if (target != null) {
-            streamToolCtx.put(MaxToolCallManager.ALLOWED_STOCK_CODES_KEY, Set.of(target.code()));
-            if (target.name() != null) {
-                streamToolCtx.put(MaxToolCallManager.RESOLVED_STOCK_NAME_KEY, target.name());
-            }
-            log.info("[ChatStream] 股票范围守卫已激活: code={}, name={}", target.code(), target.name());
-        }
+        // 构建工具上下文
+        Map<String, Object> toolCtx = toolContextBuilder.build(userId, convId, target, statusSink);
 
+        // 过滤工具
+        Set<String> intentToolWhitelist = intentResult.suggestedTools();
+        List<ToolCallback> enabledTools = toolFilter.filter(allWrappedCallbacks, mcpToolNames, intentToolWhitelist, target);
+
+        // 构建选项
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
                 .temperature(0.3)
-                .toolContext(streamToolCtx)
+                .toolContext(toolCtx)
                 .build();
 
-        Set<String> enabledNames = toolConfigService.listAll().entrySet().stream()
-                .filter(Map.Entry::getValue)
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toSet());
-        Set<String> intentToolWhitelist = intentResult.suggestedTools();
-        List<ToolCallback> enabledTools = allWrappedCallbacks.stream()
-                .filter(cb -> {
-                    String name = cb.getToolDefinition().name();
-                    if (!enabledNames.contains(name)) return false;
-                    if (mcpToolNames.contains(name)) return true;
-                    if (intentToolWhitelist != null && !intentToolWhitelist.contains(name)) return false;
-                    return true;
-                })
-                .<ToolCallback>map(cb -> new ToolCallbackContextWrapper(cb))
-                .toList();
-
-        // 标的锁定时，主动移除持仓工具，防止任务漂移
-        if (target != null) {
-            enabledTools = enabledTools.stream()
-                    .filter(cb -> !HOLDINGS_TOOL_NAMES.contains(cb.getToolDefinition().name()))
-                    .toList();
-        }
-
-        // 初始 THINKING 事件
-        Flux<ServerSentEvent<String>> thinkingEvent = Flux.just(
-                ServerSentEvent.<String>builder()
-                        .event("status")
-                        .data(toJson(ChatStreamEvent.thinking()))
-                        .build()
-        );
-
-        // 状态事件流（来自 MaxToolCallManager 的工具调用状态）
-        Flux<ServerSentEvent<String>> statusEvents = statusSink.asFlux()
-                .map(event -> ServerSentEvent.<String>builder()
-                        .event("status")
-                        .data(toJson(event))
-                        .build());
-
-        // Usage tracking accumulators
-        final Long[] lastInputTokens = {null};
-        final Long[] lastOutputTokens = {null};
-
-        // 文本内容流 + done 事件
+        // 委托给 StreamHandler 组装 SSE 流
         ChatClient activeChatClient = resolveChatClient(userId);
-        Flux<ServerSentEvent<String>> contentWithDone = activeChatClient.prompt()
-                .messages(context.toArray(new Message[0]))
-                .toolCallbacks(enabledTools.toArray(new ToolCallback[0]))
-                .options(options)
-                .stream()
-                .chatResponse()
-                .map(response -> {
-                    if (response.getResult() != null && response.getResult().getOutput() != null) {
-                        String text = response.getResult().getOutput().getText();
-                        if (text != null) {
-                            accumulated.append(text);
-                        }
-                    }
-                    // Capture usage from each response (last one wins)
-                    if (response.getMetadata() != null && response.getMetadata().getUsage() != null) {
-                        Usage usage = response.getMetadata().getUsage();
-                        if (usage.getPromptTokens() != null && usage.getPromptTokens() > 0) {
-                            lastInputTokens[0] = usage.getPromptTokens().longValue();
-                        }
-                        if (usage.getCompletionTokens() != null && usage.getCompletionTokens() > 0) {
-                            lastOutputTokens[0] = usage.getCompletionTokens().longValue();
-                        }
-                        log.debug("[ChatStream] chunk usage: input={}, output={}", usage.getPromptTokens(), usage.getCompletionTokens());
-                    }
-                    return ServerSentEvent.<String>builder()
-                            .event("content")
-                            .data(sanitizeOutput(accumulated.toString()))
-                            .build();
-                })
-                // 内容流结束后关闭状态 sink 并发射 done 事件
-                .doOnComplete(() -> statusSink.tryEmitComplete())
-                .concatWith(Flux.just(
-                        ServerSentEvent.<String>builder()
-                                .event("done")
-                                .data(String.valueOf(convId))
-                                .build()
-                ));
-
-        // 合并：thinking → (状态事件 ∥ 内容流+done) → 完成
-        return Flux.concat(thinkingEvent, Flux.merge(statusEvents, contentWithDone))
-                .doOnComplete(() -> {
-                    String fullResponse = sanitizeOutput(accumulated.toString());
-                    chatMessageService.saveAssistantMessage(userId, convId, fullResponse);
-                    // Record token usage
-                    try {
-                        AtomicInteger toolCounter = (AtomicInteger) streamToolCtx.get(MaxToolCallManager.TOOL_CALL_COUNTER_KEY);
-                        int toolCalls = toolCounter != null ? toolCounter.get() : 0;
-                        // Spring AI streaming doesn't aggregate input_tokens from Anthropic, estimate from context
-                        Long inputTokens = lastInputTokens[0] != null ? lastInputTokens[0] : UsageRecordService.estimateInputTokens(context);
-                        usageRecordService.record(userId, convId, inputTokens, lastOutputTokens[0], toolCalls);
-                        log.info("[ChatStream] usage recorded: input={}, output={}, tools={}", inputTokens, lastOutputTokens[0], toolCalls);
-                    } catch (Exception e) {
-                        log.warn("记录流式token用量失败: {}", e.getMessage());
-                    }
-                })
-                .timeout(Duration.ofSeconds(300))
-                .onErrorResume(e -> {
-                    statusSink.tryEmitError(e);
-                    String errorMsg = "服务端响应超时，请重试";
-                    log.error("流式请求异常: {}", e.getMessage());
-                    String partial = sanitizeOutput(accumulated.toString());
-                    if (!partial.isEmpty()) {
-                        chatMessageService.saveAssistantMessage(userId, convId, partial);
-                    }
-                    return Flux.just(ServerSentEvent.<String>builder()
-                            .event("content")
-                            .data("\n\n[" + errorMsg + "]")
-                            .build());
-                })
-                .doFinally(signal -> {});
+        return streamHandler.buildStream(activeChatClient, context, enabledTools, options, convId, userId, toolCtx, statusSink);
     }
 
     @Override
@@ -547,7 +356,7 @@ public class AgentLoopImpl implements AgentLoop {
             if (msg.getRole() == MessageRole.USER) {
                 prompt.append("用户：").append(msg.getContent()).append("\n");
             } else if (msg.getRole() == MessageRole.ASSISTANT) {
-                String cleanContent = stripXmlTags(msg.getContent());
+                String cleanContent = contextBuilder.stripXmlTags(msg.getContent());
                 if (!cleanContent.isEmpty()) {
                     prompt.append("助手：")
                           .append(cleanContent, 0, Math.min(100, cleanContent.length()))
@@ -567,7 +376,7 @@ public class AgentLoopImpl implements AgentLoop {
                 .call()
                 .content();
 
-        String title = stripXmlTags(rawTitle);
+        String title = contextBuilder.stripXmlTags(rawTitle);
         if (title.length() > 15) {
             title = title.substring(0, 15);
         }
@@ -597,188 +406,4 @@ public class AgentLoopImpl implements AgentLoop {
         }
         return conversationService.createConversation(userId, "新对话");
     }
-
-    private record ResolvedTarget(String code, String name) {}
-
-    /** 将内部 ResolvedTarget 转换为 IntentResult.ResolvedTarget */
-    private static IntentResult.ResolvedTarget toResolvedTarget(ResolvedTarget t) {
-        return t == null ? null : new IntentResult.ResolvedTarget(t.code(), t.name());
-    }
-
-    /**
-     * 原有的标的解析逻辑，作为 IntentClassifier 禁用时的 fallback。
-     */
-    private ResolvedTarget resolveStockFromMessage(String message) {
-        DebugFileLogger.logResolveStock("START", message, "-");
-        if (message == null || message.isBlank()) return null;
-
-        // 1. 快速路径：6位数字代码
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\b(\\d{6})\\b").matcher(message);
-        if (m.find()) {
-            log.info("[ChatStream] 从消息中提取到数字代码: {}", m.group(1));
-            DebugFileLogger.logResolveStock("CODE_EXTRACT", message, m.group(1));
-            return new ResolvedTarget(m.group(1), null);
-        }
-
-        // 2. 意图检测：含分析类关键词才尝试解析
-        String[] kws = {"深入分析", "深度分析", "全面分析", "详细分析", "深度研究", "深度调研",
-                "深度剖析", "深入研究", "全面研究", "详细研究", "个股分析", "个股研究",
-                "帮我分析", "帮我看看", "帮我研究", "分析一下", "研究一下",
-                "分析", "研究", "调研", "估值", "行情", "股价", "怎么样", "如何",
-                "值得入手吗", "值得买吗", "可以买吗", "可以入手吗", "能买吗",
-                "值得投资吗", "值得持有吗", "现在能买吗", "现在可以买吗", "目前怎么样",
-                "可以买", "看好", "看好吗", "有前途吗", "前景如何", "还能涨吗", "还能买吗",
-                "研报", "现在", "目前"};
-        boolean match = false;
-        for (String kw : kws) {
-            if (message.contains(kw)) { match = true; break; }
-        }
-        if (!match) {
-            DebugFileLogger.logResolveStock("NO_INTENT_KEYWORD", message, "null");
-            return null;
-        }
-
-        // 2.5 板块/行业级查询检测：包含板块关键词时，不触发标的守卫
-        String[] sectorKeywords = {"板块", "行业", "概念", "赛道", "题材", "领域"};
-        for (String sk : sectorKeywords) {
-            if (message.contains(sk)) {
-                log.info("[ChatStream] 检测到板块/行业关键词「{}」，跳过标的守卫", sk);
-                DebugFileLogger.logResolveStock("SECTOR_QUERY", message, "null");
-                return null;
-            }
-        }
-
-        // 3. 剥离意图关键词，避免 StockResolver 把"分析"当作股票名称
-        String cleaned = message;
-        for (String kw : kws) {
-            cleaned = cleaned.replace(kw, "");
-        }
-        cleaned = cleaned.replaceAll("[，。？！、\\s]+", "").trim();
-        if (cleaned.isEmpty()) {
-            DebugFileLogger.logResolveStock("CLEANED_EMPTY", message, "null");
-            return null;
-        }
-
-        log.info("[ChatStream] 关键词剥离后: \"{}\" → \"{}\"", message, cleaned);
-        DebugFileLogger.logResolveStock("KEYWORD_STRIPPED", message, cleaned);
-
-        // 4. 复用 StockResolver 解析股票名称
-        try {
-            var r = StockResolver.resolve(cleaned, httpClientService);
-            log.info("[ChatStream] 标的解析成功: {}({})", r.name(), r.code());
-            DebugFileLogger.logResolveStock("RESOLVED", cleaned, r.code() + "(" + r.name() + ")");
-            return new ResolvedTarget(r.code(), r.name());
-        } catch (IllegalArgumentException e) {
-            log.warn("[ChatStream] 标的解析失败: {}", e.getMessage());
-            DebugFileLogger.logResolveStock("RESOLVE_FAILED", cleaned, e.getMessage());
-            return null;
-        }
-    }
-
-    private List<Message> buildContext(Long conversationId, Long userId, IntentResult.ResolvedTarget target, IntentType intent) {
-        List<Message> context = new ArrayList<>();
-
-        String enrichedPrompt = systemPrompt;
-        User user = userRepository.findById(userId).orElse(null);
-        if (user != null) {
-            enrichedPrompt += "\n\n[用户信息]\n当前用户：" + user.getAccountId() + "（邮箱: " + user.getEmail() + "）";
-        }
-        enrichedPrompt += "\n\n[当前时间]\n" + java.time.LocalDateTime.now()
-                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm:ss EEEE"));
-
-        if (target != null) {
-            String stockLabel = target.name() != null
-                    ? target.name() + "（" + target.code() + "）"
-                    : target.code();
-            DebugFileLogger.logBuildContext("TARGET_LOCKED", stockLabel);
-            enrichedPrompt += "\n\n[当前分析标的]\n"
-                    + "标的已锁定为：" + stockLabel + "\n"
-                    + "⚠️ 你必须严格遵守以下约束：\n"
-                    + "1. 当前用户请求分析的标的是 " + stockLabel + "，所有工具调用和数据获取必须围绕该标的\n"
-                    + "2. 禁止分析、引用、对比任何其他标的\n"
-                    + "3. 如果工具返回包含其他股票的数据，必须忽略，只关注 " + stockLabel + " 的数据\n"
-                    + "4. 输出报告的标题、数据、结论必须与 " + stockLabel + " 完全一致\n"
-                    + "5. 禁止出现用户问A你分析B的情况\n"
-                    + "6. 分析范围仅限该标的本身（行情、基本面、技术面、新闻、估值），禁止生成投资组合建议、资产配置方案、多标的推荐列表\n"
-                    + "7. 用户问的是单个标的，回答也必须是单个标的的分析，不要扩展到投资组合层面";
-        } else {
-            DebugFileLogger.logBuildContext("NO_TARGET", "标的解析失败或未触发，未设置标的锁");
-        }
-
-        // 意图提示：在 system prompt 中追加任务类型约束
-        if (intent != null) {
-            enrichedPrompt += switch (intent) {
-                case MARKET_NEWS -> "\n\n[当前任务类型]\n用户请求的是市场新闻资讯分析，"
-                        + "请使用新闻搜索工具获取最新资讯，然后基于资讯内容回答用户。"
-                        + "如果用户提到了某个具体标的的新闻，可以查询该标的的个股新闻，"
-                        + "但不要展开成完整的个股分析报告。";
-                case SECTOR_ANALYSIS -> "\n\n[当前任务类型]\n用户请求的是板块/行业层面的分析，"
-                        + "请使用行业排名、行业研报、概念板块等工具获取板块数据。"
-                        + "不需要锁定个股标的，分析整个板块/行业的趋势和机会。";
-                case TRADING_SENTIMENT -> "\n\n[当前任务类型]\n用户请求的是打板/情绪面分析，"
-                        + "请使用涨停池、龙虎榜、情绪速算等工具获取市场情绪数据。";
-                case HOLDINGS_QUERY -> "\n\n[当前任务类型]\n用户请求查询自己的持仓信息，"
-                        + "请使用持仓查询工具获取数据。";
-                case FINANCIAL_CALC -> "\n\n[当前任务类型]\n用户请求金融计算，"
-                        + "请使用金融计算器工具完成计算。";
-                default -> "";
-            };
-        }
-
-        context.add(new SystemMessage(enrichedPrompt));
-
-        List<ChatMessage> recentMessages = cacheService.getCachedRecentMessages(conversationId, MAX_CONTEXT_MESSAGES);
-        if (recentMessages == null) {
-            recentMessages = chatMessageRepository
-                    .findRecentByConversationId(conversationId, MAX_CONTEXT_MESSAGES);
-            Collections.reverse(recentMessages);
-            cacheService.cacheRecentMessages(conversationId, MAX_CONTEXT_MESSAGES, recentMessages);
-        }
-
-        for (ChatMessage msg : recentMessages) {
-            switch (msg.getRole()) {
-                case USER -> context.add(new UserMessage(msg.getContent()));
-                case ASSISTANT -> context.add(new AssistantMessage(msg.getContent()));
-            }
-        }
-
-        // 标的锁定期：在上下文末尾追加强提醒，防止模型在多轮工具调用后"忘记"分析目标
-        if (target != null) {
-            String stockLabel = target.name() != null
-                    ? target.name() + "（" + target.code() + "）"
-                    : target.code();
-            context.add(new UserMessage(
-                    "⚠️ 重要提醒：你当前正在分析的标的是 " + stockLabel + "。"
-                    + "请基于以上工具返回的数据生成分析报告，报告标题和所有内容必须严格对应 " + stockLabel + "。"
-                    + "禁止出现任何其他股票的名称或代码。如果之前的对话中提到了其他标的，必须完全忽略。"
-                    + "分析范围仅限该标的本身，禁止生成投资组合建议、资产配置方案或多标的推荐。"));
-        }
-
-        return context;
-    }
-
-    private String stripXmlTags(String text) {
-        if (text == null) return "";
-        return text.replaceAll("<[^>]+>", "").replaceAll("\\s+", " ").trim();
-    }
-
-    private static String sanitizeOutput(String text) {
-        if (text == null) return "";
-        return text
-                .replaceAll("\\n*\\[GUARD:[\\s\\S]*?\\[/GUARD]\\n*", "")
-                .replaceAll("\\n*\\[GUARD_SIGNAL\\][\\s\\S]*?\\[/GUARD_SIGNAL\\]\\n*", "")
-                // 过滤 AI 模型以文本形式输出的工具调用 JSON
-                .replaceAll("(?m)^\\s*\\{\"name\"\\s*:\\s*\"[^\"]+\"\\s*,\\s*\"arguments\"\\s*:\\s*\\{[\\s\\S]*?\\}\\s*\\}\\s*$", "")
-                .trim();
-    }
-
-    private String toJson(ChatStreamEvent event) {
-        try {
-            return objectMapper.writeValueAsString(event);
-        } catch (JsonProcessingException e) {
-            log.warn("序列化 ChatStreamEvent 失败: {}", e.getMessage());
-            return "{}";
-        }
-    }
-
 }

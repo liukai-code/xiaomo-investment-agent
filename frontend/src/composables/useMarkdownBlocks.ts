@@ -184,6 +184,11 @@ export function parseBlocks(text: string): MarkdownBlock[] {
 
     // === NORMAL STATE ===
 
+    // Skip XML-style tool call lines (<function=...>, <parameter=...>, </function>)
+    if (/^\s*<\/?function/.test(line) || /^\s*<parameter=/.test(line)) {
+      continue
+    }
+
     // Empty line
     if (line.trim() === '') {
       flushParagraph(true)
