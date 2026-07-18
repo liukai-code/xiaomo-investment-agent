@@ -95,15 +95,17 @@ vi .env
 
 ```env
 DB_USER=postgres
-DB_PASSWORD=你的数据库密码（改成强密码）
-DB_NAME=myclaudecode
-REDIS_PASSWORD=你的Redis密码（改成强密码）
+DB_PASSWORD=你的PostgreSQL密码
+DB_NAME=postgres          # 服务器上已有的数据库名，默认 postgres
+REDIS_PASSWORD=           # 服务器上Redis若无密码则留空
 ANTHROPIC_API_KEY=你的API密钥
 ANTHROPIC_BASE_URL=https://api.anthropic.com
 DASHSCOPE_MCP_URL=
 CONFIG_ENCRYPTION_KEY=
 ADMIN_PASSWORD=你的管理员密码
 ```
+
+> 数据库和 Redis 使用服务器上已有的容器（postgres16 / redis7），不需要再创建新的。
 
 ### 3.3 构建并启动
 
@@ -123,7 +125,7 @@ docker compose logs -f app
 docker compose ps
 ```
 
-三个容器均显示 `Up` 状态即可。验证应用响应：
+确认 app 容器显示 `Up` 状态。验证应用响应：
 
 ```bash
 curl -s http://127.0.0.1:4545 | head -5
@@ -265,11 +267,11 @@ docker compose up -d --build
 ### 数据库备份
 
 ```bash
-# 备份
-docker compose exec postgres pg_dump -U postgres myclaudecode > backup_$(date +%Y%m%d).sql
+# 备份（使用服务器上已有的 postgres16 容器）
+docker exec postgres16 pg_dump -U postgres postgres > backup_$(date +%Y%m%d).sql
 
 # 恢复
-cat backup_20260718.sql | docker compose exec -T postgres psql -U postgres myclaudecode
+cat backup_20260718.sql | docker exec -i postgres16 psql -U postgres postgres
 ```
 
 ### Nginx 相关
@@ -292,11 +294,13 @@ docker stats --no-stream
 
 ### 数据库连接超时
 
+检查服务器上已有的 PostgreSQL 容器是否运行：
+
 ```bash
-docker compose logs postgres
+docker ps | grep postgres
 ```
 
-确保 `.env` 中 `DB_PASSWORD` 与 `POSTGRES_PASSWORD` 一致。
+确认 `.env` 中 `DB_PASSWORD` 与已有 PostgreSQL 容器的密码一致。
 
 ### 前端页面空白
 

@@ -145,7 +145,7 @@ function getStatusLabel(status: StatusEvent): string {
 
 const currentTitle = computed(() => {
   const conv = chatStore.getCurrentConversation()
-  return conv ? conv.title : 'Financial Agent'
+  return conv ? conv.title : 'Investment Agent'
 })
 
 function formatTime(ts: string) {
@@ -416,11 +416,11 @@ watch(() => yjbStore.cardVisible, (visible) => {
     <div class="sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-header">
         <div class="sidebar-header-top">
-          <div class="sidebar-brand">
+          <div class="sidebar-brand" @click="router.push('/portal')">
             <img src="/logo.png" alt="Logo" class="logo-img" />
             <div class="logo-text">
               <div class="logo-title">小墨</div>
-              <div class="logo-sub">Financial Agent</div>
+              <div class="logo-sub">Investment Agent</div>
             </div>
           </div>
           <button class="sidebar-collapse-btn" @click="toggleSidebar" title="折叠侧边栏">
@@ -882,5 +882,9 @@ watch(() => yjbStore.cardVisible, (visible) => {
 
 .logout-confirming .footer-label {
   font-weight: 600;
+}
+
+.sidebar-brand {
+  cursor: pointer;
 }
 </style>
