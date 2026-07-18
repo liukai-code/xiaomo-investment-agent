@@ -55,7 +55,7 @@ server:
 webfetch:
   proxy:
     host: ${WEBFETCH_PROXY_HOST:}
-    port: ${WEBFETCH_PROXY_PORT:}
+    port: ${WEBFETCH_PROXY_PORT:0}
 
 # SQL Tool 配置
 sql-tool:
