@@ -1,5 +1,5 @@
 import { Marked } from 'marked'
-import DOMPurify from 'dompurify'
+import DOMPurify, { type Config as DOMPurifyConfig } from 'dompurify'
 import katex from 'katex'
 
 const inlineMarked = new Marked()
@@ -12,7 +12,7 @@ function preprocessEmphasis(text: string): string {
   return text.replace(boldRe, '<strong>$1</strong>').replace(italicRe, '<em>$1</em>')
 }
 
-const purifyConfig: DOMPurify.Config = {
+const purifyConfig: DOMPurifyConfig = {
   ADD_TAGS: ['math', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'mfrac', 'msqrt', 'annotation'],
   ADD_ATTR: ['mathvariant', 'xmlns'],
 }

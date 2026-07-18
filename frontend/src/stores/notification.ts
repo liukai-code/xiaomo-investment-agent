@@ -29,7 +29,7 @@ export const useNotificationStore = defineStore('notification', () => {
       if (res.code === 1) {
         notifications.value = res.data
       } else {
-        error.value = res.msg || '加载失败'
+        error.value = '加载失败'
       }
     } catch (e: any) {
       error.value = e?.message || '网络错误'
