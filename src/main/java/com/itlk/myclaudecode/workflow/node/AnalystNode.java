@@ -175,6 +175,17 @@ public class AnalystNode implements WorkflowNode {
                             state.getCachedData().put(roleName + "_structured", json));
                     // 再剥离 JSON，只保留自然语言部分
                     String cleanReport = sanitizeOutput(rawReport);
+                    // 空报告兜底：如果工具调用过但 LLM 未生成报告文本
+                    if (cleanReport.isEmpty()) {
+                        AtomicInteger toolCounter = (AtomicInteger) toolCtx.get(MaxToolCallManager.TOOL_CALL_COUNTER_KEY);
+                        int toolCalls = toolCounter != null ? toolCounter.get() : 0;
+                        if (toolCalls > 0) {
+                            cleanReport = "【" + roleName + " 数据采集完成】\n"
+                                    + "已执行 " + toolCalls + " 次工具调用获取标的数据，"
+                                    + "但未能生成分析文本。请基于后续环节的数据进行分析。";
+                            log.warn("[{}] 工具调用 {} 次但报告为空，使用兜底文本", roleName, toolCalls);
+                        }
+                    }
                     state.getAnalystReports().put(roleName,
                             new AgentReport(roleName, cleanReport, Instant.now()));
                     state.getCachedData().put(roleName + "_opinion", cleanReport);
