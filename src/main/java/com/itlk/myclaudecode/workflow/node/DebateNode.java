@@ -93,6 +93,7 @@ public class DebateNode implements WorkflowNode {
                     try {
                         long inputTokens = UsageRecordService.estimateInputTokensFromText(prompt + systemPrompt);
                         usageRecordService.record(state.getUserId(), state.getConversationId(), inputTokens, null, 0);
+                        state.getTotalEstimatedTokens().addAndGet(inputTokens);
                     } catch (Exception e) {
                         log.warn("[{}] 记录用量失败: {}", roleName, e.getMessage());
                     }

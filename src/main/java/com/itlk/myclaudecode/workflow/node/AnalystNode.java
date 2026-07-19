@@ -197,6 +197,7 @@ public class AnalystNode implements WorkflowNode {
                         int toolCalls = toolCounter != null ? toolCounter.get() : 0;
                         long inputTokens = UsageRecordService.estimateInputTokensFromText(userPrompt + enrichedSystemPrompt);
                         usageRecordService.record(state.getUserId(), state.getConversationId(), inputTokens, null, toolCalls);
+                        state.getTotalEstimatedTokens().addAndGet(inputTokens);
                     } catch (Exception e) {
                         log.warn("[{}] 记录用量失败: {}", roleName, e.getMessage());
                     }

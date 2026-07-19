@@ -42,6 +42,9 @@ public class WorkflowState {
     private List<DebateMessage> riskDebate = new CopyOnWriteArrayList<>();
     private FinalDecision finalDecision;
 
+    // 免费额度扣减用：累计估算 token 消耗
+    private final java.util.concurrent.atomic.AtomicLong totalEstimatedTokens = new java.util.concurrent.atomic.AtomicLong(0);
+
     // 引擎内部
     private volatile String currentPhase;
     private Instant startTime = Instant.now();
