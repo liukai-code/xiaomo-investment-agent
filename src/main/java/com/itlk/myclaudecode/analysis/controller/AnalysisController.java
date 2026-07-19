@@ -7,7 +7,6 @@ import com.itlk.myclaudecode.workflow.event.WorkflowEvent;
 import com.itlk.myclaudecode.workflow.persist.WorkflowAnalysis;
 import com.itlk.myclaudecode.workflow.state.FinalDecision;
 import com.itlk.myclaudecode.workflow.service.DeepAnalysisWorkflow;
-import com.itlk.myclaudecode.workflow.util.StockCodeExtractor;
 import com.itlk.myclaudecode.workflow.util.StockResolver;
 import com.itlk.myclaudecode.common.config.HttpClientService;
 import jakarta.annotation.Resource;
@@ -56,15 +55,15 @@ public class AnalysisController {
         }
 
         // 解析标的
-        var stockCodes = StockCodeExtractor.extract(query);
-        String stockCode = stockCodes.isEmpty() ? null : stockCodes.iterator().next();
-        String stockName = null;
+        String stockCode;
+        String stockName;
         try {
             var resolved = StockResolver.resolve(query, httpClientService);
             stockCode = resolved.code();
             stockName = resolved.name();
         } catch (Exception e) {
-            log.warn("标的名称解析失败，仅使用代码: {}", e.getMessage());
+            log.warn("标的解析失败: {}", e.getMessage());
+            return Result.error("标的解析失败: " + e.getMessage());
         }
 
         // 创建分析记录

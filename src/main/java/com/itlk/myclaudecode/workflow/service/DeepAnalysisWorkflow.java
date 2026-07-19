@@ -14,7 +14,6 @@ import com.itlk.myclaudecode.workflow.node.*;
 import com.itlk.myclaudecode.workflow.persist.WorkflowAnalysis;
 import com.itlk.myclaudecode.workflow.persist.WorkflowAnalysisRepository;
 import com.itlk.myclaudecode.workflow.state.WorkflowState;
-import com.itlk.myclaudecode.workflow.util.StockCodeExtractor;
 import com.itlk.myclaudecode.workflow.util.StockResolver;
 import com.itlk.myclaudecode.common.config.HttpClientService;
 import com.itlk.myclaudecode.user.config.UserConfigDTO;
@@ -155,39 +154,16 @@ public class DeepAnalysisWorkflow {
         state.setOriginalQuery(query);
         state.setUseFreeQuota(!hasOwnApiKey);
 
-        // 提取股票代码用于范围守卫
-        var stockCodes = StockCodeExtractor.extract(query);
-        if (!stockCodes.isEmpty()) {
-            // 数字代码直接锁定
-            String code = stockCodes.iterator().next();
-            state.setResolvedStockCode(code);
-            state.setAllowedStockCodes(stockCodes);
-            log.info("从查询中提取到数字代码: {}", code);
-        } else {
-            // 无数字代码，走名称解析器
-            try {
-                var resolved = StockResolver.resolve(query, httpClientService);
-                state.setResolvedStockCode(resolved.code());
-                state.setResolvedStockName(resolved.name());
-                state.setAllowedStockCodes(java.util.Set.of(resolved.code()));
-                log.info("标的解析成功: {}({})", resolved.name(), resolved.code());
-            } catch (IllegalArgumentException e) {
-                log.warn("标的解析失败: {}", e.getMessage());
-                return Flux.just(WorkflowEvent.error("标的解析失败: " + e.getMessage()));
-            }
-        }
-
-        // 补充解析股票名称（数字代码路径 StockResolver 未被调用）
-        if (state.getResolvedStockName() == null && state.getResolvedStockCode() != null) {
-            try {
-                var resolved = StockResolver.resolve(state.getResolvedStockCode(), httpClientService);
-                if (resolved.name() != null) {
-                    state.setResolvedStockName(resolved.name());
-                    log.info("补充解析股票名称: {} -> {}", state.getResolvedStockCode(), resolved.name());
-                }
-            } catch (Exception e) {
-                log.warn("补充解析股票名称失败: {}", e.getMessage());
-            }
+        // 解析标的（统一走 StockResolver 验证）
+        try {
+            var resolved = StockResolver.resolve(query, httpClientService);
+            state.setResolvedStockCode(resolved.code());
+            state.setResolvedStockName(resolved.name());
+            state.setAllowedStockCodes(java.util.Set.of(resolved.code()));
+            log.info("标的解析成功: {}({})", resolved.name(), resolved.code());
+        } catch (IllegalArgumentException e) {
+            log.warn("标的解析失败: {}", e.getMessage());
+            return Flux.just(WorkflowEvent.error("标的解析失败: " + e.getMessage()));
         }
 
         // 解析用户级 ChatModel（Per-User API Key 路由）
@@ -299,40 +275,19 @@ public class DeepAnalysisWorkflow {
         state.setOriginalQuery(query);
         state.setUseFreeQuota(!hasOwnApiKey);
 
-        // 提取股票代码用于范围守卫
-        var stockCodes = StockCodeExtractor.extract(query);
-        if (!stockCodes.isEmpty()) {
-            String code = stockCodes.iterator().next();
-            state.setResolvedStockCode(code);
-            state.setAllowedStockCodes(stockCodes);
-            log.info("从查询中提取到数字代码: {}", code);
-        } else {
-            try {
-                var resolved = StockResolver.resolve(query, httpClientService);
-                state.setResolvedStockCode(resolved.code());
-                state.setResolvedStockName(resolved.name());
-                state.setAllowedStockCodes(java.util.Set.of(resolved.code()));
-                log.info("标的解析成功: {}({})", resolved.name(), resolved.code());
-            } catch (IllegalArgumentException e) {
-                log.warn("标的解析失败: {}", e.getMessage());
-                sink.tryEmitNext(WorkflowEvent.error("标的解析失败: " + e.getMessage()));
-                sink.tryEmitComplete();
-                removeEventSink(analysisId);
-                return;
-            }
-        }
-
-        // 补充解析股票名称（数字代码路径 StockResolver 未被调用）
-        if (state.getResolvedStockName() == null && state.getResolvedStockCode() != null) {
-            try {
-                var resolved = StockResolver.resolve(state.getResolvedStockCode(), httpClientService);
-                if (resolved.name() != null) {
-                    state.setResolvedStockName(resolved.name());
-                    log.info("补充解析股票名称: {} -> {}", state.getResolvedStockCode(), resolved.name());
-                }
-            } catch (Exception e) {
-                log.warn("补充解析股票名称失败: {}", e.getMessage());
-            }
+        // 解析标的（统一走 StockResolver 验证）
+        try {
+            var resolved = StockResolver.resolve(query, httpClientService);
+            state.setResolvedStockCode(resolved.code());
+            state.setResolvedStockName(resolved.name());
+            state.setAllowedStockCodes(java.util.Set.of(resolved.code()));
+            log.info("标的解析成功: {}({})", resolved.name(), resolved.code());
+        } catch (IllegalArgumentException e) {
+            log.warn("标的解析失败: {}", e.getMessage());
+            sink.tryEmitNext(WorkflowEvent.error("标的解析失败: " + e.getMessage()));
+            sink.tryEmitComplete();
+            removeEventSink(analysisId);
+            return;
         }
 
         // 解析用户级 ChatModel（Per-User API Key 路由）

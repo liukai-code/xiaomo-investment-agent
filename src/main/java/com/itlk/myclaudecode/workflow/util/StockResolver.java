@@ -74,7 +74,7 @@ public class StockResolver {
             } catch (Exception e) {
                 log.warn("[StockResolver] 代码反查名称失败: {}", e.getMessage());
             }
-            return new ResolvedStock(code, null);
+            throw new IllegalArgumentException("未找到代码「" + code + "」对应的A股股票，请确认代码是否正确");
         }
 
         // 2. 提取中文名称关键词

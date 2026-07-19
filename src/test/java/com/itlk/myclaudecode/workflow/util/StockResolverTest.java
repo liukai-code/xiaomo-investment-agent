@@ -183,5 +183,17 @@ class StockResolverTest {
                     () -> StockResolver.resolve("不存在的股票名xyz", httpClientService),
                     "无法解析的输入应抛出异常");
         }
+
+        @Test
+        @DisplayName("不存在的6位代码 → 抛出 IllegalArgumentException")
+        void invalidNumericCode() throws Exception {
+            // 东财返回空结果，说明该代码不是有效股票
+            when(httpClientService.get(anyString(), any(Headers.class)))
+                    .thenReturn("{\"QuotationCodeTable\":{\"Data\":[]}}");
+
+            assertThrows(IllegalArgumentException.class,
+                    () -> StockResolver.resolve("118118", httpClientService),
+                    "不存在的6位代码应抛出异常");
+        }
     }
 }

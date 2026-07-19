@@ -71,8 +71,14 @@ export const useAnalysisStore = defineStore('analysis', () => {
   }
 
   async function handleStartAnalysis(query: string) {
+    let result
+    try {
+      result = await apiStartAnalysis(query)
+    } catch (e: any) {
+      alert(e.message || '发起分析失败')
+      return
+    }
     const authStore = useAuthStore()
-    const result = await apiStartAnalysis(query)
 
     // 立即在列表中添加一条 RUNNING 记录
     const newRecord: AnalysisRecord = {
