@@ -105,6 +105,14 @@ public class DeepAnalysisWorkflow {
         com.itlk.myclaudecode.workflow.state.WorkflowState state = runningStates.get(analysisId);
         if (state != null) {
             state.signalCancel();
+            // 取消时也要扣减已消耗的免费额度
+            if (state.isUseFreeQuota()) {
+                long consumed = state.getTotalEstimatedTokens().get();
+                if (consumed > 0) {
+                    freeQuotaService.deduct(state.getUserId(), consumed);
+                    log.info("[DeepAnalysis] 取消时扣减免费额度: userId={}, consumed={}", state.getUserId(), consumed);
+                }
+            }
         }
 
         // dispose 正在运行的 Flux 订阅
@@ -145,6 +153,7 @@ public class DeepAnalysisWorkflow {
         state.setUserId(userId);
         state.setConversationId(conversationId);
         state.setOriginalQuery(query);
+        state.setUseFreeQuota(!hasOwnApiKey);
 
         // 提取股票代码用于范围守卫
         var stockCodes = StockCodeExtractor.extract(query);
@@ -288,6 +297,7 @@ public class DeepAnalysisWorkflow {
         state.setUserId(userId);
         state.setAnalysisId(analysisId);
         state.setOriginalQuery(query);
+        state.setUseFreeQuota(!hasOwnApiKey);
 
         // 提取股票代码用于范围守卫
         var stockCodes = StockCodeExtractor.extract(query);
