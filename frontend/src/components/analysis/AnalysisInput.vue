@@ -27,7 +27,7 @@ function handleSubmit() {
       <input
         v-model="inputValue"
         type="text"
-        placeholder="输入股票名称或代码，如：中国平安、000001"
+        placeholder="输入股票名称或代码，如：平安银行、000001"
         :disabled="isRunning"
         @keydown.enter="handleSubmit"
       />
