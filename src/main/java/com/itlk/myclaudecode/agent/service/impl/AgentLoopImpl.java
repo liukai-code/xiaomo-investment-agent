@@ -97,6 +97,9 @@ public class AgentLoopImpl implements AgentLoop {
     @Resource
     private StreamHandler streamHandler;
 
+    @Resource
+    private com.itlk.myclaudecode.user.service.FreeQuotaService freeQuotaService;
+
     /**
      * 根据用户配置解析对应的 ChatClient。
      * 用户有自定义 API Key 配置时，使用用户级 ChatModel；否则使用全局默认。
@@ -201,10 +204,17 @@ public class AgentLoopImpl implements AgentLoop {
     @Override
     @Transactional
     public String chat(Long userId, Long conversationId, String message) {
-        // 检查用户配置
+        log.info("[Chat] 收到请求: userId={}, conversationId={}", userId, conversationId);
+        // 检查用户配置：有自有 API Key 则直接放行，否则检查免费额度
         UserConfigDTO userConfig = userConfigService.getConfig(userId);
-        if (userConfig == null || userConfig.getApiKey() == null || userConfig.getApiKey().isEmpty()) {
-            return "请先配置API Key才能使用AI对话功能";
+        boolean hasOwnApiKey = userConfig != null && userConfig.getApiKey() != null && !userConfig.getApiKey().isEmpty();
+        if (!hasOwnApiKey) {
+            long remaining = freeQuotaService.getRemainingQuota(userId);
+            log.info("[Chat] 免费额度检查: userId={}, remaining={}, hasOwnApiKey={}", userId, remaining, hasOwnApiKey);
+            if (remaining <= 0) {
+                log.warn("[Chat] 免费额度不足, userId={}", userId);
+                return "免费体验额度已用完，请在设置中配置自己的 API Key 继续使用";
+            }
         }
 
         Conversation conversation = getOrCreateConversation(userId, conversationId);
@@ -265,7 +275,12 @@ public class AgentLoopImpl implements AgentLoop {
                 Long inputTokens = usage != null && usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : UsageRecordService.estimateInputTokens(context);
                 Long outputTokens = usage != null && usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : null;
                 usageRecordService.record(userId, conversation.getId(), inputTokens, outputTokens, toolCalls);
-                log.info("[Chat] usage recorded: input={}, output={}, tools={}", inputTokens, outputTokens, toolCalls);
+                log.info("[Chat] usage recorded: input={}, output={}, tools={}, hasOwnApiKey={}", inputTokens, outputTokens, toolCalls, hasOwnApiKey);
+                // 免费额度扣减
+                if (!hasOwnApiKey) {
+                    long consumed = (inputTokens != null ? inputTokens : 0L) + (outputTokens != null ? outputTokens : 0L);
+                    freeQuotaService.deduct(userId, consumed);
+                }
             } catch (Exception e) {
                 log.warn("记录token用量失败: {}", e.getMessage());
             }
@@ -279,13 +294,20 @@ public class AgentLoopImpl implements AgentLoop {
     @Override
     @Transactional
     public Flux<ServerSentEvent<String>> chatStream(Long userId, Long conversationId, String message) {
-        // 检查用户配置
+        log.info("[ChatStream] 收到请求: userId={}, conversationId={}", userId, conversationId);
+        // 检查用户配置：有自有 API Key 则直接放行，否则检查免费额度
         UserConfigDTO userConfig = userConfigService.getConfig(userId);
-        if (userConfig == null || userConfig.getApiKey() == null || userConfig.getApiKey().isEmpty()) {
-            return Flux.just(ServerSentEvent.<String>builder()
-                    .event("content")
-                    .data("请先配置API Key才能使用AI对话功能")
-                    .build());
+        boolean hasOwnApiKey = userConfig != null && userConfig.getApiKey() != null && !userConfig.getApiKey().isEmpty();
+        if (!hasOwnApiKey) {
+            long remaining = freeQuotaService.getRemainingQuota(userId);
+            log.info("[ChatStream] 免费额度检查: userId={}, remaining={}, hasOwnApiKey={}", userId, remaining, hasOwnApiKey);
+            if (remaining <= 0) {
+                log.warn("[ChatStream] 免费额度不足, userId={}, remaining={}", userId, remaining);
+                return Flux.just(ServerSentEvent.<String>builder()
+                        .event("content")
+                        .data("免费体验额度已用完，请在设置中配置自己的 API Key 继续使用")
+                        .build());
+            }
         }
 
         Conversation conversation = getOrCreateConversation(userId, conversationId);
@@ -330,7 +352,8 @@ public class AgentLoopImpl implements AgentLoop {
 
         // 委托给 StreamHandler 组装 SSE 流
         ChatClient activeChatClient = resolveChatClient(userId);
-        return streamHandler.buildStream(activeChatClient, context, enabledTools, options, convId, userId, toolCtx, statusSink);
+        boolean useFreeQuota = !hasOwnApiKey;
+        return streamHandler.buildStream(activeChatClient, context, enabledTools, options, convId, userId, toolCtx, statusSink, useFreeQuota);
     }
 
     @Override

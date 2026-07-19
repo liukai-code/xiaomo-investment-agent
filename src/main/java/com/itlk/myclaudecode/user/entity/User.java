@@ -25,6 +25,12 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    @Column(name = "free_token_quota")
+    private Long freeTokenQuota = 0L;
+
+    @Column(name = "free_token_used")
+    private Long freeTokenUsed = 0L;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

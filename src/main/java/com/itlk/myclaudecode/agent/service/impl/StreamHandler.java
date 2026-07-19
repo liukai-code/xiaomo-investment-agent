@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itlk.myclaudecode.agent.service.ChatStreamEvent;
 import com.itlk.myclaudecode.conversation.service.ChatMessageService;
 import com.itlk.myclaudecode.conversation.service.UsageRecordService;
+import com.itlk.myclaudecode.user.service.FreeQuotaService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -38,13 +39,17 @@ public class StreamHandler {
     @Resource
     private UsageRecordService usageRecordService;
 
+    @Resource
+    private FreeQuotaService freeQuotaService;
+
     public Flux<ServerSentEvent<String>> buildStream(ChatClient chatClient,
                                                       List<Message> context,
                                                       List<ToolCallback> enabledTools,
                                                       ChatOptions options,
                                                       Long convId, Long userId,
                                                       Map<String, Object> toolCtx,
-                                                      Sinks.Many<ChatStreamEvent> statusSink) {
+                                                      Sinks.Many<ChatStreamEvent> statusSink,
+                                                      boolean useFreeQuota) {
         StringBuilder accumulated = new StringBuilder();
 
         // 初始 THINKING 事件
@@ -116,7 +121,12 @@ public class StreamHandler {
                         int toolCalls = toolCounter != null ? toolCounter.get() : 0;
                         Long inputTokens = lastInputTokens[0] != null ? lastInputTokens[0] : UsageRecordService.estimateInputTokens(context);
                         usageRecordService.record(userId, convId, inputTokens, lastOutputTokens[0], toolCalls);
-                        log.info("[ChatStream] usage recorded: input={}, output={}, tools={}", inputTokens, lastOutputTokens[0], toolCalls);
+                        log.info("[ChatStream] usage recorded: input={}, output={}, tools={}, useFreeQuota={}", inputTokens, lastOutputTokens[0], toolCalls, useFreeQuota);
+                        // 免费额度扣减
+                        if (useFreeQuota) {
+                            long consumed = (inputTokens != null ? inputTokens : 0L) + (lastOutputTokens[0] != null ? lastOutputTokens[0] : 0L);
+                            freeQuotaService.deduct(userId, consumed);
+                        }
                     } catch (Exception e) {
                         log.warn("记录流式token用量失败: {}", e.getMessage());
                     }

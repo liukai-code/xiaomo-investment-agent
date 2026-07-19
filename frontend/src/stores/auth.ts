@@ -9,6 +9,8 @@ export const useAuthStore = defineStore('auth', () => {
   const userId = ref(Number(localStorage.getItem('userId')) || 0)
   const email = ref(localStorage.getItem('email') || '')
   const accountId = ref(localStorage.getItem('accountId') || '')
+  const freeTokenQuota = ref(Number(localStorage.getItem('freeTokenQuota')) || 0)
+  const freeTokenUsed = ref(Number(localStorage.getItem('freeTokenUsed')) || 0)
   const isAuthenticated = ref(false)
   const loading = ref(false)
 
@@ -29,12 +31,16 @@ export const useAuthStore = defineStore('auth', () => {
     userId.value = 0
     email.value = ''
     accountId.value = ''
+    freeTokenQuota.value = 0
+    freeTokenUsed.value = 0
     isAuthenticated.value = false
     localStorage.removeItem('token')
     localStorage.removeItem('userId')
     localStorage.removeItem('email')
     localStorage.removeItem('accountId')
     localStorage.removeItem('username')
+    localStorage.removeItem('freeTokenQuota')
+    localStorage.removeItem('freeTokenUsed')
   }
 
   async function login(uemail: string, password: string) {
@@ -43,6 +49,8 @@ export const useAuthStore = defineStore('auth', () => {
       const res = await apiLogin(uemail, password)
       if (res.code === 1) {
         setAuth(res.data.token, res.data.userId, res.data.email, res.data.accountId)
+        // 登录后立即获取免费额度信息
+        await checkAuth()
         return { success: true }
       }
       return { success: false, msg: res.msg || '登录失败' }
@@ -87,6 +95,13 @@ export const useAuthStore = defineStore('auth', () => {
       const res = await getMe()
       if (res.code === 1) {
         isAuthenticated.value = true
+        // 同步免费额度信息
+        if (res.data.freeTokenQuota !== undefined) {
+          freeTokenQuota.value = res.data.freeTokenQuota
+          freeTokenUsed.value = res.data.freeTokenUsed || 0
+          localStorage.setItem('freeTokenQuota', String(res.data.freeTokenQuota))
+          localStorage.setItem('freeTokenUsed', String(res.data.freeTokenUsed || 0))
+        }
         return true
       }
       clearAuth()
@@ -97,5 +112,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, userId, email, accountId, isAuthenticated, loading, login, register, logout, checkAuth, clearAuth }
+  return { token, userId, email, accountId, freeTokenQuota, freeTokenUsed, isAuthenticated, loading, login, register, logout, checkAuth, clearAuth }
 })

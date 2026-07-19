@@ -1,14 +1,17 @@
 package com.itlk.myclaudecode.auth.controller;
 
+import com.itlk.myclaudecode.auth.event.UserRegisteredEvent;
 import com.itlk.myclaudecode.auth.service.TokenManager;
 import com.itlk.myclaudecode.common.entity.Result;
 import com.itlk.myclaudecode.user.entity.User;
 import com.itlk.myclaudecode.user.repository.UserRepository;
 import com.itlk.myclaudecode.user.service.AccountIdGenerator;
 import jakarta.annotation.Resource;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -23,6 +26,9 @@ public class AuthController {
 
     @Resource
     private AccountIdGenerator accountIdGenerator;
+
+    @Resource
+    private ApplicationEventPublisher eventPublisher;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -48,7 +54,12 @@ public class AuthController {
         user.setEmail(email.trim());
         user.setAccountId(accountIdGenerator.generate());
         user.setPassword(passwordEncoder.encode(password));
+        user.setFreeTokenQuota(100_000L);
+        user.setFreeTokenUsed(0L);
         userRepository.save(user);
+
+        // 异步发送注册欢迎通知
+        eventPublisher.publishEvent(new UserRegisteredEvent(user.getId()));
 
         return Result.success(Map.of("id", user.getId(), "email", user.getEmail(), "accountId", user.getAccountId()));
     }
@@ -104,7 +115,13 @@ public class AuthController {
         if (user == null) {
             return Result.error("用户不存在");
         }
-        return Result.success(Map.of("id", user.getId(), "email", user.getEmail(), "accountId", user.getAccountId()));
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", user.getId());
+        data.put("email", user.getEmail());
+        data.put("accountId", user.getAccountId());
+        data.put("freeTokenQuota", user.getFreeTokenQuota() != null ? user.getFreeTokenQuota() : 0L);
+        data.put("freeTokenUsed", user.getFreeTokenUsed() != null ? user.getFreeTokenUsed() : 0L);
+        return Result.success(data);
     }
 
     private boolean isValidEmail(String email) {

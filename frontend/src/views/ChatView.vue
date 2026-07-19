@@ -282,14 +282,20 @@ async function handleSend() {
   const text = inputText.value.trim()
   if (!text || chatStore.isGenerating) return
 
-  // 检查用户配置
+  // 检查用户配置：有自有 API Key 则放行，否则检查免费额度
   try {
     const { getConfig } = await import('@/api/config')
     const config = await getConfig()
     if (!config || !config.apiKey) {
-      alert('请先配置API Key才能使用AI对话功能')
-      showSettings.value = true
-      return
+      if (authStore.freeTokenQuota > 0 && authStore.freeTokenUsed < authStore.freeTokenQuota) {
+        // 有免费额度，允许发送
+      } else {
+        alert(authStore.freeTokenUsed >= authStore.freeTokenQuota
+          ? '免费体验额度已用完，请在设置中配置 API Key 继续使用'
+          : '请先配置API Key才能使用AI对话功能')
+        showSettings.value = true
+        return
+      }
     }
   } catch (error) {
     console.error('检查配置失败:', error)
@@ -347,6 +353,8 @@ async function handleSend() {
       scrollToBottom()
       chatStore.loadConversations()
       chatStore.generateTitle(convId)
+      // 刷新免费额度
+      authStore.checkAuth()
     },
     onError(err: Error) {
       cancelRaf()

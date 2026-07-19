@@ -19,6 +19,8 @@ interface MeResponse {
     id: number
     email: string
     accountId: string
+    freeTokenQuota: number
+    freeTokenUsed: number
   }
 }
 

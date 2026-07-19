@@ -172,6 +172,25 @@
             </div>
 
             <div v-else-if="usageStats" class="stats-container">
+              <!-- 免费额度卡片 -->
+              <div v-if="authStore.freeTokenQuota > 0" class="stats-group">
+                <h5><Gift :size="14" /> 免费体验额度</h5>
+                <div class="stats-grid">
+                  <div class="stat-card free-quota-card">
+                    <div class="stat-value">{{ remainingFreeTokens.toLocaleString() }}</div>
+                    <div class="stat-label">剩余 Token</div>
+                  </div>
+                  <div class="stat-card free-quota-card">
+                    <div class="stat-value">{{ authStore.freeTokenUsed.toLocaleString() }}</div>
+                    <div class="stat-label">已使用</div>
+                  </div>
+                </div>
+                <div class="quota-progress">
+                  <div class="quota-bar" :style="{ width: freeQuotaPercent + '%' }"></div>
+                </div>
+                <p class="section-desc" style="margin-top: 8px;">额度用完后请在「API 配置」中添加自己的 API Key</p>
+              </div>
+
               <div class="stats-group">
                 <h5>Token 用量</h5>
                 <div class="stats-grid">
@@ -287,8 +306,14 @@ use([
 ]);
 import {
   Settings, X, Key, Globe, Cpu, Eye, EyeOff, Plug, Save, Loader2,
-  CheckCircle2, XCircle, Info, BarChart3, Plus, Trash2, Check, RadioTower, RotateCcw,
+  CheckCircle2, XCircle, Info, BarChart3, Plus, Trash2, Check, RadioTower, RotateCcw, Gift,
 } from 'lucide-vue-next';
+import { useAuthStore } from '../stores/auth';
+
+const authStore = useAuthStore();
+
+const remainingFreeTokens = computed(() => Math.max(0, authStore.freeTokenQuota - authStore.freeTokenUsed));
+const freeQuotaPercent = computed(() => authStore.freeTokenQuota > 0 ? Math.min(100, (authStore.freeTokenUsed / authStore.freeTokenQuota) * 100) : 0);
 
 const props = defineProps<{
   visible: boolean;
@@ -342,6 +367,10 @@ const channelForm = reactive({
 watch(() => props.visible, async (newVal) => {
   if (newVal) {
     await loadChannels();
+    // 如果当前在用量统计 tab，自动刷新数据
+    if (activeMenu.value === 'stats') {
+      await loadStats();
+    }
   }
 });
 
@@ -1076,6 +1105,30 @@ button:disabled {
 .stat-label {
   font-size: 12px;
   color: #999;
+}
+
+.free-quota-card {
+  background: linear-gradient(135deg, #f6ffed 0%, #e6f7ff 100%);
+  border-color: #b7eb8f;
+}
+
+.free-quota-card .stat-value {
+  color: #52c41a;
+}
+
+.quota-progress {
+  height: 8px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+.quota-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #52c41a 0%, #faad14 70%, #ff4d4f 100%);
+  border-radius: 4px;
+  transition: width 0.3s ease;
 }
 
 .about-info {
