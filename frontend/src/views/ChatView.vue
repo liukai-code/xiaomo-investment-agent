@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted, computed, watch, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
@@ -146,6 +146,15 @@ function getStatusLabel(status: StatusEvent): string {
 const currentTitle = computed(() => {
   const conv = chatStore.getCurrentConversation()
   return conv ? conv.title : 'Investment Agent'
+})
+
+watchEffect(() => {
+  const title = currentTitle.value
+  if (title) {
+    document.title = `${title} - 小墨投资助手`
+  } else {
+    document.title = '小墨投资助手'
+  }
 })
 
 function formatTime(ts: string) {
