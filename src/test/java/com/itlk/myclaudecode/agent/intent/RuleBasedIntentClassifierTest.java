@@ -175,7 +175,8 @@ class RuleBasedIntentClassifierTest {
                 "帮我算一下收益率",
                 "复利计算",
                 "贷款月供多少",
-                "NPV计算"
+                "NPV计算",
+                "帮我计算房贷，原价234万，首付60万，等额本息，20年还款，年利率3.5，一共要付多少钱"
         })
         void 金融计算应分类为FINANCIAL_CALC(String msg) {
             IntentResult result = classifier.classify(msg);

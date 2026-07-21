@@ -28,13 +28,26 @@ export function renderMath(tex: string, display: boolean): string {
 export function renderInline(text: string): string {
   if (!text) return ''
 
-  // Extract inline math $...$ (not $$)
+  // Extract inline math: $...$ (not $$) or \(...\)
   const parts: string[] = []
   let remaining = text
-  const mathRe = /(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/
+  const dollarRe = /(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/
+  const parenRe = /\\\((.+?)\\\)/
 
   while (remaining.length > 0) {
-    const match = remaining.match(mathRe)
+    const dollarMatch = remaining.match(dollarRe)
+    const parenMatch = remaining.match(parenRe)
+
+    // Pick the earliest match
+    let match: RegExpMatchArray | null = null
+    if (dollarMatch && dollarMatch.index !== undefined && parenMatch && parenMatch.index !== undefined) {
+      match = dollarMatch.index <= parenMatch.index ? dollarMatch : parenMatch
+    } else if (dollarMatch && dollarMatch.index !== undefined) {
+      match = dollarMatch
+    } else if (parenMatch && parenMatch.index !== undefined) {
+      match = parenMatch
+    }
+
     if (!match || match.index === undefined) {
       parts.push(inlineMarked.parseInline(preprocessEmphasis(remaining)) as string)
       break

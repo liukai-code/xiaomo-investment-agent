@@ -38,6 +38,7 @@ export function parseBlocks(text: string): MarkdownBlock[] {
 
   // table accumulation
   let mathLines: string[] = []
+  let mathDelimiter: '$$' | '\\[' = '$$'
   let tableHeader: string[] = []
   let tableAlignments: ('left' | 'center' | 'right')[] = []
   let tableRows: string[][] = []
@@ -165,7 +166,10 @@ export function parseBlocks(text: string): MarkdownBlock[] {
 
     // === IN MATH STATE ===
     if (state === 'IN_MATH') {
-      if (/^\$\$\s*$/.test(line)) {
+      const isClosing = mathDelimiter === '$$'
+        ? /^\$\$\s*$/.test(line)
+        : /^\\\]\s*$/.test(line)
+      if (isClosing) {
         const tex = mathLines.join('\n')
         blocks.push({
           type: 'math',
@@ -256,6 +260,7 @@ export function parseBlocks(text: string): MarkdownBlock[] {
       flushList(true)
       flushTable(true)
       mathLines = []
+      mathDelimiter = '$$'
       state = 'IN_MATH'
       continue
     }
@@ -272,6 +277,34 @@ export function parseBlocks(text: string): MarkdownBlock[] {
         display: true,
         closed: true,
         key: blockKey('math', inlineMathMatch[1]),
+      })
+      continue
+    }
+
+    // Display math \[...\]
+    if (/^\\\[\s*$/.test(line)) {
+      flushParagraph(true)
+      flushBlockquote(true)
+      flushList(true)
+      flushTable(true)
+      mathLines = []
+      mathDelimiter = '\\['
+      state = 'IN_MATH'
+      continue
+    }
+    // Single-line display math \[...\]
+    const latexDisplayMatch = line.match(/^\\\[(.+)\\\]\s*$/)
+    if (latexDisplayMatch) {
+      flushParagraph(true)
+      flushBlockquote(true)
+      flushList(true)
+      flushTable(true)
+      blocks.push({
+        type: 'math',
+        tex: latexDisplayMatch[1],
+        display: true,
+        closed: true,
+        key: blockKey('math', latexDisplayMatch[1]),
       })
       continue
     }

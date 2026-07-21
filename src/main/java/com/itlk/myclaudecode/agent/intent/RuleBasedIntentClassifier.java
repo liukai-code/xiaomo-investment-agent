@@ -76,6 +76,12 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
                     IntentToolGroupMap.getTools(IntentType.SECTOR_ANALYSIS));
         }
 
+        if (isFinancialCalc(trimmed)) {
+            log.info("[IntentClassifier] FINANCIAL_CALC: {}", trimmed);
+            return new IntentResult(IntentType.FINANCIAL_CALC, 0.9, null,
+                    IntentToolGroupMap.getTools(IntentType.FINANCIAL_CALC));
+        }
+
         if (isMarketNews(trimmed)) {
             log.info("[IntentClassifier] MARKET_NEWS: {}", trimmed);
             return new IntentResult(IntentType.MARKET_NEWS, 0.85, null,
@@ -86,12 +92,6 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
             log.info("[IntentClassifier] TRADING_SENTIMENT: {}", trimmed);
             return new IntentResult(IntentType.TRADING_SENTIMENT, 0.9, null,
                     IntentToolGroupMap.getTools(IntentType.TRADING_SENTIMENT));
-        }
-
-        if (isFinancialCalc(trimmed)) {
-            log.info("[IntentClassifier] FINANCIAL_CALC: {}", trimmed);
-            return new IntentResult(IntentType.FINANCIAL_CALC, 0.9, null,
-                    IntentToolGroupMap.getTools(IntentType.FINANCIAL_CALC));
         }
 
         if (isDbQuery(trimmed)) {
