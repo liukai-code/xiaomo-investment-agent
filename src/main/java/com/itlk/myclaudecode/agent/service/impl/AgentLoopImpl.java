@@ -24,6 +24,8 @@ import com.itlk.myclaudecode.tool.GetAnalysisReportTool;
 import com.itlk.myclaudecode.tool.astock.*;
 import com.itlk.myclaudecode.user.config.UserConfigDTO;
 import com.itlk.myclaudecode.user.config.UserConfigService;
+import com.itlk.myclaudecode.user.entity.User;
+import com.itlk.myclaudecode.user.repository.UserRepository;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
@@ -101,6 +103,9 @@ public class AgentLoopImpl implements AgentLoop {
 
     @Resource
     private com.itlk.myclaudecode.user.service.FreeQuotaService freeQuotaService;
+
+    @Resource
+    private UserRepository userRepository;
 
     @Resource
     private MemoryService memoryService;
@@ -252,7 +257,13 @@ public class AgentLoopImpl implements AgentLoop {
             target = ContextBuilder.toResolvedTarget(contextBuilder.resolveStockFromMessage(message));
         }
 
-        List<Message> context = contextBuilder.buildContext(conversation.getId(), userId, target, intentResult.intent());
+        // 读取用户偏好
+        User user = userRepository.findById(userId).orElse(null);
+        double temperature = user != null && user.getTemperature() != null ? user.getTemperature() : 0.7;
+        int maxTokens = user != null && user.getMaxTokens() != null ? user.getMaxTokens() : 4096;
+        int contextWindow = user != null && user.getContextWindow() != null ? user.getContextWindow() : 50;
+
+        List<Message> context = contextBuilder.buildContext(conversation.getId(), userId, target, intentResult.intent(), contextWindow);
         Long convId = conversation.getId();
 
         // 构建工具上下文
@@ -265,7 +276,8 @@ public class AgentLoopImpl implements AgentLoop {
         // 构建选项
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
-                .temperature(0.3)
+                .temperature(temperature)
+                .maxTokens(maxTokens)
                 .toolContext(toolCtx)
                 .build();
 
@@ -355,7 +367,13 @@ public class AgentLoopImpl implements AgentLoop {
             target = ContextBuilder.toResolvedTarget(contextBuilder.resolveStockFromMessage(message));
         }
 
-        List<Message> context = contextBuilder.buildContext(conversation.getId(), userId, target, intentResult.intent());
+        // 读取用户偏好
+        User user = userRepository.findById(userId).orElse(null);
+        double temperature = user != null && user.getTemperature() != null ? user.getTemperature() : 0.7;
+        int maxTokens = user != null && user.getMaxTokens() != null ? user.getMaxTokens() : 4096;
+        int contextWindow = user != null && user.getContextWindow() != null ? user.getContextWindow() : 50;
+
+        List<Message> context = contextBuilder.buildContext(conversation.getId(), userId, target, intentResult.intent(), contextWindow);
         Long convId = conversation.getId();
 
         // 创建状态事件 Sink
@@ -371,7 +389,8 @@ public class AgentLoopImpl implements AgentLoop {
         // 构建选项
         AnthropicChatOptions options = AnthropicChatOptions.builder()
                 .thinking(AnthropicApi.ThinkingType.DISABLED, null)
-                .temperature(0.3)
+                .temperature(temperature)
+                .maxTokens(maxTokens)
                 .toolContext(toolCtx)
                 .build();
 

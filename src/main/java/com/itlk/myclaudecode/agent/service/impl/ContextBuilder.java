@@ -34,7 +34,7 @@ import java.util.List;
 @Slf4j
 public class ContextBuilder {
 
-    private static final int MAX_CONTEXT_MESSAGES = 50;
+    private static final int DEFAULT_CONTEXT_MESSAGES = 50;
 
     @Value("${system-default-prompt}")
     private String systemPrompt;
@@ -62,7 +62,8 @@ public class ContextBuilder {
     }
 
     public List<Message> buildContext(Long conversationId, Long userId,
-                                      IntentResult.ResolvedTarget target, IntentType intent) {
+                                      IntentResult.ResolvedTarget target, IntentType intent,
+                                      int contextWindow) {
         List<Message> context = new ArrayList<>();
 
         String enrichedPrompt = systemPrompt;
@@ -121,12 +122,12 @@ public class ContextBuilder {
 
         context.add(new SystemMessage(enrichedPrompt));
 
-        List<ChatMessage> recentMessages = cacheService.getCachedRecentMessages(conversationId, MAX_CONTEXT_MESSAGES);
+        List<ChatMessage> recentMessages = cacheService.getCachedRecentMessages(conversationId, contextWindow);
         if (recentMessages == null) {
             recentMessages = chatMessageRepository
-                    .findRecentByConversationId(conversationId, MAX_CONTEXT_MESSAGES);
+                    .findRecentByConversationId(conversationId, contextWindow);
             Collections.reverse(recentMessages);
-            cacheService.cacheRecentMessages(conversationId, MAX_CONTEXT_MESSAGES, recentMessages);
+            cacheService.cacheRecentMessages(conversationId, contextWindow, recentMessages);
         }
 
         for (ChatMessage msg : recentMessages) {

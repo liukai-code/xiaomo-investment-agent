@@ -408,4 +408,112 @@ class AuthControllerTest {
             assertTrue(result.getMsg().contains("不存在"));
         }
     }
+
+    // ========== preferences 对话偏好 ==========
+
+    @Nested
+    @DisplayName("preferences 对话偏好")
+    class PreferencesTest {
+
+        @Test
+        @DisplayName("获取偏好 → 返回默认值")
+        void getDefaults() {
+            User user = new User();
+            user.setId(1L);
+            user.setTemperature(0.7);
+            user.setMaxTokens(4096);
+            user.setContextWindow(50);
+
+            when(tokenManager.getUserId("valid-token")).thenReturn(1L);
+            when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+            Result<?> result = authController.getPreferences("Bearer valid-token");
+            assertEquals(1, result.getCode(), "获取偏好应成功");
+            Map<?, ?> data = (Map<?, ?>) result.getData();
+            assertEquals(0.7, data.get("temperature"));
+            assertEquals(4096, data.get("maxTokens"));
+            assertEquals(50, data.get("contextWindow"));
+        }
+
+        @Test
+        @DisplayName("获取偏好 - 未登录 → 返回错误")
+        void getNotLoggedIn() {
+            Result<?> result = authController.getPreferences(null);
+            assertEquals(0, result.getCode());
+        }
+
+        @Test
+        @DisplayName("更新偏好 → 返回成功")
+        void updateSuccess() {
+            User user = new User();
+            user.setId(1L);
+            user.setTemperature(0.7);
+            user.setMaxTokens(4096);
+            user.setContextWindow(50);
+
+            when(tokenManager.getUserId("valid-token")).thenReturn(1L);
+            when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+            when(userRepository.save(any(User.class))).thenReturn(user);
+
+            Result<?> result = authController.updatePreferences("Bearer valid-token", Map.of(
+                    "temperature", 0.3,
+                    "maxTokens", 2048,
+                    "contextWindow", 20
+            ));
+            assertEquals(1, result.getCode(), "更新偏好应成功");
+            verify(userRepository).save(any(User.class));
+        }
+
+        @Test
+        @DisplayName("更新偏好 - temperature 超出范围 → 返回错误")
+        void updateInvalidTemperature() {
+            User user = new User();
+            user.setId(1L);
+            when(tokenManager.getUserId("valid-token")).thenReturn(1L);
+            when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+            Result<?> result = authController.updatePreferences("Bearer valid-token", Map.of(
+                    "temperature", 1.5
+            ));
+            assertEquals(0, result.getCode(), "超出范围应失败");
+            assertTrue(result.getMsg().contains("temperature"));
+        }
+
+        @Test
+        @DisplayName("更新偏好 - maxTokens 超出范围 → 返回错误")
+        void updateInvalidMaxTokens() {
+            User user = new User();
+            user.setId(1L);
+            when(tokenManager.getUserId("valid-token")).thenReturn(1L);
+            when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+            Result<?> result = authController.updatePreferences("Bearer valid-token", Map.of(
+                    "maxTokens", 50
+            ));
+            assertEquals(0, result.getCode(), "超出范围应失败");
+            assertTrue(result.getMsg().contains("maxTokens"));
+        }
+
+        @Test
+        @DisplayName("更新偏好 - contextWindow 超出范围 → 返回错误")
+        void updateInvalidContextWindow() {
+            User user = new User();
+            user.setId(1L);
+            when(tokenManager.getUserId("valid-token")).thenReturn(1L);
+            when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+            Result<?> result = authController.updatePreferences("Bearer valid-token", Map.of(
+                    "contextWindow", 200
+            ));
+            assertEquals(0, result.getCode(), "超出范围应失败");
+            assertTrue(result.getMsg().contains("contextWindow"));
+        }
+
+        @Test
+        @DisplayName("更新偏好 - 未登录 → 返回错误")
+        void updateNotLoggedIn() {
+            Result<?> result = authController.updatePreferences(null, Map.of("temperature", 0.5));
+            assertEquals(0, result.getCode());
+        }
+    }
 }

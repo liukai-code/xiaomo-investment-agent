@@ -253,6 +253,85 @@
             </div>
           </div>
 
+          <!-- 对话偏好 -->
+          <div v-if="activeMenu === 'preferences'" class="section">
+            <h4><Sliders :size="16" /> 对话偏好</h4>
+            <p class="section-desc">调整 AI 对话的参数，影响回复风格和上下文长度</p>
+
+            <div class="pref-group">
+              <div class="pref-header">
+                <label>Temperature（创造性）</label>
+                <span class="pref-value">{{ (prefs.temperature ?? 0.7).toFixed(1) }}</span>
+              </div>
+              <input
+                type="range"
+                v-model.number="prefs.temperature"
+                min="0" max="1" step="0.1"
+                class="pref-slider"
+              />
+              <div class="pref-range-labels">
+                <span>精确确定</span>
+                <span>平衡</span>
+                <span>创意发散</span>
+              </div>
+              <p class="pref-hint">越低越确定、越保守；越高越发散、越有创意。金融分析建议 0.3 以下。</p>
+            </div>
+
+            <div class="pref-group">
+              <div class="pref-header">
+                <label>最大回复长度 (maxTokens)</label>
+                <span class="pref-value">{{ (prefs.maxTokens ?? 4096).toLocaleString() }}</span>
+              </div>
+              <select v-model.number="prefs.maxTokens" class="pref-select">
+                <option :value="1024">1,024 — 简短回答</option>
+                <option :value="2048">2,048 — 适中</option>
+                <option :value="4096">4,096 — 默认</option>
+                <option :value="8192">8,192 — 详细分析</option>
+                <option :value="16384">16,384 — 最大长度</option>
+              </select>
+              <p class="pref-hint">控制单次回复的最大 Token 数量，较长回复消耗更多额度。</p>
+            </div>
+
+            <div class="pref-group">
+              <div class="pref-header">
+                <label>上下文窗口</label>
+                <span class="pref-value">{{ prefs.contextWindow ?? 50 }} 条</span>
+              </div>
+              <input
+                type="range"
+                v-model.number="prefs.contextWindow"
+                min="5" max="100" step="5"
+                class="pref-slider"
+              />
+              <div class="pref-range-labels">
+                <span>5 条</span>
+                <span>50 条</span>
+                <span>100 条</span>
+              </div>
+              <p class="pref-hint">保留的历史消息条数。越大上下文越完整，但消耗 Token 越多。</p>
+            </div>
+
+            <div class="section-actions">
+              <button class="reset-btn" @click="resetPreferences">
+                <RotateCcw :size="14" />
+                恢复默认
+              </button>
+              <button class="save-btn" @click="savePreferences" :disabled="prefsLoading">
+                <Loader2 v-if="prefsLoading" :size="14" class="spin" />
+                <Save v-else :size="14" />
+                {{ prefsLoading ? '保存中...' : '保存' }}
+              </button>
+            </div>
+            <div v-if="prefsSuccess" class="test-result success">
+              <CheckCircle2 :size="14" />
+              偏好已保存，下次对话生效
+            </div>
+            <div v-if="prefsError" class="test-result error">
+              <XCircle :size="14" />
+              {{ prefsError }}
+            </div>
+          </div>
+
           <!-- 用量统计 -->
           <div v-if="activeMenu === 'stats'" class="section">
             <h4>用量统计</h4>
@@ -387,6 +466,7 @@ import {
   getDailyUsage, DailyUsage,
   getChannels, createChannel, updateChannel, deleteChannel, activateChannel,
   ApiChannel, ApiChannelList,
+  getPreferences, updatePreferences, UserPreferences,
 } from '../api/config';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -404,7 +484,7 @@ use([
 import {
   Settings, X, Key, Globe, Cpu, Eye, EyeOff, Plug, Save, Loader2,
   CheckCircle2, XCircle, Info, BarChart3, Plus, Trash2, Check, RadioTower, RotateCcw, Gift,
-  User, Shield,
+  User, Shield, Sliders,
 } from 'lucide-vue-next';
 import { useAuthStore } from '../stores/auth';
 
@@ -443,6 +523,12 @@ const pwdLoading = ref(false);
 const pwdError = ref('');
 const pwdSuccess = ref(false);
 
+// 对话偏好相关
+const prefs = reactive<UserPreferences>({ temperature: 0.7, maxTokens: 4096, contextWindow: 50 });
+const prefsLoading = ref(false);
+const prefsError = ref('');
+const prefsSuccess = ref(false);
+
 // 多渠道相关状态
 const channels = ref<ApiChannel[]>([]);
 const selectedChannelId = ref<number | null>(null);
@@ -452,6 +538,7 @@ const channelLoading = ref(false);
 const menus = [
   { key: 'api', label: 'API配置', icon: Key },
   { key: 'account', label: '账户信息', icon: User },
+  { key: 'preferences', label: '对话偏好', icon: Sliders },
   { key: 'stats', label: '用量统计', icon: BarChart3 },
   { key: 'about', label: '关于', icon: Info },
 ];
@@ -484,6 +571,9 @@ watch(() => props.visible, async (newVal) => {
 watch(activeMenu, async (newVal) => {
   if (newVal === 'stats') {
     await loadStats();
+  }
+  if (newVal === 'preferences') {
+    await loadPreferences();
   }
 });
 
@@ -790,6 +880,43 @@ async function handleChangePassword() {
   } finally {
     pwdLoading.value = false;
   }
+}
+
+async function loadPreferences() {
+  try {
+    const data = await getPreferences();
+    prefs.temperature = data.temperature ?? 0.7;
+    prefs.maxTokens = data.maxTokens ?? 4096;
+    prefs.contextWindow = data.contextWindow ?? 50;
+  } catch (error) {
+    console.error('加载偏好失败:', error);
+  }
+}
+
+async function savePreferences() {
+  prefsLoading.value = true;
+  prefsError.value = '';
+  prefsSuccess.value = false;
+  try {
+    await updatePreferences({
+      temperature: prefs.temperature,
+      maxTokens: prefs.maxTokens,
+      contextWindow: prefs.contextWindow,
+    });
+    prefsSuccess.value = true;
+    setTimeout(() => { prefsSuccess.value = false; }, 3000);
+  } catch (error) {
+    prefsError.value = (error as Error).message || '保存失败';
+    setTimeout(() => { prefsError.value = ''; }, 5000);
+  } finally {
+    prefsLoading.value = false;
+  }
+}
+
+function resetPreferences() {
+  prefs.temperature = 0.7;
+  prefs.maxTokens = 4096;
+  prefs.contextWindow = 50;
 }
 
 async function handleTest() {
@@ -1399,6 +1526,82 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.pref-group {
+  background: #f8f9fa;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.pref-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.pref-header label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.pref-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1890ff;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.pref-slider {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #e0e0e0;
+  border-radius: 3px;
+  outline: none;
+  margin: 8px 0;
+}
+
+.pref-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #1890ff;
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.pref-range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 6px;
+}
+
+.pref-hint {
+  font-size: 12px;
+  color: #999;
+  margin: 6px 0 0 0;
+}
+
+.pref-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
 }
 
 .stats-charts-row {

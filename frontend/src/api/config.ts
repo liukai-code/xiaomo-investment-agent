@@ -209,6 +209,47 @@ export async function getDailyUsage(): Promise<DailyUsage[]> {
   throw new Error(result.msg || '获取每日统计数据失败');
 }
 
+// ==================== 对话偏好 ====================
+
+export interface UserPreferences {
+  temperature: number;
+  maxTokens: number;
+  contextWindow: number;
+}
+
+export async function getPreferences(): Promise<UserPreferences> {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('用户未登录');
+
+  const response = await fetch('/api/auth/preferences', {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('获取偏好失败');
+
+  const result = await response.json();
+  if (result.code === 1) return result.data;
+  throw new Error(result.msg || '获取偏好失败');
+}
+
+export async function updatePreferences(prefs: Partial<UserPreferences>): Promise<void> {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('用户未登录');
+
+  const response = await fetch('/api/auth/preferences', {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(prefs),
+  });
+  if (!response.ok) throw new Error('保存偏好失败');
+
+  const result = await response.json();
+  if (result.code !== 1) throw new Error(result.msg || '保存偏好失败');
+}
+
 // ==================== 多渠道管理 ====================
 
 export async function getChannels(): Promise<ApiChannelList> {

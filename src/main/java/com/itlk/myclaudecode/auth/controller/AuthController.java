@@ -160,6 +160,68 @@ public class AuthController {
         return Result.success();
     }
 
+    private Long getUserIdFromToken(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return null;
+        }
+        return tokenManager.getUserId(authHeader.substring(7));
+    }
+
+    @GetMapping("/preferences")
+    public Result<?> getPreferences(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        Long userId = getUserIdFromToken(authHeader);
+        if (userId == null) {
+            return Result.error("未登录");
+        }
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return Result.error("用户不存在");
+        }
+        Map<String, Object> data = new HashMap<>();
+        data.put("temperature", user.getTemperature());
+        data.put("maxTokens", user.getMaxTokens());
+        data.put("contextWindow", user.getContextWindow());
+        return Result.success(data);
+    }
+
+    @PutMapping("/preferences")
+    public Result<?> updatePreferences(@RequestHeader(value = "Authorization", required = false) String authHeader,
+                                       @RequestBody Map<String, Object> body) {
+        Long userId = getUserIdFromToken(authHeader);
+        if (userId == null) {
+            return Result.error("未登录");
+        }
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return Result.error("用户不存在");
+        }
+
+        if (body.containsKey("temperature")) {
+            double temp = ((Number) body.get("temperature")).doubleValue();
+            if (temp < 0 || temp > 1) {
+                return Result.error("temperature 必须在 0~1 之间");
+            }
+            user.setTemperature(temp);
+        }
+        if (body.containsKey("maxTokens")) {
+            int tokens = ((Number) body.get("maxTokens")).intValue();
+            if (tokens < 100 || tokens > 16384) {
+                return Result.error("maxTokens 必须在 100~16384 之间");
+            }
+            user.setMaxTokens(tokens);
+        }
+        if (body.containsKey("contextWindow")) {
+            int window = ((Number) body.get("contextWindow")).intValue();
+            if (window < 5 || window > 100) {
+                return Result.error("contextWindow 必须在 5~100 之间");
+            }
+            user.setContextWindow(window);
+        }
+
+        userRepository.save(user);
+        return Result.success();
+    }
+
     private boolean isValidEmail(String email) {
         return email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
     }

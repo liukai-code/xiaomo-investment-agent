@@ -31,6 +31,15 @@ public class User {
     @Column(name = "free_token_used")
     private Long freeTokenUsed = 0L;
 
+    @Column(name = "temperature")
+    private Double temperature = 0.7;
+
+    @Column(name = "max_tokens")
+    private Integer maxTokens = 4096;
+
+    @Column(name = "context_window")
+    private Integer contextWindow = 50;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
