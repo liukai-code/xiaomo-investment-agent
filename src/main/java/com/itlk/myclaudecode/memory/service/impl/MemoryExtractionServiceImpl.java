@@ -51,6 +51,9 @@ public class MemoryExtractionServiceImpl implements MemoryExtractionService {
     private MemoryExtractionTaskRepository extractionTaskRepository;
 
     @Resource
+    private com.itlk.myclaudecode.user.repository.UserRepository userRepository;
+
+    @Resource
     private MemoryService memoryService;
 
     @Resource
@@ -86,13 +89,16 @@ public class MemoryExtractionServiceImpl implements MemoryExtractionService {
             extractionTaskRepository.save(task);
 
             try {
-                // 2. 检查消息数量，超过阈值才触发摘要压缩
+                // 2. 检查消息数量，超过阈值才触发摘要压缩（用户关闭压缩时跳过）
                 long messageCount = chatMessageRepository.countByConversationId(conversationId);
                 ConversationSummary existing = summaryRepository.findLatestByConversationId(conversationId);
                 int compressedSoFar = existing != null ? existing.getCompressedCount() : 0;
                 int uncompactedCount = (int) (messageCount - compressedSoFar);
 
-                if (uncompactedCount >= COMPRESSION_THRESHOLD) {
+                boolean compressionEnabled = userRepository.findById(userId)
+                        .map(u -> u.getCompressionEnabled() == null || u.getCompressionEnabled())
+                        .orElse(true);
+                if (compressionEnabled && uncompactedCount >= COMPRESSION_THRESHOLD) {
                     compressConversation(userId, conversationId, existing);
                 }
 

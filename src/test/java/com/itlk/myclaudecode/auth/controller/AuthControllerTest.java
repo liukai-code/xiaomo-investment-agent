@@ -515,5 +515,47 @@ class AuthControllerTest {
             Result<?> result = authController.updatePreferences(null, Map.of("temperature", 0.5));
             assertEquals(0, result.getCode());
         }
+
+        @Test
+        @DisplayName("获取偏好 → 返回记忆开关默认值")
+        void getMemoryDefaults() {
+            User user = new User();
+            user.setId(1L);
+            user.setTemperature(0.7);
+            user.setMaxTokens(4096);
+            user.setContextWindow(50);
+            user.setMemoryEnabled(true);
+            user.setCompressionEnabled(true);
+
+            when(tokenManager.getUserId("valid-token")).thenReturn(1L);
+            when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+            Result<?> result = authController.getPreferences("Bearer valid-token");
+            assertEquals(1, result.getCode());
+            Map<?, ?> data = (Map<?, ?>) result.getData();
+            assertEquals(true, data.get("memoryEnabled"));
+            assertEquals(true, data.get("compressionEnabled"));
+        }
+
+        @Test
+        @DisplayName("更新记忆开关 → 返回成功")
+        void updateMemoryToggle() {
+            User user = new User();
+            user.setId(1L);
+            user.setMemoryEnabled(true);
+            user.setCompressionEnabled(true);
+
+            when(tokenManager.getUserId("valid-token")).thenReturn(1L);
+            when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+            when(userRepository.save(any(User.class))).thenReturn(user);
+
+            Result<?> result = authController.updatePreferences("Bearer valid-token", Map.of(
+                    "memoryEnabled", false,
+                    "compressionEnabled", false
+            ));
+            assertEquals(1, result.getCode(), "更新记忆开关应成功");
+            assertFalse(user.getMemoryEnabled(), "记忆应被关闭");
+            assertFalse(user.getCompressionEnabled(), "压缩应被关闭");
+        }
     }
 }

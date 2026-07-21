@@ -235,7 +235,14 @@ public class AgentLoopImpl implements AgentLoop {
 
         chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
 
-        // 用户主动记忆检测（"记住XXX"）
+        // 读取用户偏好
+        User user = userRepository.findById(userId).orElse(null);
+        double temperature = user != null && user.getTemperature() != null ? user.getTemperature() : 0.7;
+        int maxTokens = user != null && user.getMaxTokens() != null ? user.getMaxTokens() : 4096;
+        int contextWindow = user != null && user.getContextWindow() != null ? user.getContextWindow() : 50;
+        boolean memoryEnabled = user == null || user.getMemoryEnabled() == null || user.getMemoryEnabled();
+
+        // 用户主动记忆检测（"记住XXX"），记忆关闭时仍保留主动记忆
         MemoryService.DetectResult detectResult = memoryService.detectExplicitMemory(message);
         if (detectResult.detected()) {
             memoryService.addUserMemory(userId, detectResult.content(),
@@ -256,12 +263,6 @@ public class AgentLoopImpl implements AgentLoop {
         if (intentResult.confidence() == 0 && intentResult.suggestedTools() == null) {
             target = ContextBuilder.toResolvedTarget(contextBuilder.resolveStockFromMessage(message));
         }
-
-        // 读取用户偏好
-        User user = userRepository.findById(userId).orElse(null);
-        double temperature = user != null && user.getTemperature() != null ? user.getTemperature() : 0.7;
-        int maxTokens = user != null && user.getMaxTokens() != null ? user.getMaxTokens() : 4096;
-        int contextWindow = user != null && user.getContextWindow() != null ? user.getContextWindow() : 50;
 
         List<Message> context = contextBuilder.buildContext(conversation.getId(), userId, target, intentResult.intent(), contextWindow);
         Long convId = conversation.getId();
@@ -294,8 +295,10 @@ public class AgentLoopImpl implements AgentLoop {
             String sanitized = streamHandler.sanitizeOutput(response);
             chatMessageService.saveMessage(conversation, MessageRole.ASSISTANT, sanitized, null, null);
 
-            // 异步触发记忆提取（画像 + 对话摘要压缩）
-            memoryExtractionService.extractMemoriesAsync(userId, conversation.getId(), null);
+            // 异步触发记忆提取（画像 + 对话摘要压缩），记忆关闭时跳过
+            if (memoryEnabled) {
+                memoryExtractionService.extractMemoriesAsync(userId, conversation.getId(), null);
+            }
 
             // Record token usage
             try {
@@ -345,7 +348,14 @@ public class AgentLoopImpl implements AgentLoop {
 
         chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
 
-        // 用户主动记忆检测（"记住XXX"）
+        // 读取用户偏好
+        User user = userRepository.findById(userId).orElse(null);
+        double temperature = user != null && user.getTemperature() != null ? user.getTemperature() : 0.7;
+        int maxTokens = user != null && user.getMaxTokens() != null ? user.getMaxTokens() : 4096;
+        int contextWindow = user != null && user.getContextWindow() != null ? user.getContextWindow() : 50;
+        boolean memoryEnabled = user == null || user.getMemoryEnabled() == null || user.getMemoryEnabled();
+
+        // 用户主动记忆检测（"记住XXX"），记忆关闭时仍保留主动记忆
         MemoryService.DetectResult detectResult = memoryService.detectExplicitMemory(message);
         if (detectResult.detected()) {
             memoryService.addUserMemory(userId, detectResult.content(),
@@ -367,12 +377,6 @@ public class AgentLoopImpl implements AgentLoop {
             target = ContextBuilder.toResolvedTarget(contextBuilder.resolveStockFromMessage(message));
         }
 
-        // 读取用户偏好
-        User user = userRepository.findById(userId).orElse(null);
-        double temperature = user != null && user.getTemperature() != null ? user.getTemperature() : 0.7;
-        int maxTokens = user != null && user.getMaxTokens() != null ? user.getMaxTokens() : 4096;
-        int contextWindow = user != null && user.getContextWindow() != null ? user.getContextWindow() : 50;
-
         List<Message> context = contextBuilder.buildContext(conversation.getId(), userId, target, intentResult.intent(), contextWindow);
         Long convId = conversation.getId();
 
@@ -381,6 +385,7 @@ public class AgentLoopImpl implements AgentLoop {
 
         // 构建工具上下文
         Map<String, Object> toolCtx = toolContextBuilder.build(userId, convId, target, statusSink);
+        toolCtx.put("memoryEnabled", memoryEnabled);
 
         // 过滤工具
         Set<String> intentToolWhitelist = intentResult.suggestedTools();

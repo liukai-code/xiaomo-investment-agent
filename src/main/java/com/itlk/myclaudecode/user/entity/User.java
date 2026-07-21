@@ -40,6 +40,12 @@ public class User {
     @Column(name = "context_window")
     private Integer contextWindow = 50;
 
+    @Column(name = "memory_enabled")
+    private Boolean memoryEnabled = true;
+
+    @Column(name = "compression_enabled")
+    private Boolean compressionEnabled = true;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

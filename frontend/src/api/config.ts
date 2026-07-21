@@ -215,6 +215,8 @@ export interface UserPreferences {
   temperature: number;
   maxTokens: number;
   contextWindow: number;
+  memoryEnabled: boolean;
+  compressionEnabled: boolean;
 }
 
 export async function getPreferences(): Promise<UserPreferences> {

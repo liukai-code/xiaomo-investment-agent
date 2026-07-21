@@ -72,10 +72,13 @@ public class ContextBuilder {
             enrichedPrompt += "\n\n[用户信息]\n当前用户：" + user.getAccountId() + "（邮箱: " + user.getEmail() + "）";
         }
 
-        // 注入用户画像记忆和对话摘要
-        String memoryPrompt = memoryService.buildMemoryPrompt(userId, conversationId);
-        if (memoryPrompt != null && !memoryPrompt.isEmpty()) {
-            enrichedPrompt += memoryPrompt;
+        // 注入用户画像记忆和对话摘要（用户关闭记忆时跳过）
+        boolean memoryEnabled = user != null && (user.getMemoryEnabled() == null || user.getMemoryEnabled());
+        if (memoryEnabled) {
+            String memoryPrompt = memoryService.buildMemoryPrompt(userId, conversationId);
+            if (memoryPrompt != null && !memoryPrompt.isEmpty()) {
+                enrichedPrompt += memoryPrompt;
+            }
         }
 
         enrichedPrompt += "\n\n[当前时间]\n" + java.time.LocalDateTime.now()

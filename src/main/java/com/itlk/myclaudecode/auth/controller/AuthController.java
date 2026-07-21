@@ -181,6 +181,8 @@ public class AuthController {
         data.put("temperature", user.getTemperature());
         data.put("maxTokens", user.getMaxTokens());
         data.put("contextWindow", user.getContextWindow());
+        data.put("memoryEnabled", user.getMemoryEnabled() != null ? user.getMemoryEnabled() : true);
+        data.put("compressionEnabled", user.getCompressionEnabled() != null ? user.getCompressionEnabled() : true);
         return Result.success(data);
     }
 
@@ -216,6 +218,12 @@ public class AuthController {
                 return Result.error("contextWindow 必须在 5~100 之间");
             }
             user.setContextWindow(window);
+        }
+        if (body.containsKey("memoryEnabled")) {
+            user.setMemoryEnabled((Boolean) body.get("memoryEnabled"));
+        }
+        if (body.containsKey("compressionEnabled")) {
+            user.setCompressionEnabled((Boolean) body.get("compressionEnabled"));
         }
 
         userRepository.save(user);

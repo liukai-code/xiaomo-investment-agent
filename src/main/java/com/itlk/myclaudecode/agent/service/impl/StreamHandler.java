@@ -119,8 +119,11 @@ public class StreamHandler {
                 .doOnComplete(() -> {
                     String fullResponse = sanitizeOutput(accumulated.toString());
                     chatMessageService.saveAssistantMessage(userId, convId, fullResponse);
-                    // 异步触发记忆提取（画像 + 对话摘要压缩）
-                    memoryExtractionService.extractMemoriesAsync(userId, convId, null);
+                    // 异步触发记忆提取（画像 + 对话摘要压缩），记忆关闭时跳过
+                    Object memFlag = toolCtx.get("memoryEnabled");
+                    if (memFlag == null || (Boolean) memFlag) {
+                        memoryExtractionService.extractMemoriesAsync(userId, convId, null);
+                    }
                     // Record token usage
                     try {
                         AtomicInteger toolCounter = (AtomicInteger) toolCtx.get(MaxToolCallManager.TOOL_CALL_COUNTER_KEY);

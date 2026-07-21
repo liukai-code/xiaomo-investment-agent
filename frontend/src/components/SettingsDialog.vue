@@ -311,6 +311,28 @@
               <p class="pref-hint">保留的历史消息条数。越大上下文越完整，但消耗 Token 越多。</p>
             </div>
 
+            <div class="pref-group">
+              <div class="pref-header">
+                <label>记忆功能</label>
+                <label class="switch">
+                  <input type="checkbox" v-model="prefs.memoryEnabled" />
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+              <p class="pref-hint">开启后 AI 会记住您的偏好和画像，越用越懂你。关闭后不再注入记忆到对话上下文，也不再自动提取画像。</p>
+            </div>
+
+            <div class="pref-group" :class="{ 'pref-disabled': !prefs.memoryEnabled }">
+              <div class="pref-header">
+                <label>对话摘要压缩</label>
+                <label class="switch">
+                  <input type="checkbox" v-model="prefs.compressionEnabled" :disabled="!prefs.memoryEnabled" />
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+              <p class="pref-hint">开启后长对话会自动压缩历史消息为摘要，节省 Token 消耗。关闭后保留完整对话历史。</p>
+            </div>
+
             <div class="section-actions">
               <button class="reset-btn" @click="resetPreferences">
                 <RotateCcw :size="14" />
@@ -524,7 +546,7 @@ const pwdError = ref('');
 const pwdSuccess = ref(false);
 
 // 对话偏好相关
-const prefs = reactive<UserPreferences>({ temperature: 0.7, maxTokens: 4096, contextWindow: 50 });
+const prefs = reactive<UserPreferences>({ temperature: 0.7, maxTokens: 4096, contextWindow: 50, memoryEnabled: true, compressionEnabled: true });
 const prefsLoading = ref(false);
 const prefsError = ref('');
 const prefsSuccess = ref(false);
@@ -888,6 +910,8 @@ async function loadPreferences() {
     prefs.temperature = data.temperature ?? 0.7;
     prefs.maxTokens = data.maxTokens ?? 4096;
     prefs.contextWindow = data.contextWindow ?? 50;
+    prefs.memoryEnabled = data.memoryEnabled ?? true;
+    prefs.compressionEnabled = data.compressionEnabled ?? true;
   } catch (error) {
     console.error('加载偏好失败:', error);
   }
@@ -902,6 +926,8 @@ async function savePreferences() {
       temperature: prefs.temperature,
       maxTokens: prefs.maxTokens,
       contextWindow: prefs.contextWindow,
+      memoryEnabled: prefs.memoryEnabled,
+      compressionEnabled: prefs.compressionEnabled,
     });
     prefsSuccess.value = true;
     setTimeout(() => { prefsSuccess.value = false; }, 3000);
@@ -917,6 +943,8 @@ function resetPreferences() {
   prefs.temperature = 0.7;
   prefs.maxTokens = 4096;
   prefs.contextWindow = 50;
+  prefs.memoryEnabled = true;
+  prefs.compressionEnabled = true;
 }
 
 async function handleTest() {
@@ -1602,6 +1630,57 @@ button:disabled {
   font-size: 14px;
   background: white;
   cursor: pointer;
+}
+
+.pref-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  border-radius: 24px;
+  transition: 0.3s;
+}
+
+.switch-slider::before {
+  content: "";
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+
+.switch input:checked + .switch-slider {
+  background-color: #1890ff;
+}
+
+.switch input:checked + .switch-slider::before {
+  transform: translateX(20px);
 }
 
 .stats-charts-row {
