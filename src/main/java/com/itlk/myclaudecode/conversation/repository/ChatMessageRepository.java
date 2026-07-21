@@ -19,4 +19,9 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 
     @Query("SELECT COUNT(m) FROM ChatMessage m WHERE m.conversation.userId = :userId AND m.createdAt > :since")
     Long countByUserIdSince(@Param("userId") Long userId, @Param("since") LocalDateTime since);
+
+    @Query("SELECT COUNT(m) FROM ChatMessage m WHERE m.conversation.id = :convId")
+    long countByConversationId(@Param("convId") Long convId);
+
+    List<ChatMessage> findByConversationIdAndIdGreaterThanOrderByIdAsc(Long conversationId, Long id);
 }

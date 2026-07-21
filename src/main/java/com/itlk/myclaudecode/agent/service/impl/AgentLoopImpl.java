@@ -10,6 +10,8 @@ import com.itlk.myclaudecode.common.util.DebugFileLogger;
 import com.itlk.myclaudecode.conversation.entity.*;
 import com.itlk.myclaudecode.conversation.repository.ChatMessageRepository;
 import com.itlk.myclaudecode.conversation.service.*;
+import com.itlk.myclaudecode.memory.service.MemoryExtractionService;
+import com.itlk.myclaudecode.memory.service.MemoryService;
 import com.itlk.myclaudecode.tool.FileListTool;
 import com.itlk.myclaudecode.tool.FileReadTool;
 import com.itlk.myclaudecode.tool.FileWriteTool;
@@ -99,6 +101,12 @@ public class AgentLoopImpl implements AgentLoop {
 
     @Resource
     private com.itlk.myclaudecode.user.service.FreeQuotaService freeQuotaService;
+
+    @Resource
+    private MemoryService memoryService;
+
+    @Resource
+    private MemoryExtractionService memoryExtractionService;
 
     /**
      * 根据用户配置解析对应的 ChatClient。
@@ -222,6 +230,13 @@ public class AgentLoopImpl implements AgentLoop {
 
         chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
 
+        // 用户主动记忆检测（"记住XXX"）
+        MemoryService.DetectResult detectResult = memoryService.detectExplicitMemory(message);
+        if (detectResult.detected()) {
+            memoryService.addUserMemory(userId, detectResult.content(),
+                    detectResult.category(), conversation.getId());
+        }
+
         // 意图分类
         IntentResult intentResult = intentClassifier.classify(message);
         IntentResult.ResolvedTarget target = intentResult.target();
@@ -266,6 +281,9 @@ public class AgentLoopImpl implements AgentLoop {
             String response = chatResponse.getResult().getOutput().getText();
             String sanitized = streamHandler.sanitizeOutput(response);
             chatMessageService.saveMessage(conversation, MessageRole.ASSISTANT, sanitized, null, null);
+
+            // 异步触发记忆提取（画像 + 对话摘要压缩）
+            memoryExtractionService.extractMemoriesAsync(userId, conversation.getId(), null);
 
             // Record token usage
             try {
@@ -314,6 +332,13 @@ public class AgentLoopImpl implements AgentLoop {
         maxToolCallManager.reset();
 
         chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
+
+        // 用户主动记忆检测（"记住XXX"）
+        MemoryService.DetectResult detectResult = memoryService.detectExplicitMemory(message);
+        if (detectResult.detected()) {
+            memoryService.addUserMemory(userId, detectResult.content(),
+                    detectResult.category(), conversation.getId());
+        }
 
         // 意图分类
         IntentResult intentResult = intentClassifier.classify(message);

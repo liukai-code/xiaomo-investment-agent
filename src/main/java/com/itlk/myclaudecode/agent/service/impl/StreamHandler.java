@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itlk.myclaudecode.agent.service.ChatStreamEvent;
 import com.itlk.myclaudecode.conversation.service.ChatMessageService;
 import com.itlk.myclaudecode.conversation.service.UsageRecordService;
+import com.itlk.myclaudecode.memory.service.MemoryExtractionService;
 import com.itlk.myclaudecode.user.service.FreeQuotaService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +42,9 @@ public class StreamHandler {
 
     @Resource
     private FreeQuotaService freeQuotaService;
+
+    @Resource
+    private MemoryExtractionService memoryExtractionService;
 
     public Flux<ServerSentEvent<String>> buildStream(ChatClient chatClient,
                                                       List<Message> context,
@@ -115,6 +119,8 @@ public class StreamHandler {
                 .doOnComplete(() -> {
                     String fullResponse = sanitizeOutput(accumulated.toString());
                     chatMessageService.saveAssistantMessage(userId, convId, fullResponse);
+                    // 异步触发记忆提取（画像 + 对话摘要压缩）
+                    memoryExtractionService.extractMemoriesAsync(userId, convId, null);
                     // Record token usage
                     try {
                         AtomicInteger toolCounter = (AtomicInteger) toolCtx.get(MaxToolCallManager.TOOL_CALL_COUNTER_KEY);

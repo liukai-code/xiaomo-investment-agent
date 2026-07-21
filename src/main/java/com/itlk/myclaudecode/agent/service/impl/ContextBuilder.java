@@ -9,6 +9,7 @@ import com.itlk.myclaudecode.conversation.entity.ChatMessage;
 import com.itlk.myclaudecode.conversation.entity.MessageRole;
 import com.itlk.myclaudecode.conversation.repository.ChatMessageRepository;
 import com.itlk.myclaudecode.conversation.service.ChatHistoryCacheService;
+import com.itlk.myclaudecode.memory.service.MemoryService;
 import com.itlk.myclaudecode.user.entity.User;
 import com.itlk.myclaudecode.user.repository.UserRepository;
 import com.itlk.myclaudecode.workflow.util.StockResolver;
@@ -50,6 +51,9 @@ public class ContextBuilder {
     @Resource
     private HttpClientService httpClientService;
 
+    @Resource
+    private MemoryService memoryService;
+
     public record ResolvedTarget(String code, String name) {}
 
     /** 将内部 ResolvedTarget 转换为 IntentResult.ResolvedTarget */
@@ -66,6 +70,13 @@ public class ContextBuilder {
         if (user != null) {
             enrichedPrompt += "\n\n[用户信息]\n当前用户：" + user.getAccountId() + "（邮箱: " + user.getEmail() + "）";
         }
+
+        // 注入用户画像记忆和对话摘要
+        String memoryPrompt = memoryService.buildMemoryPrompt(userId, conversationId);
+        if (memoryPrompt != null && !memoryPrompt.isEmpty()) {
+            enrichedPrompt += memoryPrompt;
+        }
+
         enrichedPrompt += "\n\n[当前时间]\n" + java.time.LocalDateTime.now()
                 .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm:ss EEEE"));
 
