@@ -56,6 +56,13 @@ public class MemoryExtractionServiceImpl implements MemoryExtractionService {
     @Resource
     private ChatModel chatModel;
 
+    private ChatClient chatClient;
+
+    @jakarta.annotation.PostConstruct
+    void init() {
+        this.chatClient = ChatClient.builder(chatModel).build();
+    }
+
     @Resource
     private ObjectMapper objectMapper;
 
@@ -168,7 +175,7 @@ public class MemoryExtractionServiceImpl implements MemoryExtractionService {
                 """.formatted(existingStr.toString(), dialog.toString());
 
         try {
-            ChatClient client = ChatClient.builder(chatModel).build();
+            ChatClient client = this.chatClient;
             AnthropicChatOptions options = AnthropicChatOptions.builder()
                     .thinking(AnthropicApi.ThinkingType.DISABLED, null)
                     .temperature(0.1)
@@ -189,7 +196,7 @@ public class MemoryExtractionServiceImpl implements MemoryExtractionService {
         }
     }
 
-    private void saveExtractedProfiles(Long userId, Long conversationId, String jsonResult) {
+    void saveExtractedProfiles(Long userId, Long conversationId, String jsonResult) {
         try {
             // 清理可能的 markdown 代码块标记
             String cleaned = jsonResult.trim();
@@ -285,7 +292,7 @@ public class MemoryExtractionServiceImpl implements MemoryExtractionService {
                 """.formatted(previousSummary, dialog.toString());
 
         try {
-            ChatClient client = ChatClient.builder(chatModel).build();
+            ChatClient client = this.chatClient;
             AnthropicChatOptions options = AnthropicChatOptions.builder()
                     .thinking(AnthropicApi.ThinkingType.DISABLED, null)
                     .temperature(0.2)
