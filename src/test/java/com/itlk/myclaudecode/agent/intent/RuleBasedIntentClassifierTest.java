@@ -290,6 +290,19 @@ class RuleBasedIntentClassifierTest {
             assertNotNull(result.suggestedTools());
             assertTrue(result.suggestedTools().contains("a_stock_sentiment"));
         }
+
+        @ParameterizedTest
+        @ValueSource(strings = {
+                "今天行情怎么样",
+                "今日行情如何",
+                "最近行情怎么样",
+                "昨天大盘怎么样"
+        })
+        void 时间词不应被误识别为股票名称(String msg) {
+            // "今天行情怎么样" 不应被解析为股票"今天国际"(300532)
+            IntentResult result = classifier.classify(msg);
+            assertNull(result.target(), "时间词不应被识别为股票标的，消息: " + msg);
+        }
     }
 
     @Nested

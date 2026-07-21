@@ -254,6 +254,10 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
         for (String kw : STRIP_KEYWORDS) {
             cleaned = cleaned.replace(kw, "");
         }
+        // 剥离时间词，避免"今天行情怎么样"中的"今天"被误识别为股票名称"今天国际"
+        for (String kw : TIME_KEYWORDS) {
+            cleaned = cleaned.replace(kw, "");
+        }
         cleaned = cleaned.replaceAll("[，。？！、\\s]+", "").trim();
         return cleaned;
     }
@@ -341,5 +345,11 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
             "期权", "融资融券", "大宗交易", "北向资金", "解禁",
             "分红", "股东户数", "利润表", "资产负债表", "现金流量表",
             "财报", "互动易", "概念热度"
+    };
+
+    private static final String[] TIME_KEYWORDS = {
+            "今天", "今日", "明天", "明日", "昨天", "昨日",
+            "上周", "本周", "下周", "上个月", "这个月", "下个月",
+            "最近", "近期", "前段时间", "这段时间"
     };
 }

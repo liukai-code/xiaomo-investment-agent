@@ -183,9 +183,15 @@ public class ContextBuilder {
             }
         }
 
-        // 3. 剥离意图关键词，避免 StockResolver 把"分析"当作股票名称
+        // 3. 剥离意图关键词 + 时间词，避免 StockResolver 把时间词当作股票名称
+        String[] timeKeywords = {"今天", "今日", "明天", "明日", "昨天", "昨日",
+                "上周", "本周", "下周", "上个月", "这个月", "下个月",
+                "最近", "近期", "前段时间", "这段时间"};
         String cleaned = message;
         for (String kw : kws) {
+            cleaned = cleaned.replace(kw, "");
+        }
+        for (String kw : timeKeywords) {
             cleaned = cleaned.replace(kw, "");
         }
         cleaned = cleaned.replaceAll("[，。？！、\\s]+", "").trim();
