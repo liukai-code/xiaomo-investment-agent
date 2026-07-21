@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { login as apiLogin, register as apiRegister, logout as apiLogout, getMe } from '@/api/auth'
+import { login as apiLogin, register as apiRegister, logout as apiLogout, getMe, changePassword as apiChangePassword } from '@/api/auth'
 import { useChatStore } from './chat'
 import { useYangjibaoStore } from './yangjibao'
 
@@ -11,6 +11,7 @@ export const useAuthStore = defineStore('auth', () => {
   const accountId = ref(localStorage.getItem('accountId') || '')
   const freeTokenQuota = ref(Number(localStorage.getItem('freeTokenQuota')) || 0)
   const freeTokenUsed = ref(Number(localStorage.getItem('freeTokenUsed')) || 0)
+  const createdAt = ref(localStorage.getItem('createdAt') || '')
   const isAuthenticated = ref(false)
   const loading = ref(false)
 
@@ -85,6 +86,10 @@ export const useAuthStore = defineStore('auth', () => {
     yangjibaoStore.logout()
   }
 
+  async function changePassword(oldPassword: string, newPassword: string) {
+    return await apiChangePassword(oldPassword, newPassword)
+  }
+
   async function checkAuth() {
     if (!token.value) {
       isAuthenticated.value = false
@@ -102,6 +107,10 @@ export const useAuthStore = defineStore('auth', () => {
           localStorage.setItem('freeTokenQuota', String(res.data.freeTokenQuota))
           localStorage.setItem('freeTokenUsed', String(res.data.freeTokenUsed || 0))
         }
+        if (res.data.createdAt) {
+          createdAt.value = res.data.createdAt
+          localStorage.setItem('createdAt', res.data.createdAt)
+        }
         return true
       }
       clearAuth()
@@ -112,5 +121,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, userId, email, accountId, freeTokenQuota, freeTokenUsed, isAuthenticated, loading, login, register, logout, checkAuth, clearAuth }
+  return { token, userId, email, accountId, freeTokenQuota, freeTokenUsed, createdAt, isAuthenticated, loading, login, register, logout, changePassword, checkAuth, clearAuth }
 })

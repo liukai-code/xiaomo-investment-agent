@@ -156,6 +156,103 @@
             </div>
           </div>
 
+          <!-- 账户信息 -->
+          <div v-if="activeMenu === 'account'" class="section">
+            <h4><User :size="16" /> 账户信息</h4>
+            <p class="section-desc">查看您的账户详情和修改密码</p>
+
+            <div class="account-info-card">
+              <div class="info-row">
+                <span class="info-label"><Shield :size="14" /> 账号</span>
+                <span class="info-value mono">{{ authStore.accountId || '—' }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label"><Globe :size="14" /> 邮箱</span>
+                <span class="info-value">{{ authStore.email || '—' }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label"><BarChart3 :size="14" /> 注册时间</span>
+                <span class="info-value">{{ formatDate(authStore.createdAt) }}</span>
+              </div>
+            </div>
+
+            <div v-if="authStore.freeTokenQuota > 0" class="account-quota-card">
+              <h5><Gift :size="14" /> 免费体验额度</h5>
+              <div class="quota-info-row">
+                <div class="quota-info-item">
+                  <span class="quota-num">{{ remainingFreeTokens.toLocaleString() }}</span>
+                  <span class="quota-label">剩余 Token</span>
+                </div>
+                <div class="quota-info-item">
+                  <span class="quota-num">{{ authStore.freeTokenUsed.toLocaleString() }}</span>
+                  <span class="quota-label">已使用</span>
+                </div>
+                <div class="quota-info-item">
+                  <span class="quota-num">{{ authStore.freeTokenQuota.toLocaleString() }}</span>
+                  <span class="quota-label">总额度</span>
+                </div>
+              </div>
+              <div class="quota-progress">
+                <div class="quota-bar" :style="{ width: freeQuotaPercent + '%' }"></div>
+              </div>
+            </div>
+
+            <div class="password-section">
+              <h5><Key :size="14" /> 修改密码</h5>
+              <div class="form-group">
+                <label>旧密码</label>
+                <div class="input-group">
+                  <input
+                    :type="showOldPwd ? 'text' : 'password'"
+                    v-model="pwdForm.oldPassword"
+                    placeholder="输入当前密码"
+                  />
+                  <button class="toggle-btn" @click="showOldPwd = !showOldPwd">
+                    <EyeOff v-if="showOldPwd" :size="14" />
+                    <Eye v-else :size="14" />
+                  </button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>新密码</label>
+                <div class="input-group">
+                  <input
+                    :type="showNewPwd ? 'text' : 'password'"
+                    v-model="pwdForm.newPassword"
+                    placeholder="至少6位"
+                  />
+                  <button class="toggle-btn" @click="showNewPwd = !showNewPwd">
+                    <EyeOff v-if="showNewPwd" :size="14" />
+                    <Eye v-else :size="14" />
+                  </button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>确认新密码</label>
+                <input
+                  type="password"
+                  v-model="pwdForm.confirmPassword"
+                  placeholder="再次输入新密码"
+                />
+              </div>
+              <div class="section-actions">
+                <button class="save-btn" @click="handleChangePassword" :disabled="pwdLoading">
+                  <Loader2 v-if="pwdLoading" :size="14" class="spin" />
+                  <Key v-else :size="14" />
+                  {{ pwdLoading ? '提交中...' : '修改密码' }}
+                </button>
+              </div>
+              <div v-if="pwdSuccess" class="test-result success">
+                <CheckCircle2 :size="14" />
+                密码修改成功，下次登录请使用新密码
+              </div>
+              <div v-if="pwdError" class="test-result error">
+                <XCircle :size="14" />
+                {{ pwdError }}
+              </div>
+            </div>
+          </div>
+
           <!-- 用量统计 -->
           <div v-if="activeMenu === 'stats'" class="section">
             <h4>用量统计</h4>
@@ -307,6 +404,7 @@ use([
 import {
   Settings, X, Key, Globe, Cpu, Eye, EyeOff, Plug, Save, Loader2,
   CheckCircle2, XCircle, Info, BarChart3, Plus, Trash2, Check, RadioTower, RotateCcw, Gift,
+  User, Shield,
 } from 'lucide-vue-next';
 import { useAuthStore } from '../stores/auth';
 
@@ -337,6 +435,14 @@ const dailyData = ref<DailyUsage[]>([]);
 const statsLoading = ref(false);
 const statsError = ref('');
 
+// 修改密码相关
+const pwdForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' });
+const showOldPwd = ref(false);
+const showNewPwd = ref(false);
+const pwdLoading = ref(false);
+const pwdError = ref('');
+const pwdSuccess = ref(false);
+
 // 多渠道相关状态
 const channels = ref<ApiChannel[]>([]);
 const selectedChannelId = ref<number | null>(null);
@@ -345,6 +451,7 @@ const channelLoading = ref(false);
 
 const menus = [
   { key: 'api', label: 'API配置', icon: Key },
+  { key: 'account', label: '账户信息', icon: User },
   { key: 'stats', label: '用量统计', icon: BarChart3 },
   { key: 'about', label: '关于', icon: Info },
 ];
@@ -642,6 +749,46 @@ async function handleDeleteChannel(channel: ApiChannel) {
     emit('saved');
   } catch (error) {
     alert('删除失败: ' + (error as Error).message);
+  }
+}
+
+function formatDate(dateStr: string) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+
+async function handleChangePassword() {
+  pwdError.value = '';
+  pwdSuccess.value = false;
+
+  if (!pwdForm.oldPassword) {
+    pwdError.value = '请输入旧密码';
+    return;
+  }
+  if (!pwdForm.newPassword || pwdForm.newPassword.length < 6) {
+    pwdError.value = '新密码长度不能少于6位';
+    return;
+  }
+  if (pwdForm.newPassword !== pwdForm.confirmPassword) {
+    pwdError.value = '两次输入的新密码不一致';
+    return;
+  }
+
+  pwdLoading.value = true;
+  try {
+    await authStore.changePassword(pwdForm.oldPassword, pwdForm.newPassword);
+    pwdSuccess.value = true;
+    pwdForm.oldPassword = '';
+    pwdForm.newPassword = '';
+    pwdForm.confirmPassword = '';
+    setTimeout(() => { pwdSuccess.value = false; }, 5000);
+  } catch (error) {
+    pwdError.value = (error as Error).message || '修改失败';
+    setTimeout(() => { pwdError.value = ''; }, 5000);
+  } finally {
+    pwdLoading.value = false;
   }
 }
 
@@ -1138,6 +1285,120 @@ button:disabled {
 
 .about-info p {
   margin: 8px 0;
+}
+
+.account-info-card {
+  background: #f8f9fa;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #666;
+}
+
+.info-value {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info-value.mono {
+  font-family: 'Consolas', 'Monaco', monospace;
+  letter-spacing: 0.5px;
+}
+
+.copy-btn {
+  padding: 2px 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  display: flex;
+  align-items: center;
+  border-radius: 3px;
+}
+
+.copy-btn:hover {
+  color: #1890ff;
+  background: #e6f7ff;
+}
+
+.account-quota-card {
+  background: linear-gradient(135deg, #f6ffed 0%, #e6f7ff 100%);
+  border: 1px solid #b7eb8f;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.account-quota-card h5 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quota-info-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.quota-info-item {
+  flex: 1;
+  text-align: center;
+}
+
+.quota-num {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  color: #52c41a;
+}
+
+.quota-label {
+  display: block;
+  font-size: 12px;
+  color: #999;
+  margin-top: 2px;
+}
+
+.password-section {
+  border-top: 1px solid #eee;
+  padding-top: 20px;
+}
+
+.password-section h5 {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .stats-charts-row {

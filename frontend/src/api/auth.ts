@@ -21,6 +21,7 @@ interface MeResponse {
     accountId: string
     freeTokenQuota: number
     freeTokenUsed: number
+    createdAt: string
   }
 }
 
@@ -59,5 +60,15 @@ export async function logout() {
 
 export async function getMe() {
   const { data } = await request.get<MeResponse>('/api/auth/me')
+  return data
+}
+
+export async function changePassword(oldPassword: string, newPassword: string) {
+  const oldHashed = await sha256(oldPassword)
+  const newHashed = await sha256(newPassword)
+  const { data } = await request.post('/api/auth/changePassword', {
+    oldPassword: oldHashed,
+    newPassword: newHashed,
+  })
   return data
 }

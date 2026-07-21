@@ -121,7 +121,43 @@ public class AuthController {
         data.put("accountId", user.getAccountId());
         data.put("freeTokenQuota", user.getFreeTokenQuota() != null ? user.getFreeTokenQuota() : 0L);
         data.put("freeTokenUsed", user.getFreeTokenUsed() != null ? user.getFreeTokenUsed() : 0L);
+        data.put("createdAt", user.getCreatedAt());
         return Result.success(data);
+    }
+
+    @PostMapping("/changePassword")
+    public Result<?> changePassword(@RequestHeader(value = "Authorization", required = false) String authHeader,
+                                    @RequestBody Map<String, String> body) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return Result.error("未登录");
+        }
+        String token = authHeader.substring(7);
+        Long userId = tokenManager.getUserId(token);
+        if (userId == null) {
+            return Result.error("未登录");
+        }
+
+        String oldPassword = body.get("oldPassword");
+        String newPassword = body.get("newPassword");
+
+        if (oldPassword == null || oldPassword.isEmpty()) {
+            return Result.error("请输入旧密码");
+        }
+        if (newPassword == null || newPassword.length() < 6) {
+            return Result.error("新密码长度不能少于6位");
+        }
+
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return Result.error("用户不存在");
+        }
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            return Result.error("旧密码错误");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        return Result.success();
     }
 
     private boolean isValidEmail(String email) {

@@ -289,4 +289,123 @@ class AuthControllerTest {
             assertTrue(result.getMsg().contains("不存在"));
         }
     }
+
+    // ========== changePassword 修改密码 ==========
+
+    @Nested
+    @DisplayName("changePassword 修改密码")
+    class ChangePasswordTest {
+
+        @Test
+        @DisplayName("正常修改密码 → 返回成功")
+        void success() {
+            User user = new User();
+            user.setId(1L);
+            user.setEmail("test@example.com");
+            user.setPassword(ENCODER.encode("old-password"));
+
+            when(tokenManager.getUserId("valid-token")).thenReturn(1L);
+            when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+            when(userRepository.save(any(User.class))).thenReturn(user);
+
+            Result<?> result = authController.changePassword("Bearer valid-token", Map.of(
+                    "oldPassword", "old-password",
+                    "newPassword", "new-password"
+            ));
+
+            assertEquals(1, result.getCode(), "修改密码应成功");
+            verify(userRepository).save(any(User.class));
+        }
+
+        @Test
+        @DisplayName("无 Authorization header → 返回未登录")
+        void noHeader() {
+            Result<?> result = authController.changePassword(null, Map.of(
+                    "oldPassword", "old", "newPassword", "new-password"
+            ));
+            assertEquals(0, result.getCode(), "无header应失败");
+            assertTrue(result.getMsg().contains("未登录"));
+        }
+
+        @Test
+        @DisplayName("token 无效 → 返回未登录")
+        void invalidToken() {
+            when(tokenManager.getUserId("bad-token")).thenReturn(null);
+
+            Result<?> result = authController.changePassword("Bearer bad-token", Map.of(
+                    "oldPassword", "old", "newPassword", "new-password"
+            ));
+            assertEquals(0, result.getCode(), "无效token应失败");
+        }
+
+        @Test
+        @DisplayName("旧密码为空 → 返回错误")
+        void emptyOldPassword() {
+            when(tokenManager.getUserId("valid-token")).thenReturn(1L);
+
+            Result<?> result = authController.changePassword("Bearer valid-token", Map.of(
+                    "oldPassword", "",
+                    "newPassword", "new-password"
+            ));
+            assertEquals(0, result.getCode(), "空旧密码应失败");
+            assertTrue(result.getMsg().contains("旧密码"));
+        }
+
+        @Test
+        @DisplayName("旧密码错误 → 返回错误")
+        void wrongOldPassword() {
+            User user = new User();
+            user.setId(1L);
+            user.setPassword(ENCODER.encode("correct-old"));
+
+            when(tokenManager.getUserId("valid-token")).thenReturn(1L);
+            when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+            Result<?> result = authController.changePassword("Bearer valid-token", Map.of(
+                    "oldPassword", "wrong-old",
+                    "newPassword", "new-password"
+            ));
+            assertEquals(0, result.getCode(), "错误旧密码应失败");
+            assertTrue(result.getMsg().contains("旧密码错误"));
+        }
+
+        @Test
+        @DisplayName("新密码不足6位 → 返回错误")
+        void shortNewPassword() {
+            when(tokenManager.getUserId("valid-token")).thenReturn(1L);
+
+            Result<?> result = authController.changePassword("Bearer valid-token", Map.of(
+                    "oldPassword", "old-password",
+                    "newPassword", "12345"
+            ));
+            assertEquals(0, result.getCode(), "短新密码应失败");
+            assertTrue(result.getMsg().contains("6"), "错误信息应提及6位");
+        }
+
+        @Test
+        @DisplayName("新密码为空 → 返回错误")
+        void emptyNewPassword() {
+            when(tokenManager.getUserId("valid-token")).thenReturn(1L);
+
+            Result<?> result = authController.changePassword("Bearer valid-token", Map.of(
+                    "oldPassword", "old-password",
+                    "newPassword", ""
+            ));
+            assertEquals(0, result.getCode(), "空新密码应失败");
+        }
+
+        @Test
+        @DisplayName("用户不存在 → 返回错误")
+        void userNotFound() {
+            when(tokenManager.getUserId("valid-token")).thenReturn(999L);
+            when(userRepository.findById(999L)).thenReturn(Optional.empty());
+
+            Result<?> result = authController.changePassword("Bearer valid-token", Map.of(
+                    "oldPassword", "old-password",
+                    "newPassword", "new-password"
+            ));
+            assertEquals(0, result.getCode(), "用户不存在应失败");
+            assertTrue(result.getMsg().contains("不存在"));
+        }
+    }
 }
