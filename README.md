@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="docs/pic/logo1.png" alt="小墨 Logo" width="120">
+</div>
+
 # 小墨 - 金融投资导学 AI 助手
 
 <div align="center">
