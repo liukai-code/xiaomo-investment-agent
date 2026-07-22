@@ -1,8 +1,8 @@
 <div align="center">
-  <img src="docs/pic/logo1.png" alt="小墨 Logo" width="120">
-  <h1>小墨 Xiaomo</h1>
-  <p><strong>基于 Spring AI 的金融投资 AI 助手</strong></p>
-  <p>自然语言输入 → 意图识别 → Tool Calling → 数据分析生成</p>
+  <img src="docs/pic/logo1.png" alt="小墨 Logo" width="100">
+  <h1 style="margin-top: 0.5em; margin-bottom: 0.3em;">小墨 Xiaomo</h1>
+  <p style="margin-top: 0; margin-bottom: 0.5em;"><strong>基于 Spring AI 的金融投资 AI 助手</strong></p>
+  <p style="margin-top: 0; margin-bottom: 0.5em;">自然语言输入 → 意图识别 → Tool Calling → 数据分析生成</p>
 </div>
 
 <div align="center">
