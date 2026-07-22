@@ -47,12 +47,40 @@ public class UsageRecordServiceImpl implements UsageRecordService {
         usageRecordRepository.save(record);
     }
 
+    /**
+     * 查找统计重置时间点，优先激活配置，回退到任意一条配置
+     */
+    private LocalDateTime findStatsResetAt(Long userId) {
+        Optional<UserConfig> config = userConfigRepository.findByUserIdAndIsActiveTrue(userId);
+        if (config.isPresent() && config.get().getStatsResetAt() != null) {
+            return config.get().getStatsResetAt();
+        }
+        // 回退：找任意一条配置
+        var allConfigs = userConfigRepository.findByUserIdOrderByCreatedAtAsc(userId);
+        for (UserConfig cfg : allConfigs) {
+            if (cfg.getStatsResetAt() != null) {
+                return cfg.getStatsResetAt();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 查找要更新的配置，优先激活配置，回退到任意一条
+     */
+    private UserConfig findConfigForUpdate(Long userId) {
+        Optional<UserConfig> config = userConfigRepository.findByUserIdAndIsActiveTrue(userId);
+        if (config.isPresent()) {
+            return config.get();
+        }
+        var allConfigs = userConfigRepository.findByUserIdOrderByCreatedAtAsc(userId);
+        return allConfigs.isEmpty() ? null : allConfigs.get(0);
+    }
+
     @Override
     @Transactional(readOnly = true)
     public UsageStatsDTO getStats(Long userId) {
-        // 获取统计重置时间点
-        Optional<UserConfig> config = userConfigRepository.findByUserIdAndIsActiveTrue(userId);
-        LocalDateTime since = config.map(UserConfig::getStatsResetAt).orElse(null);
+        LocalDateTime since = findStatsResetAt(userId);
 
         UsageStatsDTO dto = new UsageStatsDTO();
         if (since != null) {
@@ -76,28 +104,22 @@ public class UsageRecordServiceImpl implements UsageRecordService {
     @Override
     @Transactional
     public void resetStats(Long userId) {
-        // 只更新重置时间戳，不删除任何数据
-        Optional<UserConfig> config = userConfigRepository.findByUserIdAndIsActiveTrue(userId);
-        if (config.isPresent()) {
-            UserConfig cfg = config.get();
-            cfg.setStatsResetAt(LocalDateTime.now());
-            userConfigRepository.save(cfg);
-        } else {
-            // 如果没有激活渠道，找任意一条配置记录
-            var allConfigs = userConfigRepository.findByUserIdOrderByCreatedAtAsc(userId);
-            if (!allConfigs.isEmpty()) {
-                UserConfig cfg = allConfigs.get(0);
-                cfg.setStatsResetAt(LocalDateTime.now());
-                userConfigRepository.save(cfg);
-            }
+        UserConfig cfg = findConfigForUpdate(userId);
+        if (cfg == null) {
+            // 用户没有任何配置（如纯免费额度用户），创建一条用于记录重置时间
+            cfg = new UserConfig();
+            cfg.setUserId(userId);
+            cfg.setChannelName("统计记录");
+            cfg.setIsActive(false);
         }
+        cfg.setStatsResetAt(LocalDateTime.now());
+        userConfigRepository.save(cfg);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<DailyUsageDTO> getDailyStats(Long userId) {
-        Optional<UserConfig> config = userConfigRepository.findByUserIdAndIsActiveTrue(userId);
-        LocalDateTime since = config.map(UserConfig::getStatsResetAt).orElse(null);
+        LocalDateTime since = findStatsResetAt(userId);
 
         List<Object[]> rows;
         if (since != null) {

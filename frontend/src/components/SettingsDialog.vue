@@ -164,7 +164,7 @@
             <div class="account-info-card">
               <div class="info-row">
                 <span class="info-label"><Shield :size="14" /> 账号</span>
-                <span class="info-value mono">{{ authStore.accountId || '—' }}</span>
+                <span class="info-value">{{ authStore.accountId || '—' }}</span>
               </div>
               <div class="info-row">
                 <span class="info-label"><Globe :size="14" /> 邮箱</span>
