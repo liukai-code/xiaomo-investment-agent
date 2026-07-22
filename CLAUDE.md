@@ -32,7 +32,7 @@ docker-compose up --build        # app + PostgreSQL + Redis
 ## Project Structure
 
 ```
-src/main/java/com/itlk/myclaudecode/
+src/main/java/com/xiaomo/agent/
 ├── agent/service/impl/AgentLoopImpl.java   # Core: AI chat loop, context management, tool registration
 ├── auth/                                    # Token auth (Redis-backed, 72h TTL, single-session)
 ├── common/config/                           # WebMvcConfig, RedisConfig, McpKeepAliveService, HttpClientService

@@ -2,7 +2,7 @@ spring:
   profiles:
     active: local
   application:
-    name: my-claude-code
+    name: xiaomo-agent
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}

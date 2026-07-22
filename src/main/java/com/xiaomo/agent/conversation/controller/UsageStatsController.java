@@ -1,0 +1,52 @@
+package com.xiaomo.agent.conversation.controller;
+
+import com.xiaomo.agent.common.entity.Result;
+import com.xiaomo.agent.conversation.service.DailyUsageDTO;
+import com.xiaomo.agent.conversation.service.UsageRecordService;
+import com.xiaomo.agent.conversation.service.UsageStatsDTO;
+import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/usage")
+public class UsageStatsController {
+
+    @Resource
+    private UsageRecordService usageRecordService;
+
+    @GetMapping("/stats")
+    public Result<UsageStatsDTO> getStats(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.error("用户未登录");
+        }
+        UsageStatsDTO stats = usageRecordService.getStats(userId);
+        return Result.success(stats);
+    }
+
+    @GetMapping("/daily")
+    public Result<List<DailyUsageDTO>> getDailyStats(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.error("用户未登录");
+        }
+        List<DailyUsageDTO> dailyStats = usageRecordService.getDailyStats(userId);
+        return Result.success(dailyStats);
+    }
+
+    @DeleteMapping("/stats")
+    public Result<Void> resetStats(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.error("用户未登录");
+        }
+        usageRecordService.resetStats(userId);
+        return Result.success();
+    }
+}

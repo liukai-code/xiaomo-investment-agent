@@ -172,8 +172,8 @@ CREATE TABLE document_chunks (
 ### 4.1 目录结构
 
 ```
-src/main/java/com/itlk/myclaudecode/
-├── MyClaudeCodeApplication.java
+src/main/java/com/xiaomo/agent/
+├── XiaomoApplication.java
 │
 ├── agent/                              # [已有] Agent 核心
 │   ├── config/
@@ -720,4 +720,4 @@ Week 2:
 ---
 
 *文档生成时间：2026-06-17*
-*项目仓库：my-claude-code*
+*项目仓库：xiaomo-agent*

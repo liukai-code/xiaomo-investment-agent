@@ -62,7 +62,7 @@
 ### 3.1 目录结构
 
 ```
-src/main/java/com/itlk/myclaudecode/
+src/main/java/com/xiaomo/agent/
 ├── agent/
 │   ├── service/
 │   │   └── Impl/
@@ -457,4 +457,4 @@ curl -N "http://localhost:4545/agent/chat/stream?message=列出项目文件"
 ---
 
 *文档生成时间：2026-06-24*
-*项目仓库：my-claude-code*
+*项目仓库：xiaomo-agent*

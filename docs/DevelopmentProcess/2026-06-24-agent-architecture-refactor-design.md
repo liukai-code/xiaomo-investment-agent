@@ -35,7 +35,7 @@
 ### 2.1 现有代码结构
 
 ```
-src/main/java/com/itlk/myclaudecode/agent/
+src/main/java/com/xiaomo/agent/agent/
 ├── congfig/
 │   └── AnthropicConfig.java      # 配置类（手动读取配置）
 ├── controller/
@@ -209,7 +209,7 @@ system-default-prompt: |
 
 ### 4.2 步骤 2：重构 AgentLoopImpl
 
-**文件路径**：`src/main/java/com/itlk/myclaudecode/agent/service/Impl/AgentLoopImpl.java`
+**文件路径**：`src/main/java/com/xiaomo/agent/agent/service/Impl/AgentLoopImpl.java`
 
 **变更内容**：
 - 移除 `AnthropicConfig` 依赖
@@ -219,7 +219,7 @@ system-default-prompt: |
 
 ### 4.3 步骤 3：删除 AnthropicConfig
 
-**文件路径**：`src/main/java/com/itlk/myclaudecode/agent/congfig/AnthropicConfig.java`
+**文件路径**：`src/main/java/com/xiaomo/agent/agent/congfig/AnthropicConfig.java`
 
 **变更内容**：删除整个文件
 
@@ -360,4 +360,4 @@ public class AgentLoopImpl implements AgentLoop {
 
 *文档生成时间：2026-06-24*
 *最后更新时间：2026-06-24*
-*项目仓库：my-claude-code*
+*项目仓库：xiaomo-agent*

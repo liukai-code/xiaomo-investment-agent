@@ -74,7 +74,7 @@ LLM 工作流：用户提问 → LLM 先调用 `getDatabaseSchema` 了解表结�
 ### 3.1 目录结构
 
 ```
-src/main/java/com/itlk/myclaudecode/
+src/main/java/com/xiaomo/agent/
 ├── tool/
 │   ├── FileListTool.java          # [已有]
 │   ├── FileReadTool.java          # [已有]
@@ -679,4 +679,4 @@ curl "http://localhost:4545/agent/chat?message=数据库有哪些表"
 ---
 
 *文档生成时间：2026-06-27*
-*项目仓库：my-claude-code*
+*项目仓库：xiaomo-agent*

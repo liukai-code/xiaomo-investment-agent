@@ -90,7 +90,7 @@ Controller → AgentLoopImpl → ConversationRepository (DB)
 ### 3.1 目录结构
 
 ```
-src/main/java/com/itlk/myclaudecode/
+src/main/java/com/xiaomo/agent/
 ├── agent/
 │   ├── Entity/
 │   │   ├── Conversation.java       # [新增] 会话实体
@@ -453,4 +453,4 @@ curl "http://localhost:4545/agent/conversation/1/messages"
 ---
 
 *文档生成时间：2026-06-24*
-*项目仓库：my-claude-code*
+*项目仓库：xiaomo-agent*

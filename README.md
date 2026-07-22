@@ -185,7 +185,7 @@ Agent Tool Calling
 ## 项目结构
 
 ```
-src/main/java/com/itlk/myclaudecode/
+src/main/java/com/xiaomo/agent/
 ├── agent/              # AI Agent 核心（意图识别、工具调用）
 ├── tool/               # Tool 工具系统
 │   ├── Financial*      # 金融计算工具（22种）

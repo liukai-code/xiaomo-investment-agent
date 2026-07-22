@@ -24,13 +24,13 @@
 
 | 文件路径 | 职责 |
 |---------|------|
-| `src/main/java/com/itlk/myclaudecode/user/config/UserConfig.java` | 用户配置实体类 |
-| `src/main/java/com/itlk/myclaudecode/user/config/UserConfigRepository.java` | 数据访问层 |
-| `src/main/java/com/itlk/myclaudecode/user/config/UserConfigService.java` | 用户配置业务逻辑 |
-| `src/main/java/com/itlk/myclaudecode/user/config/ConfigController.java` | 配置管理REST API |
-| `src/main/java/com/itlk/myclaudecode/common/util/EncryptionService.java` | AES-256-GCM加密解密服务 |
+| `src/main/java/com/xiaomo/agent/user/config/UserConfig.java` | 用户配置实体类 |
+| `src/main/java/com/xiaomo/agent/user/config/UserConfigRepository.java` | 数据访问层 |
+| `src/main/java/com/xiaomo/agent/user/config/UserConfigService.java` | 用户配置业务逻辑 |
+| `src/main/java/com/xiaomo/agent/user/config/ConfigController.java` | 配置管理REST API |
+| `src/main/java/com/xiaomo/agent/common/util/EncryptionService.java` | AES-256-GCM加密解密服务 |
 | `src/main/resources/db/migration/V2__create_user_config_table.sql` | 数据库迁移脚本 |
-| `src/main/java/com/itlk/myclaudecode/agent/service/impl/AgentLoopImpl.java` | 修改：使用用户配置 |
+| `src/main/java/com/xiaomo/agent/agent/service/impl/AgentLoopImpl.java` | 修改：使用用户配置 |
 
 ### 前端文件
 
@@ -89,7 +89,7 @@ git commit -m "feat: 添加用户配置表数据库迁移脚本"
 ## Task 2: 创建UserConfig实体类
 
 **Files:**
-- Create: `src/main/java/com/itlk/myclaudecode/user/config/UserConfig.java`
+- Create: `src/main/java/com/xiaomo/agent/user/config/UserConfig.java`
 
 **Interfaces:**
 - Produces: `UserConfig` 实体类，包含`id`, `userId`, `apiKeyEncrypted`, `baseUrl`, `modelName`, `createdAt`, `updatedAt`字段
@@ -97,7 +97,7 @@ git commit -m "feat: 添加用户配置表数据库迁移脚本"
 - [ ] **Step 1: 创建UserConfig实体类**
 
 ```java
-package com.itlk.myclaudecode.user.config;
+package com.xiaomo.agent.user.config;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -197,7 +197,7 @@ public class UserConfig {
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/java/com/itlk/myclaudecode/user/config/UserConfig.java
+git add src/main/java/com/xiaomo/agent/user/config/UserConfig.java
 git commit -m "feat: 创建UserConfig实体类"
 ```
 
@@ -206,7 +206,7 @@ git commit -m "feat: 创建UserConfig实体类"
 ## Task 3: 创建UserConfigRepository
 
 **Files:**
-- Create: `src/main/java/com/itlk/myclaudecode/user/config/UserConfigRepository.java`
+- Create: `src/main/java/com/xiaomo/agent/user/config/UserConfigRepository.java`
 
 **Interfaces:**
 - Produces: `UserConfigRepository` 接口，提供`findByUserId`方法
@@ -214,7 +214,7 @@ git commit -m "feat: 创建UserConfig实体类"
 - [ ] **Step 1: 创建UserConfigRepository接口**
 
 ```java
-package com.itlk.myclaudecode.user.config;
+package com.xiaomo.agent.user.config;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -237,7 +237,7 @@ public interface UserConfigRepository extends JpaRepository<UserConfig, Long> {
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/java/com/itlk/myclaudecode/user/config/UserConfigRepository.java
+git add src/main/java/com/xiaomo/agent/user/config/UserConfigRepository.java
 git commit -m "feat: 创建UserConfigRepository接口"
 ```
 
@@ -246,7 +246,7 @@ git commit -m "feat: 创建UserConfigRepository接口"
 ## Task 4: 创建EncryptionService加密服务
 
 **Files:**
-- Create: `src/main/java/com/itlk/myclaudecode/common/util/EncryptionService.java`
+- Create: `src/main/java/com/xiaomo/agent/common/util/EncryptionService.java`
 
 **Interfaces:**
 - Produces: `EncryptionService` 类，提供`encrypt(String plaintext)`和`decrypt(String ciphertext)`方法
@@ -254,7 +254,7 @@ git commit -m "feat: 创建UserConfigRepository接口"
 - [ ] **Step 1: 创建EncryptionService类**
 
 ```java
-package com.itlk.myclaudecode.common.util;
+package com.xiaomo.agent.common.util;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -339,7 +339,7 @@ public class EncryptionService {
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/java/com/itlk/myclaudecode/common/util/EncryptionService.java
+git add src/main/java/com/xiaomo/agent/common/util/EncryptionService.java
 git commit -m "feat: 创建AES-256-GCM加密服务"
 ```
 
@@ -348,7 +348,7 @@ git commit -m "feat: 创建AES-256-GCM加密服务"
 ## Task 5: 创建UserConfigService业务逻辑
 
 **Files:**
-- Create: `src/main/java/com/itlk/myclaudecode/user/config/UserConfigService.java`
+- Create: `src/main/java/com/xiaomo/agent/user/config/UserConfigService.java`
 
 **Interfaces:**
 - Consumes: `UserConfigRepository`, `EncryptionService`, `RedisTemplate`
@@ -357,7 +357,7 @@ git commit -m "feat: 创建AES-256-GCM加密服务"
 - [ ] **Step 1: 创建UserConfigDTO类**
 
 ```java
-package com.itlk.myclaudecode.user.config;
+package com.xiaomo.agent.user.config;
 
 public class UserConfigDTO {
 
@@ -395,9 +395,9 @@ public class UserConfigDTO {
 - [ ] **Step 2: 创建UserConfigService类**
 
 ```java
-package com.itlk.myclaudecode.user.config;
+package com.xiaomo.agent.user.config;
 
-import com.itlk.myclaudecode.common.util.EncryptionService;
+import com.xiaomo.agent.common.util.EncryptionService;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -550,7 +550,7 @@ public class UserConfigService {
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/main/java/com/itlk/myclaudecode/user/config/UserConfigDTO.java src/main/java/com/itlk/myclaudecode/user/config/UserConfigService.java
+git add src/main/java/com/xiaomo/agent/user/config/UserConfigDTO.java src/main/java/com/xiaomo/agent/user/config/UserConfigService.java
 git commit -m "feat: 创建UserConfigService业务逻辑"
 ```
 
@@ -559,7 +559,7 @@ git commit -m "feat: 创建UserConfigService业务逻辑"
 ## Task 6: 创建ConfigController REST API
 
 **Files:**
-- Create: `src/main/java/com/itlk/myclaudecode/user/config/ConfigController.java`
+- Create: `src/main/java/com/xiaomo/agent/user/config/ConfigController.java`
 
 **Interfaces:**
 - Consumes: `UserConfigService`, `UserService`(获取当前用户ID)
@@ -568,10 +568,10 @@ git commit -m "feat: 创建UserConfigService业务逻辑"
 - [ ] **Step 1: 创建ConfigController类**
 
 ```java
-package com.itlk.myclaudecode.user.config;
+package com.xiaomo.agent.user.config;
 
-import com.itlk.myclaudecode.common.Result;
-import com.itlk.myclaudecode.user.service.UserService;
+import com.xiaomo.agent.common.Result;
+import com.xiaomo.agent.user.service.UserService;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -636,7 +636,7 @@ public class ConfigController {
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/java/com/itlk/myclaudecode/user/config/ConfigController.java
+git add src/main/java/com/xiaomo/agent/user/config/ConfigController.java
 git commit -m "feat: 创建ConfigController REST API"
 ```
 
@@ -645,7 +645,7 @@ git commit -m "feat: 创建ConfigController REST API"
 ## Task 7: 修改AgentLoopImpl使用用户配置
 
 **Files:**
-- Modify: `src/main/java/com/itlk/myclaudecode/agent/service/impl/AgentLoopImpl.java`
+- Modify: `src/main/java/com/xiaomo/agent/agent/service/impl/AgentLoopImpl.java`
 
 **Interfaces:**
 - Consumes: `UserConfigService`
@@ -694,7 +694,7 @@ String modelName = userConfig.getModelName();
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/java/com/itlk/myclaudecode/agent/service/impl/AgentLoopImpl.java
+git add src/main/java/com/xiaomo/agent/agent/service/impl/AgentLoopImpl.java
 git commit -m "feat: 修改AgentLoopImpl使用用户配置调用大模型"
 ```
 

@@ -80,8 +80,8 @@ systemctl restart docker
 
 ```bash
 cd /opt
-git clone https://github.com/你的用户名/你的仓库.git my-claude-code
-cd my-claude-code
+git clone https://github.com/你的用户名/你的仓库.git xiaomo-agent
+cd xiaomo-agent
 ```
 
 ### 3.2 配置环境变量
@@ -259,7 +259,7 @@ docker compose down -v            # 停止并删除数据卷（⚠️ 清除数�
 ### 更新部署
 
 ```bash
-cd /opt/my-claude-code
+cd /opt/xiaomo-agent
 git pull
 docker compose up -d --build
 ```
@@ -308,7 +308,7 @@ docker ps | grep postgres
 docker compose logs app | grep "Started"
 ```
 
-看到 `Started MyClaudeCodeApplication` 说明后端启动成功。清浏览器缓存后重试。
+看到 `Started XiaomoApplication` 说明后端启动成功。清浏览器缓存后重试。
 
 ### Nginx 502 Bad Gateway
 

@@ -71,7 +71,7 @@
 ### 1.2 包结构
 
 ```
-com.itlk.myclaudecode.workflow/
+com.xiaomo.agent.workflow/
 ├── engine/                          # 工作流引擎
 │   ├── WorkflowNode.java           # 节点接口
 │   ├── WorkflowEdge.java           # 边定义（条件转移）

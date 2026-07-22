@@ -25,15 +25,15 @@
 ## Task 1: 后端 AnalysisService + AnalysisController + Tool
 
 **Files:**
-- Modify: `src/main/java/com/itlk/myclaudecode/workflow/persist/WorkflowAnalysis.java` — conversationId 改为 nullable
-- Modify: `src/main/java/com/itlk/myclaudecode/workflow/persist/WorkflowAnalysisRepository.java` — 新增查询方法
-- Modify: `src/main/java/com/itlk/myclaudecode/workflow/service/DeepAnalysisWorkflow.java` — 新增 `executeWithAnalysisId()` 方法 + 事件发布机制
-- Create: `src/main/java/com/itlk/myclaudecode/analysis/controller/AnalysisController.java`
-- Create: `src/main/java/com/itlk/myclaudecode/analysis/service/AnalysisService.java`
-- Create: `src/main/java/com/itlk/myclaudecode/tool/GetAnalysisReportTool.java`
-- Modify: `src/main/java/com/itlk/myclaudecode/agent/service/impl/AgentLoopImpl.java` — 注册新 Tool
-- Test: `src/test/java/com/itlk/myclaudecode/analysis/service/AnalysisServiceTest.java`
-- Test: `src/test/java/com/itlk/myclaudecode/tool/GetAnalysisReportToolTest.java`
+- Modify: `src/main/java/com/xiaomo/agent/workflow/persist/WorkflowAnalysis.java` — conversationId 改为 nullable
+- Modify: `src/main/java/com/xiaomo/agent/workflow/persist/WorkflowAnalysisRepository.java` — 新增查询方法
+- Modify: `src/main/java/com/xiaomo/agent/workflow/service/DeepAnalysisWorkflow.java` — 新增 `executeWithAnalysisId()` 方法 + 事件发布机制
+- Create: `src/main/java/com/xiaomo/agent/analysis/controller/AnalysisController.java`
+- Create: `src/main/java/com/xiaomo/agent/analysis/service/AnalysisService.java`
+- Create: `src/main/java/com/xiaomo/agent/tool/GetAnalysisReportTool.java`
+- Modify: `src/main/java/com/xiaomo/agent/agent/service/impl/AgentLoopImpl.java` — 注册新 Tool
+- Test: `src/test/java/com/xiaomo/agent/analysis/service/AnalysisServiceTest.java`
+- Test: `src/test/java/com/xiaomo/agent/tool/GetAnalysisReportToolTest.java`
 
 **Interfaces:**
 - Consumes: `DeepAnalysisWorkflow.execute(userId, conversationId, query)`, `WorkflowAnalysisRepository`, `StockCodeExtractor`, `ObjectMapper`
@@ -43,7 +43,7 @@
 
 ### Step 1: 修改 WorkflowAnalysis 实体 — conversationId 改为 nullable
 
-文件: `src/main/java/com/itlk/myclaudecode/workflow/persist/WorkflowAnalysis.java`
+文件: `src/main/java/com/xiaomo/agent/workflow/persist/WorkflowAnalysis.java`
 
 将 `conversationId` 字段改为 nullable（独立分析不关联对话）:
 
@@ -60,10 +60,10 @@ ALTER TABLE workflow_analyses ALTER COLUMN conversation_id DROP NOT NULL;
 
 ### Step 2: 新增 Repository 查询方法
 
-文件: `src/main/java/com/itlk/myclaudecode/workflow/persist/WorkflowAnalysisRepository.java`
+文件: `src/main/java/com/xiaomo/agent/workflow/persist/WorkflowAnalysisRepository.java`
 
 ```java
-package com.itlk.myclaudecode.workflow.persist;
+package com.xiaomo.agent.workflow.persist;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
@@ -89,7 +89,7 @@ public interface WorkflowAnalysisRepository extends JpaRepository<WorkflowAnalys
 
 ### Step 3: DeepAnalysisWorkflow 新增事件发布机制
 
-文件: `src/main/java/com/itlk/myclaudecode/workflow/service/DeepAnalysisWorkflow.java`
+文件: `src/main/java/com/xiaomo/agent/workflow/service/DeepAnalysisWorkflow.java`
 
 新增字段和方法（不修改现有 `execute()` 逻辑）:
 
@@ -126,7 +126,7 @@ public void removeEventSink(Long analysisId) {
 
 ### Step 4: DeepAnalysisWorkflow 新增 executeWithAnalysisId 方法
 
-文件: `src/main/java/com/itlk/myclaudecode/workflow/service/DeepAnalysisWorkflow.java`
+文件: `src/main/java/com/xiaomo/agent/workflow/service/DeepAnalysisWorkflow.java`
 
 新增重载方法，接受预创建的 analysisId，不创建对话:
 
@@ -207,13 +207,13 @@ private void persistResultsWithId(WorkflowState state, Long analysisId, String s
 
 ### Step 5: 创建 AnalysisService
 
-文件: `src/main/java/com/itlk/myclaudecode/analysis/service/AnalysisService.java`
+文件: `src/main/java/com/xiaomo/agent/analysis/service/AnalysisService.java`
 
 ```java
-package com.itlk.myclaudecode.analysis.service;
+package com.xiaomo.agent.analysis.service;
 
-import com.itlk.myclaudecode.workflow.persist.WorkflowAnalysis;
-import com.itlk.myclaudecode.workflow.persist.WorkflowAnalysisRepository;
+import com.xiaomo.agent.workflow.persist.WorkflowAnalysis;
+import com.xiaomo.agent.workflow.persist.WorkflowAnalysisRepository;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -305,18 +305,18 @@ public class AnalysisService {
 
 ### Step 6: 创建 AnalysisController
 
-文件: `src/main/java/com/itlk/myclaudecode/analysis/controller/AnalysisController.java`
+文件: `src/main/java/com/xiaomo/agent/analysis/controller/AnalysisController.java`
 
 ```java
-package com.itlk.myclaudecode.analysis.controller;
+package com.xiaomo.agent.analysis.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.itlk.myclaudecode.analysis.service.AnalysisService;
-import com.itlk.myclaudecode.common.entity.Result;
-import com.itlk.myclaudecode.workflow.event.WorkflowEvent;
-import com.itlk.myclaudecode.workflow.persist.WorkflowAnalysis;
-import com.itlk.myclaudecode.workflow.service.DeepAnalysisWorkflow;
-import com.itlk.myclaudecode.workflow.util.StockCodeExtractor;
+import com.xiaomo.agent.analysis.service.AnalysisService;
+import com.xiaomo.agent.common.entity.Result;
+import com.xiaomo.agent.workflow.event.WorkflowEvent;
+import com.xiaomo.agent.workflow.persist.WorkflowAnalysis;
+import com.xiaomo.agent.workflow.service.DeepAnalysisWorkflow;
+import com.xiaomo.agent.workflow.util.StockCodeExtractor;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -478,13 +478,13 @@ public class AnalysisController {
 
 ### Step 7: 创建 GetAnalysisReportTool
 
-文件: `src/main/java/com/itlk/myclaudecode/tool/GetAnalysisReportTool.java`
+文件: `src/main/java/com/xiaomo/agent/tool/GetAnalysisReportTool.java`
 
 ```java
-package com.itlk.myclaudecode.tool;
+package com.xiaomo.agent.tool;
 
-import com.itlk.myclaudecode.analysis.service.AnalysisService;
-import com.itlk.myclaudecode.workflow.persist.WorkflowAnalysis;
+import com.xiaomo.agent.analysis.service.AnalysisService;
+import com.xiaomo.agent.workflow.persist.WorkflowAnalysis;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
@@ -567,14 +567,14 @@ public class GetAnalysisReportTool {
 
 ### Step 8: 注册 GetAnalysisReportTool 到 AgentLoopImpl
 
-文件: `src/main/java/com/itlk/myclaudecode/agent/service/impl/AgentLoopImpl.java`
+文件: `src/main/java/com/xiaomo/agent/agent/service/impl/AgentLoopImpl.java`
 
 1. 构造函数新增参数: `GetAnalysisReportTool getAnalysisReportTool`
 2. `MethodToolCallbackProvider.builder().toolObjects(...)` 中新增: `getAnalysisReportTool`
 
 ### Step 9: 编写后端测试
 
-文件: `src/test/java/com/itlk/myclaudecode/analysis/service/AnalysisServiceTest.java`
+文件: `src/test/java/com/xiaomo/agent/analysis/service/AnalysisServiceTest.java`
 
 ```java
 @ExtendWith(MockitoExtension.class)
@@ -621,7 +621,7 @@ class AnalysisServiceTest {
 }
 ```
 
-文件: `src/test/java/com/itlk/myclaudecode/tool/GetAnalysisReportToolTest.java`
+文件: `src/test/java/com/xiaomo/agent/tool/GetAnalysisReportToolTest.java`
 
 ```java
 @ExtendWith(MockitoExtension.class)
@@ -1828,13 +1828,13 @@ cd frontend && npm run dev
 ## Task 5: 后端测试 + 端到端验证
 
 **Files:**
-- Test: `src/test/java/com/itlk/myclaudecode/analysis/controller/AnalysisControllerTest.java`
+- Test: `src/test/java/com/xiaomo/agent/analysis/controller/AnalysisControllerTest.java`
 
 ---
 
 ### Step 1: 编写 AnalysisController 集成测试
 
-文件: `src/test/java/com/itlk/myclaudecode/analysis/controller/AnalysisControllerTest.java`
+文件: `src/test/java/com/xiaomo/agent/analysis/controller/AnalysisControllerTest.java`
 
 ```java
 @ExtendWith(MockitoExtension.class)

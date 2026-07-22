@@ -65,7 +65,7 @@ Spring AI 自动配置类 `ToolCallingAutoConfiguration` 的 `toolCallingManager
 
 #### 1. 新建 `MaxToolCallManager.java`
 
-路径：`src/main/java/com/itlk/myclaudecode/agent/service/impl/MaxToolCallManager.java`
+路径：`src/main/java/com/xiaomo/agent/agent/service/impl/MaxToolCallManager.java`
 
 实现 `ToolCallingManager` 接口，包装 `DefaultToolCallingManager`，加入两个防护：
 
@@ -74,13 +74,13 @@ Spring AI 自动配置类 `ToolCallingAutoConfiguration` 的 `toolCallingManager
 
 #### 2. 新建 `ToolCallLimitExceededException.java`
 
-路径：`src/main/java/com/itlk/myclaudecode/common/exception/ToolCallLimitExceededException.java`
+路径：`src/main/java/com/xiaomo/agent/common/exception/ToolCallLimitExceededException.java`
 
 继承 `RuntimeException`，携带友好中文提示："工具调用次数已达上限（N 轮），请尝试简化问题或分步提问"
 
 #### 3. 修改 `AgentLoopImpl.java`
 
-路径：`src/main/java/com/itlk/myclaudecode/agent/service/impl/AgentLoopImpl.java`
+路径：`src/main/java/com/xiaomo/agent/agent/service/impl/AgentLoopImpl.java`
 
 - 注入 `MaxToolCallManager`
 - `chat()` 和 `chatStream()` 开头调用 `maxToolCallManager.reset()` 重置状态

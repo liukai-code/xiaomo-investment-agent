@@ -85,7 +85,7 @@
 
 ### 3.1 `User.java` — 用户实体
 
-路径：`src/main/java/com/itlk/myclaudecode/agent/Entity/User.java`
+路径：`src/main/java/com/xiaomo/agent/agent/Entity/User.java`
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -98,14 +98,14 @@
 
 ### 3.2 `UserRepository.java`
 
-路径：`src/main/java/com/itlk/myclaudecode/agent/repository/UserRepository.java`
+路径：`src/main/java/com/xiaomo/agent/agent/repository/UserRepository.java`
 
 - `findByUsername(String username)` — 登录时查询
 - `existsByUsername(String username)` — 注册时校验重名
 
 ### 3.3 `TokenManager.java`
 
-路径：`src/main/java/com/itlk/myclaudecode/agent/service/TokenManager.java`
+路径：`src/main/java/com/xiaomo/agent/agent/service/TokenManager.java`
 
 | 方法 | 说明 |
 |------|------|
@@ -115,7 +115,7 @@
 
 ### 3.4 `AuthController.java`
 
-路径：`src/main/java/com/itlk/myclaudecode/agent/controller/AuthController.java`
+路径：`src/main/java/com/xiaomo/agent/agent/controller/AuthController.java`
 
 **API 接口：**
 
@@ -134,7 +134,7 @@
 
 ### 3.5 `AuthInterceptor.java`
 
-路径：`src/main/java/com/itlk/myclaudecode/config/AuthInterceptor.java`
+路径：`src/main/java/com/xiaomo/agent/config/AuthInterceptor.java`
 
 - 从 `Authorization: Bearer <token>` 提取 token
 - 调用 `TokenManager.getUserId()` 验证
@@ -143,7 +143,7 @@
 
 ### 3.6 `WebMvcConfig.java`
 
-路径：`src/main/java/com/itlk/myclaudecode/config/WebMvcConfig.java`
+路径：`src/main/java/com/xiaomo/agent/config/WebMvcConfig.java`
 
 拦截器注册配置：
 
@@ -156,7 +156,7 @@
 
 ### 3.7 `GlobalExceptionHandler.java`
 
-路径：`src/main/java/com/itlk/myclaudecode/config/GlobalExceptionHandler.java`
+路径：`src/main/java/com/xiaomo/agent/config/GlobalExceptionHandler.java`
 
 捕获 `RuntimeException`，返回 `Result.error(e.getMessage())`，避免 500 错误直接暴露堆栈。
 

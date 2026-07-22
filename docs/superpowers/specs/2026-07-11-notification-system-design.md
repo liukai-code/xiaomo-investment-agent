@@ -198,21 +198,21 @@ data: {"id":2,"title":"专属通知","content":"...","createdAt":"...","broadcas
 
 ### 后端（新建）
 
-- `src/main/java/com/itlk/myclaudecode/notification/entity/Notification.java`
-- `src/main/java/com/itlk/myclaudecode/notification/entity/NotificationRecipient.java`
-- `src/main/java/com/itlk/myclaudecode/notification/repository/NotificationRepository.java`
-- `src/main/java/com/itlk/myclaudecode/notification/repository/NotificationRecipientRepository.java`
-- `src/main/java/com/itlk/myclaudecode/notification/service/NotificationService.java`
-- `src/main/java/com/itlk/myclaudecode/notification/service/impl/NotificationServiceImpl.java`
-- `src/main/java/com/itlk/myclaudecode/notification/service/NotificationSseService.java`
-- `src/main/java/com/itlk/myclaudecode/notification/controller/AdminNotificationController.java`
-- `src/main/java/com/itlk/myclaudecode/notification/controller/AdminUserController.java`
-- `src/main/java/com/itlk/myclaudecode/notification/controller/NotificationController.java`
-- `src/main/java/com/itlk/myclaudecode/notification/interceptor/AdminAuthInterceptor.java`
+- `src/main/java/com/xiaomo/agent/notification/entity/Notification.java`
+- `src/main/java/com/xiaomo/agent/notification/entity/NotificationRecipient.java`
+- `src/main/java/com/xiaomo/agent/notification/repository/NotificationRepository.java`
+- `src/main/java/com/xiaomo/agent/notification/repository/NotificationRecipientRepository.java`
+- `src/main/java/com/xiaomo/agent/notification/service/NotificationService.java`
+- `src/main/java/com/xiaomo/agent/notification/service/impl/NotificationServiceImpl.java`
+- `src/main/java/com/xiaomo/agent/notification/service/NotificationSseService.java`
+- `src/main/java/com/xiaomo/agent/notification/controller/AdminNotificationController.java`
+- `src/main/java/com/xiaomo/agent/notification/controller/AdminUserController.java`
+- `src/main/java/com/xiaomo/agent/notification/controller/NotificationController.java`
+- `src/main/java/com/xiaomo/agent/notification/interceptor/AdminAuthInterceptor.java`
 
 ### 后端（修改）
 
-- `src/main/java/com/itlk/myclaudecode/common/config/WebMvcConfig.java` — 注册 AdminAuthInterceptor
+- `src/main/java/com/xiaomo/agent/common/config/WebMvcConfig.java` — 注册 AdminAuthInterceptor
 - `src/main/resources/application.yml` — 添加 admin.password 配置
 
 ### 前端（新建）
