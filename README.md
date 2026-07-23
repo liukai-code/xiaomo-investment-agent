@@ -24,7 +24,7 @@
 ---
 
 <div align="center">
-  <img src="docs/pic/img_1.png" alt="小墨对话界面" width="85%">
+  <img src="docs/pic/web-shot.png" alt="小墨对话界面" width="85%">
 </div>
 
 ## 项目介绍
