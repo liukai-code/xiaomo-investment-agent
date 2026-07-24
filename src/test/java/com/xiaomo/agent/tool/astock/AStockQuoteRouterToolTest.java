@@ -65,30 +65,6 @@ class AStockQuoteRouterToolTest {
             String result = tool.a_stock_quote("unknownOp", "{}");
             assertTrue(result.contains("未知操作"), "未知操作应返回提示");
         }
-
-        @Test
-        @DisplayName("mootdxKline → 返回未实现提示")
-        void mootdxKlineNotImplemented() {
-            String result = tool.a_stock_quote("mootdxKline", "{\"stockCode\":\"600519\"}");
-            assertTrue(result.contains("尚未实现") || result.contains("请使用"),
-                    "mootdx应返回未实现提示");
-        }
-
-        @Test
-        @DisplayName("mootdxQuotes → 返回未实现提示")
-        void mootdxQuotesNotImplemented() {
-            String result = tool.a_stock_quote("mootdxQuotes", "{\"stockCode\":\"600519\"}");
-            assertTrue(result.contains("尚未实现") || result.contains("请使用"),
-                    "mootdx应返回未实现提示");
-        }
-
-        @Test
-        @DisplayName("mootdxTransaction → 返回未实现提示")
-        void mootdxTransactionNotImplemented() {
-            String result = tool.a_stock_quote("mootdxTransaction", "{\"stockCode\":\"600519\"}");
-            assertTrue(result.contains("尚未实现") || result.contains("请使用"),
-                    "mootdx应返回未实现提示");
-        }
     }
 
     @Nested

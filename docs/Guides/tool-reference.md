@@ -109,9 +109,6 @@
 |------|------|------|
 | `tencentQuote` | `stockCodes` | 批量查询实时行情（PE/PB/市值/换手率/涨跌停），逗号分隔代码 |
 | `baiduKline` | `stockCode`, `startTime`(可选) | K线数据（含MA5/10/20均线），默认最近180天 |
-| `mootdxKline` | — | TODO：mootdx TCP 协议未实现 |
-| `mootdxQuotes` | — | TODO |
-| `mootdxTransaction` | — | TODO |
 
 特殊：baiduKline 使用 JDK HttpClient 绕过 OkHttp TLS 指纹检测。
 

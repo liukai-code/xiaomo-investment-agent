@@ -71,7 +71,7 @@ frontend/src/
 
 | Tool | Operations | 数据源 |
 |------|-----------|--------|
-| AStockQuoteRouterTool | tencentQuote, baiduKline, mootdx*(TODO) | 腾讯/百度 |
+| AStockQuoteRouterTool | tencentQuote, baiduKline | 腾讯/百度 |
 | AStockReportRouterTool | stockReport, industryReport, downloadReportPdf, thsEpsForecast, iwencaiSearch, iwencaiQuery | 东财/同花顺/iwencai |
 | AStockSignalRouterTool | conceptBlocks, fundFlowMinute, dragonTigerBoard, dailyDragonTiger, lockupExpiry, industryRanking | 东财 push2/datacenter |
 | AStockCapitalRouterTool | marginTrading, blockTrade, holderNumChange, dividendHistory, fundFlow120d, northboundFlow | 东财 datacenter/Redis |

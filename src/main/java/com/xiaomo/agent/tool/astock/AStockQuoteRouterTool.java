@@ -31,9 +31,6 @@ public class AStockQuoteRouterTool {
             operation 可选值：
             - tencentQuote: 批量查询实时行情（PE/PB/市值/换手率/涨跌停）。参数: stockCodes（逗号分隔代码，如"600519,000858,510050"）
             - baiduKline: 查询K线数据（含MA5/10/20均线）。参数: stockCode, startTime（可选，默认""取最近）
-            - mootdxKline: TODO 占位（mootdx TCP 协议未实现，请用 baiduKline 替代）
-            - mootdxQuotes: TODO 占位（请用 tencentQuote 替代）
-            - mootdxTransaction: TODO 占位（逐笔成交暂未实现）
 
             params 为 JSON 字符串。
             """)
@@ -53,8 +50,6 @@ public class AStockQuoteRouterTool {
                     if (code.contains(",")) code = code.split(",")[0].trim();
                     yield baiduKline(code, getOptStr(p, "startTime", ""));
                 }
-                case "mootdxKline", "mootdxQuotes", "mootdxTransaction" ->
-                        "mootdx TCP 协议尚未在 Java 端实现，请使用 tencentQuote 或 baiduKline 替代";
                 default -> "未知操作: " + operation + "。可用操作：tencentQuote, baiduKline";
             };
         } catch (IllegalArgumentException e) {
