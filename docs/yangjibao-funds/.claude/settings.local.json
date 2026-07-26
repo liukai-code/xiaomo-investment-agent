@@ -1,8 +1,0 @@
-{
-  "enabledMcpjsonServers": [
-    "docx-editor",
-    "ppt-generator",
-    "pptx-viewer",
-    "carbone"
-  ]
-}

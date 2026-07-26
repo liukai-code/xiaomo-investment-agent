@@ -48,7 +48,12 @@ frontend/.vite/
 frontend/*.tsbuildinfo
 src/main/resources/static/
 
-### Docs - external repos ###
+### Docs - personal/sensitive ###
+docs/References/
+docs/a-stock-data/.claude/
+docs/yangjibao-funds/.claude/
+**/.claude/settings.local.json
+
+### Docs - external examples ###
 docs/a-stock-data/
 docs/门户网站示例/
-/docs/Guides/简历项目亮点总结.md
