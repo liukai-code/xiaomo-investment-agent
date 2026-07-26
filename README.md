@@ -1,11 +1,12 @@
 <div align="center">
   <img src="docs/pic/logo.png" alt="小墨 Logo" width="80">
   <h1 style="margin-top: 0.5em; margin-bottom: 0.3em;">小墨 Xiaomo</h1>
-  <p style="margin-top: 0; margin-bottom: 0.5em;"><strong>基于 Spring AI 的金融投资 AI 助手</strong></p>
-  <p style="margin-top: 0; margin-bottom: 0.5em;">自然语言输入 → 意图识别 → Tool Calling → 数据分析生成</p>
+  <p style="margin-top: 0; margin-bottom: 0.5em;"><strong>可部署运营的多用户金融投资 AI 助手平台</strong></p>
+  <p style="margin-top: 0; margin-bottom: 0.5em;">注册登录 · 管理后台 · Token 配额 · 一键 Docker 部署</p>
 </div>
 
 <div align="center">
+  <img src="https://img.shields.io/badge/Platform-Multi--User-2ecc71">
   <img src="https://img.shields.io/badge/Spring%20AI-1.0-6DB33F">
   <img src="https://img.shields.io/badge/Tool%20Calling-FF6B35">
   <img src="https://img.shields.io/badge/Workflow-DAG-9b59b6">
@@ -29,11 +30,20 @@
 
 ## 项目介绍
 
-小墨是一个基于 Spring AI 构建的个人投资分析 AI 助手，通过 Tool Calling、Workflow、多源金融数据以及用户持仓数据集成，实现自然语言驱动的金融查询、资产分析与投资研究辅助。
+小墨是一个基于 Spring AI 构建的**可部署运营**的金融投资 AI 助手平台。Docker Compose 一键部署后即可作为多用户服务运营 — 用户注册登录、管理员后台、Token 配额管理一应俱全。
 
 核心能力：用户用自然语言描述需求 → AI 理解意图 → 调用金融工具 → 返回分析结果。
 
-不同于简单的聊天机器人，小墨具备：
+### 多用户平台
+
+不同于只能本地跑的 demo 项目，小墨是一个**开箱即用的运营级平台**：
+- **用户系统**：邮箱注册登录，SHA-256 + BCrypt 双重加密，自动生成唯一数字账号
+- **管理员后台**：独立管理员登录、用户管理、公告通知推送（SSE 实时送达）
+- **Token 配额**：用户级别的免费 Token 配额管理，控制使用量
+- **会话隔离**：每个用户独立的对话历史、记忆画像、持仓数据
+
+### AI Agent 能力
+
 - **Tool Calling**：根据用户需求自动选择合适的金融工具
 - **持仓分析**：集成养基宝 API，支持个人基金账户数据分析
 - **会话记忆**：维护用户偏好和历史对话上下文
@@ -44,7 +54,11 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     用户界面 (Vue 3 + SSE)                   │
+│              用户界面 (Vue 3 + SSE) + 管理后台                │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────────┐
+│              平台层 (注册登录 / Token配额 / 通知推送)          │
 └───────────────────────────┬─────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────┐
@@ -137,6 +151,16 @@ AI Agent 分析
 | 金融计算 | "贷款 100 万月供多少" | 22 种计算工具 |
 
 ## 工程设计亮点
+
+### 平台运营架构
+
+小墨设计为可部署运营的多用户平台，而非单用户本地工具：
+
+- **用户认证**：邮箱注册登录，客户端 SHA-256 哈希 → 服务端 BCrypt 存储，Redis Token 管理（72h TTL，单设备在线）
+- **管理员系统**：独立密码登录，用户列表查看，公告通知创建与推送
+- **通知系统**：管理员创建通知 → 精准推送给目标用户 → SSE 实时送达前端 → 已读/隐藏状态管理
+- **Token 配额**：每个用户独立的免费 Token 配额，注册时自动分配，使用量实时统计
+- **数据隔离**：会话、记忆、持仓数据按用户 ID 完全隔离，互不干扰
 
 ### Tool Router 架构
 
@@ -232,7 +256,9 @@ src/main/java/com/xiaomo/agent/
 │   ├── Financial*      # 金融计算工具（22种）
 │   └── astock/         # A股数据工具（8个Router）
 ├── conversation/       # 会话管理
-├── auth/               # 认证授权
+├── auth/               # 用户认证（注册登录、Token管理）
+├── notification/       # 通知系统（管理员推送、SSE实时送达）
+├── memory/             # 用户画像 + 对话摘要
 └── user/               # 用户管理
 
 frontend/src/
@@ -255,14 +281,19 @@ cd xiaomo-investment-agent
 
 # 2. 配置环境变量
 cp .env.example .env
-# 编辑 .env 填入 API Key 等配置
+# 编辑 .env 填入 API Key、管理员密码等配置
 
-# 3. 启动服务
+# 3. 启动服务（自动拉起 PostgreSQL + Redis + 应用）
 docker-compose up -d
 
 # 4. 访问应用
 open http://localhost:4545
 ```
+
+部署完成后：
+- 用户访问首页即可注册登录
+- 管理员通过 `/api/admin/login` 登录管理后台（密码在 .env 中配置）
+- 管理员可查看用户列表、推送公告通知
 
 ### 方式二：本地开发
 
