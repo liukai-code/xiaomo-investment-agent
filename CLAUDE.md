@@ -34,17 +34,22 @@ docker-compose up --build        # app + PostgreSQL + Redis
 ```
 src/main/java/com/xiaomo/agent/
 ├── agent/service/impl/AgentLoopImpl.java   # Core: AI chat loop, context management, tool registration
+├── agent/intent/                            # Intent classifier + tool group mapping
+├── analysis/                                # AnalysisController + AnalysisService (深度分析管理)
 ├── auth/                                    # Token auth (Redis-backed, 72h TTL, single-session)
 ├── common/config/                           # WebMvcConfig, RedisConfig, McpKeepAliveService, HttpClientService
 ├── common/exception/                        # GlobalExceptionHandler
-├── conversation/                            # Conversation + ChatMessage CRUD, Redis caching
+├── conversation/                            # Conversation + ChatMessage CRUD, Redis caching, UsageStats
+├── memory/                                  # UserProfile + ConversationSummary 记忆系统
+├── notification/                            # 通知系统 (用户通知 + 管理后台)
 ├── tool/                                    # AI tools (see Tools section)
 │   └── astock/                              # A股数据工具集 (8 Router Tools + EastMoneyRateLimiter)
-└── user/                                    # User entity + repository
+├── user/                                    # User entity + repository + ConfigController
+└── workflow/                                # 多智能体工作流引擎 (DAG + Reactor)
 
 frontend/src/
 ├── api/chat.ts              # SSE streaming client (fetch + ReadableStream)
-├── stores/                  # Pinia: auth, chat, theme
+├── stores/                  # Pinia: auth, chat, analysis, yangjibao, notification
 ├── views/ChatView.vue       # Main chat UI
 ├── components/blocks/       # Markdown rendering components
 └── composables/useMarkdownBlocks.ts  # Streaming-friendly markdown parser
@@ -103,12 +108,25 @@ Local dev: copy `application.yml.example` to `src/main/resources/application-loc
 
 ## API Endpoints
 
-Auth: `POST /api/auth/{register,login,logout}`, `GET /api/auth/me`
+Auth: `POST /api/auth/{register,login,logout,changePassword}`, `GET /api/auth/me`, `GET/PUT /api/auth/preferences`
 - register/login 接收 `{email, password}`，register 返回 `{id, email, accountId}`，login 返回 `{token, userId, email, accountId}`
-- me 返回 `{id, email, accountId}`
+- me 返回 `{id, email, accountId, freeTokenQuota, freeTokenUsed, createdAt}`
 - 注册时自动生成唯一六位数字账号 `user_123456` 格式入库
 
-Agent: `GET/POST /agent/conversation/*`, `GET /agent/chat`, `GET /agent/chat/stream`
+Agent: `POST /agent/conversation`, `GET /agent/conversation/list`, `GET /agent/conversation/{id}/messages`, `DELETE /agent/conversation/{id}`, `POST /agent/conversation/{id}/generate-title`, `POST /agent/conversation/{id}/message`, `GET /agent/chat`, `GET /agent/chat/stream`, `GET /agent/chat/deep-analysis`
+
+Analysis: `POST /api/analysis/start`, `GET /api/analysis/{id}/stream`(SSE), `GET /api/analysis/list`, `GET /api/analysis/{id}`, `DELETE /api/analysis/{id}`, `POST /api/analysis/{id}/cancel`
+
+Memory: `GET/POST /memory/profiles`, `PUT/DELETE /memory/profiles/{id}`, `GET /memory/summaries/{conversationId}`
+
+Notification: `GET /api/notifications`, `GET /api/notifications/read-ids`, `GET /api/notifications/unread-count`, `POST /api/notifications/{id}/read`, `POST /api/notifications/{id}/hide`, `GET /api/notifications/stream`(SSE)
+
+Admin: `POST /api/admin/login`, `POST/GET /api/admin/notifications`, `GET /api/admin/notifications/{id}/recipients`, `DELETE /api/admin/notifications/{id}`, `GET /api/admin/users`
+
+UserConfig: `GET/POST/DELETE /api/user/config`, `POST /api/user/config/test`, `GET/POST /api/user/config/channels`, `GET/PUT/DELETE /api/user/config/channels/{channelId}`, `PUT /api/user/config/channels/{channelId}/activate`
+
+Usage: `GET /api/usage/stats`, `GET /api/usage/daily`, `DELETE /api/usage/stats`
+
 Response: `{ code: 1|0, msg, data }`
 
 ## Documentation

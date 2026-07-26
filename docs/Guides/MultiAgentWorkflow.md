@@ -52,7 +52,7 @@
 ┌────────┐      ┌───────────┐      ┌─────────┐  ┌──────────┐
 │Layer 1 │      │ Layer 2   │      │ Layer 3 │  │ Layer 4  │
 │并行采集│─────▶│ 多空辩论  │─────▶│ 交易决策│──▶│ 风险评估 │
-│4个Agent│      │ Bull vs   │      │ Trader  │  │ 三方辩论 │
+│3个Agent│      │ Bull vs   │      │ Trader  │  │ 三方辩论 │
 │Flux    │      │ Bear +    │      │ +工具   │  │ +裁决    │
 │.merge()│      │ Manager   │      │         │  │          │
 └────────┘      └───────────┘      └─────────┘  └──────────┘
@@ -63,8 +63,7 @@
 │Market  │      │Bull辩论   │      │制定交易 │  │激进/保守 │
 │Fund    │      │Bear辩论   │      │方案     │  │中立辩论  │
 │News    │      │×N轮交替   │      │         │  │+最终裁决 │
-│Social  │      │→Manager   │      │         │  │→JSON输出 │
-│Analyst │      │  裁决     │      │         │  │          │
+│Analyst │      │→Manager   │      │         │  │→JSON输出 │
 └────────┘      └───────────┘      └─────────┘  └──────────┘
 ```
 
@@ -98,7 +97,7 @@ com.xiaomo.agent.workflow/
 │   └── WorkflowEventType.java      # 事件类型枚举
 │
 ├── agent/                           # Agent 角色系统
-│   ├── AgentRole.java              # 12 个角色枚举
+│   ├── AgentRole.java              # 11 个角色枚举
 │   └── WorkflowAgentFactory.java   # Agent 工厂
 │
 ├── config/                          # 配置
@@ -156,7 +155,7 @@ Flux<WorkflowEvent> = Flux.concat(
 
 ### 3.1 Layer 1：并行数据采集
 
-**目标**：4 个专业分析师同时工作，各自用专属工具采集数据。
+**目标**：3 个专业分析师同时工作，各自用专属工具采集数据。
 
 ```
                     ┌── MarketAnalyst ──┐
@@ -164,13 +163,11 @@ Flux<WorkflowEvent> = Flux.concat(
 User Query ────────┼── Fundamentals ───┼──▶ analystReports
                     │   (FinancialData  │    (ConcurrentHashMap)
                     │    + Sql + Calc)  │
-                    ├── NewsAnalyst ────┤
-                    │   (WebFetch + MCP)│
-                    └── SocialAnalyst ──┘
+                    └── NewsAnalyst ────┘
                         (WebFetch + MCP)
 ```
 
-**并行机制**：`ParallelFanOutNode` 用 `Flux.merge(concurrency, streams)` 合并 4 个分析师的流：
+**并行机制**：`ParallelFanOutNode` 用 `Flux.merge(concurrency, streams)` 合并 3 个分析师的流：
 
 ```java
 // ParallelFanOutNode.execute()
@@ -182,17 +179,16 @@ return Flux.merge(parallelNodes.size(), streams.toArray(new Flux[0]));
 ```
 
 - `Flux.merge` 不保证顺序，谁先产出事件谁先推送
-- `concurrency = 4` 确保 4 个流同时活跃
+- `concurrency = 3` 确保 3 个流同时活跃
 - 每个分析师内部有独立的 `ChatClient`，工具调用互不干扰
 
 **工具隔离**：每个分析师只看到自己需要的工具：
 
 | 分析师 | 绑定工具 |
 |--------|----------|
-| MarketAnalyst | getAShareQuote, getHKStockQuote, getUSStockQuote, getFundNav, searchStockByName, fetchWebpage, fetchArticleContent |
-| FundamentalsAnalyst | 上述 + getDatabaseSchema, executeQuery, peRatio, pbRatio, dividendYield |
-| NewsAnalyst | fetchWebpage, fetchArticleContent, bailian_web_search |
-| SocialAnalyst | fetchWebpage, fetchArticleContent, bailian_web_search |
+| MarketAnalyst | a_stock_quote, a_stock_signal, a_stock_limit_up, market_data |
+| FundamentalsAnalyst | a_stock_quote, a_stock_report, a_stock_news, a_stock_capital, market_data, financial_calculator, executeQuery |
+| NewsAnalyst | a_stock_news, a_stock_report, a_stock_signal, bailian_web_search |
 
 ### 3.2 Layer 2：多空辩论
 
@@ -469,7 +465,7 @@ public Flux<WorkflowEvent> execute(WorkflowState state, Sinks.Many<WorkflowEvent
 ```java
 @Data
 public class WorkflowState {
-    // Layer 1 输出（4 个分析师并行写入）
+    // Layer 1 输出（3 个分析师并行写入）
     private Map<String, AgentReport> analystReports = new ConcurrentHashMap<>();
 
     // Layer 2 输出（串行写入）
@@ -496,7 +492,7 @@ public class WorkflowState {
 ### 6.2 数据流传递
 
 ```
-Layer 1 (并行):  4 个 AnalystNode 各自写入 state.analystReports.put(name, report)
+Layer 1 (并行):  3 个 AnalystNode 各自写入 state.analystReports.put(name, report)
                       │
                       ▼
 Layer 2 (串行):  DebateNode 读取 state.analystReports 构建 prompt
@@ -773,7 +769,7 @@ function isDeepAnalysisRequest(text: string): boolean {
 
 ### 12.1 一句话描述
 
-> 基于 Spring Boot + Spring AI 构建多智能体深度分析系统，实现 4 层流水线（并行数据采集 → 多空辩论 → 交易决策 → 风险评估），12 个 AI Agent 协同工作，支持 SSE 流式输出全流程结果。
+> 基于 Spring Boot + Spring AI 构建多智能体深度分析系统，实现 4 层流水线（并行数据采集 → 多空辩论 → 交易决策 → 风险评估），11 个 AI Agent 协同工作，支持 SSE 流式输出全流程结果。
 
 ### 12.2 技术亮点
 
@@ -811,9 +807,9 @@ function isDeepAnalysisRequest(text: string): boolean {
 
 ### 12.4 可量化的成果
 
-- **12 个 AI Agent** 角色，各自有专属 system prompt 和工具集
-- **4 层流水线**，Layer 1 四路并行，Layer 2/4 各 2 轮辩论
-- **单次分析约 15-20 次 LLM 调用**（4 分析师 + 4 辩论 + 2 裁决 + 1 交易 + 6 风险辩论 + 1 最终裁决）
+- **11 个 AI Agent** 角色，各自有专属 system prompt 和工具集
+- **4 层流水线**，Layer 1 三路并行，Layer 2/4 各 2 轮辩论
+- **单次分析约 16 次 LLM 调用**（3 分析师 + 4 辩论 + 1 裁决 + 1 交易 + 6 风险辩论 + 1 最终裁决）
 - **10 种 SSE 事件类型**，覆盖全流程生命周期
 - **全链路流式输出**，用户可实时看到每个 Agent 的工作进展
 

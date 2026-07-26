@@ -1,6 +1,6 @@
 # 分析师工具映射表
 
-> 最后更新: 2026-07-04 | Layer 1 四位数据采集分析师的工具配置
+> 最后更新: 2026-07-26 | Layer 1 三位数据采集分析师的工具配置
 
 ---
 
@@ -10,26 +10,24 @@
 2. [MARKET_ANALYST — 市场技术分析师](#market_analyst--市场技术分析师)
 3. [FUNDAMENTALS_ANALYST — 基本面分析师](#fundamentals_analyst--基本面分析师)
 4. [NEWS_ANALYST — 新闻分析师](#news_analyst--新闻分析师)
-5. [SOCIAL_ANALYST — 舆情分析师](#social_analyst--舆情分析师)
-6. [工具优先级规则](#工具优先级规则)
+5. [工具优先级规则](#工具优先级规则)
 
 ---
 
 ## 工具总览
 
-四位分析师共使用 9 个工具，覆盖 8 个 AStock Router Tool 中的 7 个：
+三位分析师共使用 8 个工具，覆盖 8 个 AStock Router Tool 中的 7 个：
 
-| 工具 | 数据层 | Market | Fundamentals | News | Social |
-|------|--------|:------:|:------------:|:----:|:------:|
-| `a_stock_quote` | 行情层 | ✅ 主力 | ✅ 主力 | - | - |
-| `a_stock_report` | 研报层 | - | ✅ 主力 | ✅ 辅助 | - |
-| `a_stock_signal` | 信号层 | ✅ 辅助 | - | ✅ 辅助 | ✅ 辅助 |
-| `a_stock_capital` | 资金面 | - | ✅ 辅助 | - | - |
-| `a_stock_news` | 新闻层 | - | ✅ 辅助 | ✅ 主力 | ✅ 辅助 |
-| `a_stock_limit_up` | 打板层 | ✅ 辅助 | - | - | ✅ 辅助 |
-| `a_stock_sentiment` | 舆情层 | - | - | - | ✅ 主力 |
-| `market_data` | 基础行情 | ✅ 后备 | ✅ 后备 | - | - |
-| `bailian_web_search` | MCP搜索 | - | - | ✅ 后备 | ✅ 后备 |
+| 工具 | 数据层 | Market | Fundamentals | News |
+|------|--------|:------:|:------------:|:----:|
+| `a_stock_quote` | 行情层 | ✅ 主力 | ✅ 主力 | - |
+| `a_stock_report` | 研报层 | - | ✅ 主力 | ✅ 辅助 |
+| `a_stock_signal` | 信号层 | ✅ 辅助 | - | ✅ 辅助 |
+| `a_stock_capital` | 资金面 | - | ✅ 辅助 | - |
+| `a_stock_news` | 新闻层 | - | ✅ 辅助 | ✅ 主力 |
+| `a_stock_limit_up` | 打板层 | ✅ 辅助 | - | - |
+| `market_data` | 基础行情 | ✅ 后备 | ✅ 后备 | - |
+| `bailian_web_search` | MCP搜索 | - | - | ✅ 后备 |
 
 - **主力**: 优先使用，核心数据来源
 - **辅助**: 工作流中使用，补充特定维度数据
@@ -133,42 +131,6 @@ stockNews (个股新闻) → cninfoAnnouncements (公告) → stockReport (研�
 - 目标不是A股（港股、美股、宏观政策等）
 - a_stock_news 未找到相关信息
 - 需要搜索非金融类新闻（如行业政策、公司事件等）
-
----
-
-## SOCIAL_ANALYST — 舆情分析师
-
-**职责**: 分析市场情绪和投资者关注度 — 人气热度、打板情绪、互动易、板块联动
-
-### 工具列表
-
-| 优先级 | 工具 | Operation | 用途 | 参数 |
-|:------:|------|-----------|------|------|
-| 1 | `a_stock_sentiment` | `thsHotList` | 同花顺热榜（人气排名+概念标签+涨跌幅） | `period`(hour/day) |
-| 1 | `a_stock_sentiment` | `emHotRank` | 东财人气榜（市场关注度排名） | `top` |
-| 1 | `a_stock_sentiment` | `emConceptHit` | 个股概念命中（市场归类+热度值） | `stockCode` |
-| 2 | `a_stock_limit_up` | `sentimentOverview` | 打板情绪速算（炸板率/涨停跌停比/连板梯队） | 无 |
-| 2 | `a_stock_limit_up` | `thsLimitUpPool` | 涨停揭秘（含题材归因） | `date` |
-| 3 | `a_stock_news` | `stockNews` | 个股新闻 | `stockCode`, `pageSize` |
-| 3 | `a_stock_news` | `globalNews` | 全球财经资讯7x24 | `pageSize` |
-| 3 | `a_stock_news` | `irmQA` | 互动易问答（投资者情绪直接来源） | `stockCode`, `pageSize` |
-| 4 | `a_stock_signal` | `conceptBlocks` | 个股板块归属（概念/行业/地域） | `stockCode` |
-| 4 | `a_stock_signal` | `industryRanking` | 行业板块排名 | `top` |
-| 5 | `bailian_web_search` | - | 联网搜索（非A股/社交媒体/论坛） | `query` |
-
-### 工作流程
-
-```
-thsHotList (热榜) → emConceptHit (概念热度) → sentimentOverview (打板情绪)
-    → irmQA (互动易) → conceptBlocks (板块联动)
-    → [bailian_web_search 补充] → 输出报告
-```
-
-### bailian_web_search 使用条件
-
-- 目标不是A股（港股、美股等）
-- a_stock_sentiment / a_stock_news 未找到相关信息
-- 需要搜索社交媒体讨论、论坛帖子等非官方信息
 
 ---
 
