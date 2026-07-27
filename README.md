@@ -2,7 +2,7 @@
   <img src="docs/pic/logo.png" alt="小墨 Logo" width="80">
   <h1 style="margin-top: 0.5em; margin-bottom: 0.3em;">小墨 Xiaomo</h1>
   <p style="margin-top: 0; margin-bottom: 0.5em;"><strong>面向多用户部署的金融领域 AI Agent 平台</strong></p>
-  <p style="margin-top: 0; margin-bottom: 0.5em;">基于 Spring AI 构建，支持自然语言投研、资产分析与多用户运营</p>
+  <p style="margin-top: 0; margin-bottom: 0.5em;">基于 Spring AI 构建，支持自然语言投研、资产分析与多用户管理</p>
   <p style="margin-top: 0; margin-bottom: 0.5em;">注册登录 · 管理后台 · Token 配额 · 一键 Docker 部署</p>
 </div>
 
@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/Platform-Multi--User-2ecc71">
   <img src="https://img.shields.io/badge/Spring%20AI-1.0-6DB33F">
   <img src="https://img.shields.io/badge/Tool%20Calling-FF6B35">
-  <img src="https://img.shields.io/badge/Workflow-DAG-9b59b6">
+  <img src="https://img.shields.io/badge/Workflow-Orchestration-9b59b6">
   <img src="https://img.shields.io/badge/SSE-Streaming-e67e22">
 </div>
 
@@ -31,14 +31,9 @@
 
 ## 项目介绍
 
-小墨是一个基于 Spring AI 构建的金融投资 AI 助手平台。Docker Compose 一键部署后即可作为多用户服务运营 — 用户注册登录、管理员后台、Token 配额管理一应俱全。
+小墨是一个基于 Spring AI 构建的金融领域 AI Agent 平台。用户通过自然语言描述投资研究需求，Agent 自动理解任务、调用金融数据工具，并生成分析结果。
 
-核心能力：用户用自然语言描述需求 → AI 理解意图 → 调用金融工具 → 返回分析结果。
-
-- **用户系统**：邮箱注册登录，SHA-256 + BCrypt 双重加密，自动生成唯一数字账号
-- **管理员后台**：独立管理员登录、用户管理、公告通知推送（SSE 实时送达）
-- **Token 配额**：用户级别的免费 Token 配额管理，控制使用量
-- **会话隔离**：每个用户独立的对话历史、记忆画像、持仓数据
+平台同时提供用户认证、数据隔离、Token 配额和管理员运营能力，支持 Docker Compose 一键部署。
 
 ## 核心亮点
 
@@ -46,19 +41,43 @@
 
 ### 1. Agent 工具调用治理
 
-不是简单地把工具丢给 LLM，而是有完整的治理机制：
+不是简单地把工具丢给 LLM，而是在 Agent 执行链路中加入了治理层：
 
-- **重复调用检测**：避免同一工具被多次调用，浪费 Token
-- **搜索轮次控制**：限制搜索类工具的调用次数，防止无限循环
-- **工具结果检查**：评估调用结果的有效性，无效结果触发重试
-- **报告完整性检查**：确保分析报告覆盖必要维度
+```
+           User Query
+               │
+               ▼
+        Intent Filter
+        (基于规则的意图分类)
+               │
+               ▼
+      Relevant Tools Only
+       (白名单过滤)
+               │
+               ▼
+        Agent Reasoning
+               │
+               ▼
+     Tool Governance Layer
+  (重复检测 / 轮次控制 / 信息增益)
+               │
+               ▼
+           Response
+```
+
+治理机制包括：
+
+- **重复调用检测**：基于加权相似度（Jaccard 词相似度 + 数字相似度 + 长度相似度）判断工具是否陷入重复调用
+- **搜索轮次控制**：限制搜索类工具调用次数；抓取类工具结合信息增益判断，连续无新信息时自动停止
+- **工具结果检查**：三维度加权相似度分析工具返回内容的信息增益，低增益结果触发分级升级信号
+- **报告完整性检查**（深度分析模式下）：检查报告字数和章节结构是否达标
 
 ### 2. Router Tool 架构
 
-将 40+ 个 API 按领域封装为 8 个 Router Tool，Agent 只需选择 Router，Router 内部路由到具体 Operation：
+将 40+ 个 API 按领域封装为 8 个 Router Tool，将工具选择空间从 40+ 个具体接口降维为 8 个领域级 Router，降低 LLM Tool Selection 复杂度：
 
 ```
-AStockQuoteRouterTool     → 行情层（实时报价、K线、盘口）
+AStockQuoteRouterTool     → 行情层（实时报价、K线）
 AStockReportRouterTool    → 研报层（个股/行业研报、PDF下载）
 AStockSignalRouterTool    → 信号层（热点、北向、龙虎榜）
 AStockCapitalRouterTool   → 资金面（融资融券、大宗交易、股东）
@@ -68,57 +87,64 @@ AStockOptionRouterTool    → 期权层（ETF期权、希腊字母）
 AStockSentimentRouterTool → 舆情层（热榜、人气榜）
 ```
 
-降低工具选择复杂度，Agent 从"从 40 个工具里选"变为"从 8 个领域里选"。
+Router 内部路由到具体 Operation，Agent 只需选择领域，不需要关心具体接口。
 
-### 3. Workflow DAG 引擎
+### 3. 深度分析 Workflow
 
-基于 Reactor 响应式编程的多阶段工作流引擎，支持 DAG 图结构、条件边、并行节点、取消机制。深度分析场景下，数据采集三路并行 → 多角色交叉评估 → 风险评估 → 生成报告。
+基于 Reactor 响应式编程实现的 Workflow 编排模块，用于复杂个股分析场景。数据采集阶段三路并行（市场分析师、基本面分析师、新闻分析师），随后进入多角色辩论和风险评估流程。
 
-### 4. 多用户 SaaS 化设计
+支持运行中取消、节点超时控制、分级升级信号。工作流拓扑为预定义流程，运行时参数（辩论轮数、温度、token 上限等）可配置。
 
-不是单用户本地 demo，而是具备完整用户体系和运营能力的应用平台：用户认证、数据隔离、Token 配额、管理员后台、通知推送。
+### 4. 多用户平台化设计
+
+不是单用户本地 demo，而是具备完整用户体系和管理能力的应用平台：用户认证、数据隔离、Token 配额、管理员后台、通知推送。
 
 ### 5. SSE 流式交互
 
-后端 Flux 累积全文 → 流式输出，前端 ReadableStream 解析 → 实时渲染。用户可实时看到 Agent 的思考和执行过程。
+后端 Flux 累积全文 → 流式输出，前端 ReadableStream 解析 → 实时渲染。用户可实时看到 Agent 的任务执行状态和生成过程（如"正在查询行情..."、"正在分析财务数据..."）。
 
 ## 系统架构
 
 ```
-                         User
-                          │
-                          ▼
-                 Conversation Layer
-                  (会话管理 / 记忆系统)
-                          │
-                          ▼
-                Intent Understanding
-                  (意图识别 / 工具过滤)
-                          │
-                          ▼
-               Agent Orchestration
-              /        |         \
-             /         |          \
-     Tool Router    Memory      Workflow
-      (8个领域)   (画像+摘要)   (DAG引擎)
-          │
-          ▼
-     数据源层
-  腾讯/东财/同花顺/巨潮/新浪/iwencai
+                          User
+                           │
+                           ▼
+               Conversation Layer
+                (会话管理 / 记忆系统)
+                           │
+                           ▼
+                 Intent Understanding
+                (基于规则的意图分类 / 工具过滤)
+                           │
+                           ▼
+                  Agent Orchestrator
+                           │
+                   ┌───────┴───────┐
+                   ▼               ▼
+                LLM Model      Workflow
+             (Spring AI 1.0)   (多阶段编排)
+                   │
+                   ▼
+              Tool Router
+               (8个领域)
+                   │
+                   ▼
+             数据源层
+       腾讯/东财/同花顺/巨潮/新浪/iwencai
 ```
 
 ## 核心能力
 
 ### AI Agent 对话
 
-- **用户意图识别**：识别用户真实需求，匹配合适的工具集合
+- **基于规则的意图分类**：通过关键词匹配识别用户任务类型（9 种意图），过滤无关工具
 - **Tool Calling**：根据任务类型自动调用对应工具
 - **上下文管理**：维护对话历史，支持多轮追问
 - **流式响应**：SSE 实时输出模型响应和任务执行状态
 
 ### 金融研究
 
-- **行情查询**：实时报价、K 线数据、五档盘口
+- **行情查询**：实时报价、K 线数据
 - **基本面分析**：财务指标、估值计算、盈利能力
 - **技术面分析**：趋势判断、支撑压力位
 - **市场情绪**：资金流向、北向资金、龙虎榜
@@ -135,10 +161,10 @@ AStockSentimentRouterTool → 舆情层（热榜、人气榜）
 
 ### 深度分析工作流
 
-针对复杂个股分析场景，基于 Workflow 的多阶段分析流程：
+针对复杂个股分析场景，基于预定义 Workflow 的多阶段分析流程：
 
 ```
-数据采集 (三路并行) → 多角色分析与观点交叉评估 → 风险评估 → 生成报告
+数据采集 (三路并行) → 多角色辩论与交叉评估 → 风险评估 → 生成报告
 ```
 
 ## 使用场景
@@ -156,7 +182,7 @@ AStockSentimentRouterTool → 舆情层（热榜、人气榜）
 
 ## 工程设计
 
-### 平台运营架构
+### 平台架构
 
 - **用户认证**：邮箱注册登录，客户端 SHA-256 哈希 → 服务端 BCrypt 存储，Redis Token 管理（72h TTL，单设备在线）
 - **管理员系统**：独立密码登录，用户列表查看，公告通知创建与推送
@@ -166,17 +192,17 @@ AStockSentimentRouterTool → 舆情层（热榜、人气榜）
 
 ### 意图级工具过滤
 
-通过规则识别用户任务类型，仅向 Agent 暴露相关工具集合，减少无关 Tool 干扰，提高调用准确性。
+基于规则的意图分类，通过关键词匹配识别用户任务类型，仅向 Agent 暴露相关工具集合，减少无关 Tool 干扰。覆盖 9 种意图类型，每种对应独立的工具子集，含三层 fallback 机制。
 
 ```
-用户输入 → Intent Filter (规则匹配) → 过滤后的工具集合 → Agent Tool Calling
+用户输入 → Intent Filter (关键词规则匹配) → 过滤后的工具集合 → Agent Tool Calling
 ```
 
 ### 会话记忆系统
 
-- **用户画像管理**：记录用户偏好和交互习惯
-- **对话摘要压缩**：长对话自动压缩，保持上下文连贯
-- **Redis 会话缓存**：72h Token 有效期，多级缓存策略
+- **用户画像管理**：AI 自动从对话中提取用户投资偏好（6 个维度），支持用户主动记忆，自动去重，每用户最多 50 条
+- **对话摘要压缩**：未压缩消息超过 20 条时触发 AI 压缩（10:1），增量处理，保留最近 5 条在上下文中
+- **记忆注入**：用户画像和对话摘要以 token 预算控制注入 system prompt
 
 ### 养基宝数据集成
 
@@ -186,7 +212,7 @@ AStockSentimentRouterTool → 舆情层（热榜、人气榜）
 
 - **后端**：Flux 累积全文 → 流式输出
 - **前端**：ReadableStream 解析 → 实时渲染
-- **体验**：用户可实时看到 Agent 执行过程
+- **体验**：用户可实时看到 Agent 的任务执行状态和生成过程
 
 ## 技术架构
 
@@ -196,7 +222,7 @@ AStockSentimentRouterTool → 舆情层（热榜、人气榜）
 - **Spring AI 1.0** - LLM 接入、Tool Calling、Prompt 管理
 - **Spring Data JPA** + **PostgreSQL** - 持久化
 - **Spring Data Redis** - 缓存 / 会话 / 限流
-- **MCP Protocol** - 外部 AI 服务集成
+- **MCP Protocol** - 外部 AI 服务集成（百度 AI 搜索）
 
 ### Frontend
 
@@ -288,7 +314,7 @@ open http://localhost:5656
 ## Roadmap
 
 - [x] AI Agent 基础框架（Spring AI + Tool Calling）
-- [x] A 股数据工具集（13 源 40 端点）
+- [x] A 股数据工具集（13 源 55 端点）
 - [x] SSE 流式对话
 - [x] 用户记忆系统
 - [x] 深度分析 Workflow
