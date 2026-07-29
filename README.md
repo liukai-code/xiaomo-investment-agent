@@ -277,19 +277,28 @@ cd xiaomo-investment-agent
 
 # 2. 配置环境变量
 cp .env.example .env
-# 编辑 .env 填入 API Key、管理员密码等配置
+# 编辑 .env 填入 ANTHROPIC_API_KEY、ADMIN_PASSWORD 等配置
 
-# 3. 启动服务（自动拉起 PostgreSQL + Redis + 应用）
-docker-compose up -d
+# 3. 一键启动（自动拉起 PostgreSQL + Redis + 应用）
+docker-compose up -d --build
 
 # 4. 访问应用
 open http://localhost:4545
 ```
 
+compose 文件包含三个服务：
+
+| 服务 | 镜像 | 端口 | 说明 |
+|------|------|------|------|
+| postgres | postgres:16-alpine | 5432 | 数据持久化到 Docker volume |
+| redis | redis:7-alpine | 6379 | 密码保护 |
+| app | 本项目构建 | 4545 | 等待 PG/Redis 健康后启动 |
+
 部署完成后：
 - 用户访问首页即可注册登录
 - 管理员通过 `/api/admin/login` 登录管理后台（密码在 .env 中配置）
 - 管理员可查看用户列表、推送公告通知
+- 数据库数据通过 Docker volume `pgdata` 持久化，`docker-compose down` 不会丢失数据
 
 ### 方式二：本地开发
 
@@ -300,9 +309,14 @@ open http://localhost:4545
 git clone https://github.com/liukai-code/xiaomo-investment-agent.git
 cd xiaomo-investment-agent
 
-# 2. 配置环境变量
+# 2. 配置环境变量（本地开发需自行准备 PostgreSQL 和 Redis）
 cp .env.example .env
-# 编辑 .env 填入数据库、Redis、API Key 等配置
+# 编辑 .env 填入数据库连接、Redis、API Key 等配置
+# 本地开发时需设置：
+#   DB_URL=jdbc:postgresql://localhost:5432/你的数据库名
+#   DB_USERNAME=你的数据库用户
+#   DB_PASSWORD=你的数据库密码
+#   REDIS_HOST=localhost
 
 # 3. 启动后端
 mvn clean package -DskipTests

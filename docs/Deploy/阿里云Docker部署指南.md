@@ -94,18 +94,25 @@ vi .env
 填入实际值：
 
 ```env
-DB_USER=postgres
-DB_PASSWORD=你的PostgreSQL密码
-DB_NAME=postgres          # 服务器上已有的数据库名，默认 postgres
-REDIS_PASSWORD=           # 服务器上Redis若无密码则留空
+# PostgreSQL（compose 会自动创建容器）
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=你的PostgreSQL密码
+POSTGRES_DB=xiaomo
+
+# Redis（compose 会自动创建容器）
+REDIS_PASSWORD=你的Redis密码
+
+# AI 模型
 ANTHROPIC_API_KEY=你的API密钥
 ANTHROPIC_BASE_URL=https://api.anthropic.com
 DASHSCOPE_MCP_URL=
+
+# 安全
 CONFIG_ENCRYPTION_KEY=
 ADMIN_PASSWORD=你的管理员密码
 ```
 
-> 数据库和 Redis 使用服务器上已有的容器（postgres16 / redis7），不需要再创建新的。
+> compose 文件包含 PostgreSQL 和 Redis 容器，无需额外安装。数据通过 Docker volume 持久化。
 
 ### 3.3 构建并启动
 
@@ -113,7 +120,7 @@ ADMIN_PASSWORD=你的管理员密码
 docker compose up -d --build
 ```
 
-首次构建需要 5-10 分钟。查看构建进度：
+首次构建需要 5-10 分钟（app 镜像需编译前端和后端）。查看构建进度：
 
 ```bash
 docker compose logs -f app
@@ -125,7 +132,7 @@ docker compose logs -f app
 docker compose ps
 ```
 
-确认 app 容器显示 `Up` 状态。验证应用响应：
+确认 postgres、redis、app 三个容器均显示 `Up` 或 `healthy` 状态。验证应用响应：
 
 ```bash
 curl -s http://127.0.0.1:4545 | head -5
@@ -251,8 +258,9 @@ ECS 控制台 → 安全组 → 入方向规则：
 
 ```bash
 docker compose logs -f app        # 查看应用日志
-docker compose restart app        # 重启应用
-docker compose down               # 停止所有服务
+docker compose logs -f postgres   # 查看数据库日志
+docker compose restart app        # 重启应用（不影响数据库）
+docker compose down               # 停止所有服务（数据保留）
 docker compose down -v            # 停止并删除数据卷（⚠️ 清除数据库）
 ```
 
@@ -267,11 +275,11 @@ docker compose up -d --build
 ### 数据库备份
 
 ```bash
-# 备份（使用服务器上已有的 postgres16 容器）
-docker exec postgres16 pg_dump -U postgres postgres > backup_$(date +%Y%m%d).sql
+# 备份
+docker compose exec postgres pg_dump -U postgres xiaomo > backup_$(date +%Y%m%d).sql
 
 # 恢复
-cat backup_20260718.sql | docker exec -i postgres16 psql -U postgres postgres
+cat backup_20260718.sql | docker compose exec -T postgres psql -U postgres xiaomo
 ```
 
 ### Nginx 相关
@@ -294,13 +302,17 @@ docker stats --no-stream
 
 ### 数据库连接超时
 
-检查服务器上已有的 PostgreSQL 容器是否运行：
+检查 PostgreSQL 容器是否运行：
 
 ```bash
-docker ps | grep postgres
+docker compose ps postgres
 ```
 
-确认 `.env` 中 `DB_PASSWORD` 与已有 PostgreSQL 容器的密码一致。
+确认 `.env` 中 `POSTGRES_PASSWORD` 与 compose 配置一致。查看数据库日志：
+
+```bash
+docker compose logs postgres
+```
 
 ### 前端页面空白
 
