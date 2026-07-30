@@ -31,16 +31,27 @@ class RuleBasedIntentClassifierTest {
         void 纯问候应分类为GENERAL_CHAT(String msg) {
             IntentResult result = classifier.classify(msg);
             assertEquals(IntentType.GENERAL_CHAT, result.intent());
-            assertNotNull(result.suggestedTools());
-            assertTrue(result.suggestedTools().isEmpty());
+            assertNotNull(result.policy().toWhitelist());
+            assertTrue(result.policy().toWhitelist().isEmpty());
         }
 
         @ParameterizedTest
-        @ValueSource(strings = {"什么是ETF", "什么是基金", "市盈率是什么意思", "解释一下复利"})
+        @ValueSource(strings = {"什么是ETF", "什么是基金", "什么是股票"})
         void 概念解释应分类为GENERAL_CHAT(String msg) {
             IntentResult result = classifier.classify(msg);
             assertEquals(IntentType.GENERAL_CHAT, result.intent());
-            assertTrue(result.suggestedTools().isEmpty());
+        }
+
+        @Test
+        void 什么是市盈率应分类为GENERAL_CHAT() {
+            IntentResult result = classifier.classify("什么是市盈率");
+            assertEquals(IntentType.GENERAL_CHAT, result.intent());
+        }
+
+        @Test
+        void 什么是PE应分类为GENERAL_CHAT() {
+            IntentResult result = classifier.classify("什么是PE");
+            assertEquals(IntentType.GENERAL_CHAT, result.intent());
         }
 
         @Test
@@ -63,6 +74,27 @@ class RuleBasedIntentClassifierTest {
     }
 
     @Nested
+    @DisplayName("通用对话不吞掉指标查询")
+    class IndicatorNotSwallowed {
+
+        @Test
+        void 茅台PE应分类为STOCK_ANALYSIS() throws Exception {
+            when(httpClientService.get(anyString(), any())).thenReturn(
+                    "{\"QuotationCodeTable\":{\"Data\":[{\"Code\":\"600519\",\"Name\":\"贵州茅台\",\"MktNum\":\"1\"}]}}");
+            IntentResult result = classifier.classify("茅台PE是多少");
+            assertEquals(IntentType.STOCK_ANALYSIS, result.intent());
+        }
+
+        @Test
+        void 茅台ROE应分类为STOCK_ANALYSIS() throws Exception {
+            when(httpClientService.get(anyString(), any())).thenReturn(
+                    "{\"QuotationCodeTable\":{\"Data\":[{\"Code\":\"600519\",\"Name\":\"贵州茅台\",\"MktNum\":\"1\"}]}}");
+            IntentResult result = classifier.classify("茅台ROE怎么样");
+            assertEquals(IntentType.STOCK_ANALYSIS, result.intent());
+        }
+    }
+
+    @Nested
     @DisplayName("市场新闻")
     class MarketNews {
 
@@ -80,18 +112,15 @@ class RuleBasedIntentClassifierTest {
         void 新闻类查询应分类为MARKET_NEWS(String msg) {
             IntentResult result = classifier.classify(msg);
             assertEquals(IntentType.MARKET_NEWS, result.intent(), "消息: " + msg);
-            // MARKET_NEWS 不应包含 a_stock_quote，防止漂移到个股分析
-            assertNotNull(result.suggestedTools());
-            assertFalse(result.suggestedTools().contains("a_stock_quote"),
+            assertNotNull(result.policy().toWhitelist());
+            assertFalse(result.policy().toWhitelist().contains("a_stock_quote"),
                     "MARKET_NEWS 不应包含 a_stock_quote 工具");
-            // 应包含新闻工具
-            assertTrue(result.suggestedTools().contains("a_stock_news"),
+            assertTrue(result.policy().toWhitelist().contains("a_stock_news"),
                     "MARKET_NEWS 应包含 a_stock_news 工具");
         }
 
         @Test
         void 带有分析关键词但无标的的新闻查询应分类为MARKET_NEWS() {
-            // "分析一下今天的新闻" - 有"分析"关键词但无股票名称
             IntentResult result = classifier.classify("分析一下今天的新闻");
             assertEquals(IntentType.MARKET_NEWS, result.intent());
         }
@@ -113,8 +142,8 @@ class RuleBasedIntentClassifierTest {
             IntentResult result = classifier.classify(msg);
             assertEquals(IntentType.SECTOR_ANALYSIS, result.intent(), "消息: " + msg);
             assertNull(result.target(), "板块分析不应有标的锁定");
-            assertNotNull(result.suggestedTools());
-            assertTrue(result.suggestedTools().contains("a_stock_signal"));
+            assertNotNull(result.policy().toWhitelist());
+            assertTrue(result.policy().toWhitelist().contains("a_stock_signal"));
         }
     }
 
@@ -140,9 +169,9 @@ class RuleBasedIntentClassifierTest {
         void 打板情绪查询应分类为TRADING_SENTIMENT(String msg) {
             IntentResult result = classifier.classify(msg);
             assertEquals(IntentType.TRADING_SENTIMENT, result.intent(), "消息: " + msg);
-            assertNotNull(result.suggestedTools());
-            assertTrue(result.suggestedTools().contains("a_stock_limit_up"));
-            assertTrue(result.suggestedTools().contains("a_stock_sentiment"));
+            assertNotNull(result.policy().toWhitelist());
+            assertTrue(result.policy().toWhitelist().contains("a_stock_limit_up"));
+            assertTrue(result.policy().toWhitelist().contains("a_stock_sentiment"));
         }
     }
 
@@ -161,8 +190,8 @@ class RuleBasedIntentClassifierTest {
         void 持仓查询应分类为HOLDINGS_QUERY(String msg) {
             IntentResult result = classifier.classify(msg);
             assertEquals(IntentType.HOLDINGS_QUERY, result.intent(), "消息: " + msg);
-            assertNotNull(result.suggestedTools());
-            assertTrue(result.suggestedTools().contains("getMyHoldings"));
+            assertNotNull(result.policy().toWhitelist());
+            assertTrue(result.policy().toWhitelist().contains("getMyHoldings"));
         }
     }
 
@@ -181,8 +210,8 @@ class RuleBasedIntentClassifierTest {
         void 金融计算应分类为FINANCIAL_CALC(String msg) {
             IntentResult result = classifier.classify(msg);
             assertEquals(IntentType.FINANCIAL_CALC, result.intent(), "消息: " + msg);
-            assertNotNull(result.suggestedTools());
-            assertTrue(result.suggestedTools().contains("financial_calculator"));
+            assertNotNull(result.policy().toWhitelist());
+            assertTrue(result.policy().toWhitelist().contains("financial_calculator"));
         }
     }
 
@@ -199,23 +228,41 @@ class RuleBasedIntentClassifierTest {
         void 数据库查询应分类为DB_QUERY(String msg) {
             IntentResult result = classifier.classify(msg);
             assertEquals(IntentType.DB_QUERY, result.intent(), "消息: " + msg);
-            assertNotNull(result.suggestedTools());
-            assertTrue(result.suggestedTools().contains("getDatabaseSchema"));
-            assertTrue(result.suggestedTools().contains("executeQuery"));
+            assertNotNull(result.policy().toWhitelist());
+            assertTrue(result.policy().toWhitelist().contains("getDatabaseSchema"));
+            assertTrue(result.policy().toWhitelist().contains("executeQuery"));
         }
     }
 
     @Nested
-    @DisplayName("深度分析")
+    @DisplayName("深度分析（AnalysisDepth.DEEP）")
     class DeepAnalysis {
 
         @Test
-        void 深度分析应分类为DEEP_ANALYSIS() {
-            // 注意：StockResolver 需要 HTTP 调用，此处无 mock 所以 target 可能为 null
-            // 但 intent 应始终为 DEEP_ANALYSIS
+        void 深度分析个股应返回STOCK_ANALYSIS加DEEP深度() throws Exception {
+            when(httpClientService.get(anyString(), any())).thenReturn(
+                    "{\"QuotationCodeTable\":{\"Data\":[{\"Code\":\"300750\",\"Name\":\"宁德时代\",\"MktNum\":\"0\"}]}}");
             IntentResult result = classifier.classify("深度分析宁德时代");
-            assertEquals(IntentType.DEEP_ANALYSIS, result.intent());
-            assertNull(result.suggestedTools(), "DEEP_ANALYSIS 的 suggestedTools 应为 null");
+            assertEquals(IntentType.STOCK_ANALYSIS, result.intent());
+            assertEquals(AnalysisDepth.DEEP, result.depth());
+            assertEquals(ToolPolicyMode.PLANNER_MANAGED, result.policy().mode());
+        }
+
+        @Test
+        void 深度分析板块应返回SECTOR_ANALYSIS加DEEP深度() {
+            IntentResult result = classifier.classify("深度分析半导体板块");
+            assertEquals(IntentType.SECTOR_ANALYSIS, result.intent());
+            assertEquals(AnalysisDepth.DEEP, result.depth());
+            assertEquals(ToolPolicyMode.PLANNER_MANAGED, result.policy().mode());
+        }
+
+        @Test
+        void 详细研究应触发DEEP深度() throws Exception {
+            when(httpClientService.get(anyString(), any())).thenReturn(
+                    "{\"QuotationCodeTable\":{\"Data\":[{\"Code\":\"600519\",\"Name\":\"贵州茅台\",\"MktNum\":\"1\"}]}}");
+            IntentResult result = classifier.classify("详细研究茅台的基本面");
+            assertEquals(IntentType.STOCK_ANALYSIS, result.intent());
+            assertEquals(AnalysisDepth.DEEP, result.depth());
         }
     }
 
@@ -225,7 +272,6 @@ class RuleBasedIntentClassifierTest {
 
         @Test
         void 带数字代码的分析应分类为STOCK_ANALYSIS() throws Exception {
-            // Mock StockResolver 返回
             when(httpClientService.get(anyString(), any())).thenReturn(
                     "{\"QuotationCodeTable\":{\"Data\":[{\"Code\":\"600519\",\"Name\":\"贵州茅台\",\"MktNum\":\"1\"}]}}");
             IntentResult result = classifier.classify("分析600519");
@@ -236,7 +282,6 @@ class RuleBasedIntentClassifierTest {
 
         @Test
         void 带股票名的分析应分类为STOCK_ANALYSIS() throws Exception {
-            // Mock StockResolver 返回
             when(httpClientService.get(anyString(), any())).thenReturn(
                     "{\"QuotationCodeTable\":{\"Data\":[{\"Code\":\"600519\",\"Name\":\"贵州茅台\",\"MktNum\":\"1\"}]}}");
             IntentResult result = classifier.classify("分析茅台");
@@ -249,11 +294,11 @@ class RuleBasedIntentClassifierTest {
             when(httpClientService.get(anyString(), any())).thenReturn(
                     "{\"QuotationCodeTable\":{\"Data\":[{\"Code\":\"600519\",\"Name\":\"贵州茅台\",\"MktNum\":\"1\"}]}}");
             IntentResult result = classifier.classify("分析600519");
-            assertNotNull(result.suggestedTools());
-            assertTrue(result.suggestedTools().contains("a_stock_quote"));
-            assertTrue(result.suggestedTools().contains("a_stock_report"));
-            assertTrue(result.suggestedTools().contains("a_stock_news"));
-            assertTrue(result.suggestedTools().contains("a_stock_capital"));
+            assertNotNull(result.policy().toWhitelist());
+            assertTrue(result.policy().toWhitelist().contains("a_stock_quote"));
+            assertTrue(result.policy().toWhitelist().contains("a_stock_report"));
+            assertTrue(result.policy().toWhitelist().contains("a_stock_news"));
+            assertTrue(result.policy().toWhitelist().contains("a_stock_capital"));
         }
 
         @ParameterizedTest
@@ -276,20 +321,19 @@ class RuleBasedIntentClassifierTest {
                     "{\"QuotationCodeTable\":{\"Data\":[{\"Code\":\"600519\",\"Name\":\"贵州茅台\",\"MktNum\":\"1\"}]}}");
             IntentResult result = classifier.classify(msg);
             assertEquals(IntentType.STOCK_ANALYSIS, result.intent(), "消息: " + msg);
-            assertNotNull(result.suggestedTools());
-            assertTrue(result.suggestedTools().contains("a_stock_capital"));
-            assertTrue(result.suggestedTools().contains("a_stock_news"));
+            assertNotNull(result.policy().toWhitelist());
+            assertTrue(result.policy().toWhitelist().contains("a_stock_capital"));
+            assertTrue(result.policy().toWhitelist().contains("a_stock_news"));
         }
 
         @Test
         void 概念热度带标的应分类为SECTOR_ANALYSIS() throws Exception {
-            // "概念"在SECTOR_KEYWORDS中优先级更高，且SECTOR_TOOLS包含a_stock_sentiment
             when(httpClientService.get(anyString(), any())).thenReturn(
                     "{\"QuotationCodeTable\":{\"Data\":[{\"Code\":\"600519\",\"Name\":\"贵州茅台\",\"MktNum\":\"1\"}]}}");
             IntentResult result = classifier.classify("茅台概念热度");
             assertEquals(IntentType.SECTOR_ANALYSIS, result.intent());
-            assertNotNull(result.suggestedTools());
-            assertTrue(result.suggestedTools().contains("a_stock_sentiment"));
+            assertNotNull(result.policy().toWhitelist());
+            assertTrue(result.policy().toWhitelist().contains("a_stock_sentiment"));
         }
 
         @ParameterizedTest
@@ -300,9 +344,18 @@ class RuleBasedIntentClassifierTest {
                 "昨天大盘怎么样"
         })
         void 时间词不应被误识别为股票名称(String msg) {
-            // "今天行情怎么样" 不应被解析为股票"今天国际"(300532)
             IntentResult result = classifier.classify(msg);
             assertNull(result.target(), "时间词不应被识别为股票标的，消息: " + msg);
+        }
+
+        @Test
+        void 今天国际应正确解析为股票() throws Exception {
+            when(httpClientService.get(anyString(), any())).thenReturn(
+                    "{\"QuotationCodeTable\":{\"Data\":[{\"Code\":\"300532\",\"Name\":\"今天国际\",\"MktNum\":\"0\"}]}}");
+            IntentResult result = classifier.classify("今天国际怎么样");
+            assertEquals(IntentType.STOCK_ANALYSIS, result.intent());
+            assertNotNull(result.target(), "今天国际应被识别为股票标的");
+            assertEquals("300532", result.target().code());
         }
     }
 
@@ -311,11 +364,11 @@ class RuleBasedIntentClassifierTest {
     class Disabled {
 
         @Test
-        void 禁用时应返回confidence0且suggestedTools为null() {
+        void 禁用时应返回confidence0且policy为PLANNER_MANAGED() {
             RuleBasedIntentClassifier disabledClassifier = new RuleBasedIntentClassifier(httpClientService, false);
             IntentResult result = disabledClassifier.classify("分析茅台");
             assertEquals(0, result.confidence());
-            assertNull(result.suggestedTools());
+            assertEquals(ToolPolicyMode.PLANNER_MANAGED, result.policy().mode());
         }
     }
 
@@ -325,7 +378,6 @@ class RuleBasedIntentClassifierTest {
 
         @Test
         void 板块关键词应优先于个股分析() {
-            // "半导体板块分析" 包含"分析"关键词，但"板块"应优先
             IntentResult result = classifier.classify("半导体板块分析");
             assertEquals(IntentType.SECTOR_ANALYSIS, result.intent());
         }
@@ -340,9 +392,8 @@ class RuleBasedIntentClassifierTest {
         void 新闻查询不应漂移到个股分析() {
             IntentResult result = classifier.classify("查询今日新闻，并总结一下对周一开盘的影响");
             assertEquals(IntentType.MARKET_NEWS, result.intent());
-            // 确保不包含行情工具
-            assertNotNull(result.suggestedTools());
-            assertFalse(result.suggestedTools().contains("a_stock_quote"));
+            assertNotNull(result.policy().toWhitelist());
+            assertFalse(result.policy().toWhitelist().contains("a_stock_quote"));
         }
     }
 }

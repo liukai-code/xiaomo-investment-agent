@@ -30,6 +30,11 @@ public class StockResolver {
             "分析", "研究", "调研", "估值"
     };
 
+    // 虚词/数词前缀，如"从三个招商银行" → "招商银行"
+    // 使用交替匹配（词语级别），而非字符集合，避免破坏"三一重工"等合法股票名称
+    private static final Pattern NOISE_PREFIX_PATTERN = Pattern.compile(
+            "^(?:从|把|被|对|为|给|让|叫|用|通过|和|与|及|的|了|一|两个|三个|四个|五个|多个|几个|些|所有|全部|每个)+");
+
     // 常见查询后缀，需要剥离后才能作为股票名称搜索
     private static final String[] QUERY_SUFFIXES = {
             "值得入手吗", "值得买吗", "可以买吗", "可以入手吗", "能买吗",
@@ -83,6 +88,9 @@ public class StockResolver {
             throw new IllegalArgumentException("无法从查询「" + trimmed + "」中识别股票名称或代码，请输入股票名称（如丰光精密）或6位代码（如430510）");
         }
         String name = nameMatcher.group();
+
+        // 剥离虚词/数词前缀（如"从三个招商银行" → "招商银行"）
+        name = NOISE_PREFIX_PATTERN.matcher(name).replaceFirst("");
 
         // 剥离常见查询前缀（如"深度分析三花智控" → "三花智控"）
         for (String prefix : QUERY_PREFIXES) {

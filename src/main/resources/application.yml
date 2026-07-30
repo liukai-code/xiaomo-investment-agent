@@ -84,6 +84,11 @@ agent:
     report-min-sections: 2
   intent:
     enabled: true
+  planning:
+    enabled: true
+    max-steps: 5
+    plan-max-tokens: 1024
+    scratchpad-max-length: 200
 
 # 多智能体深度分析工作流
 workflow:

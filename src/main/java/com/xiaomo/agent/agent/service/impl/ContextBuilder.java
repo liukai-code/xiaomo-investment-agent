@@ -63,7 +63,8 @@ public class ContextBuilder {
 
     public List<Message> buildContext(Long conversationId, Long userId,
                                       IntentResult.ResolvedTarget target, IntentType intent,
-                                      int contextWindow) {
+                                      int contextWindow,
+                                      PlanContext planContext) {
         List<Message> context = new ArrayList<>();
 
         String enrichedPrompt = systemPrompt;
@@ -121,6 +122,11 @@ public class ContextBuilder {
                         + "请使用金融计算器工具完成计算。";
                 default -> "";
             };
+        }
+
+        // 注入执行计划
+        if (planContext != null) {
+            enrichedPrompt += planContext.planPrompt();
         }
 
         context.add(new SystemMessage(enrichedPrompt));

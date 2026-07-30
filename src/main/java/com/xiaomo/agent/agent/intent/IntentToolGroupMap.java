@@ -8,8 +8,8 @@ import java.util.Set;
  * <p>
  * 设计原则：
  * 1. 工具名与 ToolDefinition.name() 一致（即 @Tool 注解的方法名）
- * 2. null 白名单 = 不做意图级过滤，使用全部已启用工具
- * 3. 空集合 = 不加载任何工具（纯对话模式）
+ * 2. PLANNER_MANAGED 模式跳过意图级过滤，由 Planner 管理工具选择
+ * 3. DENY_ALL 模式不加载任何业务工具
  * 4. MCP 工具（搜索类）由 AgentLoopImpl 在过滤时特殊处理，始终保留
  */
 public final class IntentToolGroupMap {
@@ -82,13 +82,6 @@ public final class IntentToolGroupMap {
             "executeQuery"
     );
 
-    // ===== 通用对话 —— 无工具 =====
-    private static final Set<String> EMPTY_TOOLS = Set.of();
-
-    /**
-     * 意图→工具白名单映射。
-     * null 值表示不做意图级过滤（保留全部已启用工具）。
-     */
     private static final Map<IntentType, Set<String>> GROUP_MAP;
 
     static {
@@ -100,13 +93,23 @@ public final class IntentToolGroupMap {
         m.put(IntentType.HOLDINGS_QUERY, HOLDINGS_TOOLS);
         m.put(IntentType.FINANCIAL_CALC, CALC_TOOLS);
         m.put(IntentType.DB_QUERY, DB_TOOLS);
-        m.put(IntentType.GENERAL_CHAT, EMPTY_TOOLS);
-        m.put(IntentType.DEEP_ANALYSIS, null);
+        m.put(IntentType.GENERAL_CHAT, Set.of());
         GROUP_MAP = m;
     }
 
-    public static Set<String> getTools(IntentType intent) {
-        return GROUP_MAP.getOrDefault(intent, null);
+    /**
+     * 根据业务意图生成工具策略。
+     * 深度分析时返回 PLANNER_MANAGED，跳过静态白名单由 Planner 管理。
+     */
+    public static ToolPolicy getPolicy(IntentType intent, AnalysisDepth depth) {
+        if (depth == AnalysisDepth.DEEP) {
+            return ToolPolicy.plannerManaged();
+        }
+        Set<String> tools = GROUP_MAP.getOrDefault(intent, Set.of());
+        if (tools.isEmpty() && intent == IntentType.GENERAL_CHAT) {
+            return ToolPolicy.denyAll();
+        }
+        return ToolPolicy.allowList(tools);
     }
 
     private IntentToolGroupMap() {

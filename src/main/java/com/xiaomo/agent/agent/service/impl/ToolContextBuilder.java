@@ -33,7 +33,9 @@ public class ToolContextBuilder {
 
     public Map<String, Object> build(Long userId, Long conversationId,
                                      IntentResult.ResolvedTarget target,
-                                     Sinks.Many<ChatStreamEvent> statusSink) {
+                                     Sinks.Many<ChatStreamEvent> statusSink,
+                                     PlanContext planContext,
+                                     Scratchpad scratchpad) {
         Map<String, Object> toolCtx = new HashMap<>();
         toolCtx.put("conversationId", conversationId.toString());
         toolCtx.put("userId", userId);
@@ -54,6 +56,13 @@ public class ToolContextBuilder {
 
         if (statusSink != null) {
             toolCtx.put(MaxToolCallManager.STATUS_SINK_KEY, statusSink);
+        }
+
+        if (planContext != null) {
+            toolCtx.put(MaxToolCallManager.PLAN_CONTEXT_KEY, planContext);
+        }
+        if (scratchpad != null) {
+            toolCtx.put(MaxToolCallManager.SCRATCHPAD_KEY, scratchpad);
         }
 
         if (target != null) {

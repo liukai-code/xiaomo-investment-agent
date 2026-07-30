@@ -1,8 +1,12 @@
 package com.xiaomo.agent.agent.service.impl;
 
+import com.xiaomo.agent.agent.config.PlanningProperties;
 import com.xiaomo.agent.agent.config.ToolGuardProperties;
+import com.xiaomo.agent.agent.intent.AnalysisDepth;
 import com.xiaomo.agent.agent.intent.IntentClassifier;
 import com.xiaomo.agent.agent.intent.IntentResult;
+import com.xiaomo.agent.agent.intent.IntentType;
+import com.xiaomo.agent.agent.intent.ToolPolicyMode;
 import com.xiaomo.agent.agent.service.AgentLoop;
 import com.xiaomo.agent.agent.service.ChatStreamEvent;
 import com.xiaomo.agent.common.config.HttpClientService;
@@ -112,6 +116,12 @@ public class AgentLoopImpl implements AgentLoop {
 
     @Resource
     private MemoryExtractionService memoryExtractionService;
+
+    @Resource
+    private TaskPlanner taskPlanner;
+
+    @Resource
+    private PlanningProperties planningProperties;
 
     /**
      * 根据用户配置解析对应的 ChatClient。
@@ -260,18 +270,22 @@ public class AgentLoopImpl implements AgentLoop {
                         + " | target=" + (target != null ? target.code() + "(" + target.name() + ")" : "null"));
 
         // 如果意图分类器未启用，回退到原有逻辑
-        if (intentResult.confidence() == 0 && intentResult.suggestedTools() == null) {
+        if (intentResult.confidence() == 0 && intentResult.policy().mode() == ToolPolicyMode.PLANNER_MANAGED) {
             target = ContextBuilder.toResolvedTarget(contextBuilder.resolveStockFromMessage(message));
         }
 
-        List<Message> context = contextBuilder.buildContext(conversation.getId(), userId, target, intentResult.intent(), contextWindow);
+        // 自主任务规划
+        PlanContext planContext = maybePlan(message, intentResult.intent(), intentResult.depth(), target, allWrappedCallbacks);
+        Scratchpad scratchpad = planContext != null ? new Scratchpad(planningProperties.scratchpadMaxLength()) : null;
+
+        List<Message> context = contextBuilder.buildContext(conversation.getId(), userId, target, intentResult.intent(), contextWindow, planContext);
         Long convId = conversation.getId();
 
         // 构建工具上下文
-        Map<String, Object> toolCtx = toolContextBuilder.build(userId, convId, target, null);
+        Map<String, Object> toolCtx = toolContextBuilder.build(userId, convId, target, null, planContext, scratchpad);
 
         // 过滤工具
-        Set<String> intentToolWhitelist = intentResult.suggestedTools();
+        Set<String> intentToolWhitelist = intentResult.policy().toWhitelist();
         List<ToolCallback> enabledTools = toolFilter.filter(allWrappedCallbacks, mcpToolNames, intentToolWhitelist, target);
 
         // 构建选项
@@ -373,22 +387,26 @@ public class AgentLoopImpl implements AgentLoop {
                         + " | target=" + (target != null ? target.code() + "(" + target.name() + ")" : "null"));
 
         // 如果意图分类器未启用，回退到原有逻辑
-        if (intentResult.confidence() == 0 && intentResult.suggestedTools() == null) {
+        if (intentResult.confidence() == 0 && intentResult.policy().mode() == ToolPolicyMode.PLANNER_MANAGED) {
             target = ContextBuilder.toResolvedTarget(contextBuilder.resolveStockFromMessage(message));
         }
 
-        List<Message> context = contextBuilder.buildContext(conversation.getId(), userId, target, intentResult.intent(), contextWindow);
+        // 自主任务规划
+        PlanContext planContext = maybePlan(message, intentResult.intent(), intentResult.depth(), target, allWrappedCallbacks);
+        Scratchpad scratchpad = planContext != null ? new Scratchpad(planningProperties.scratchpadMaxLength()) : null;
+
+        List<Message> context = contextBuilder.buildContext(conversation.getId(), userId, target, intentResult.intent(), contextWindow, planContext);
         Long convId = conversation.getId();
 
         // 创建状态事件 Sink
         Sinks.Many<ChatStreamEvent> statusSink = Sinks.many().multicast().onBackpressureBuffer();
 
         // 构建工具上下文
-        Map<String, Object> toolCtx = toolContextBuilder.build(userId, convId, target, statusSink);
+        Map<String, Object> toolCtx = toolContextBuilder.build(userId, convId, target, statusSink, planContext, scratchpad);
         toolCtx.put("memoryEnabled", memoryEnabled);
 
         // 过滤工具
-        Set<String> intentToolWhitelist = intentResult.suggestedTools();
+        Set<String> intentToolWhitelist = intentResult.policy().toWhitelist();
         List<ToolCallback> enabledTools = toolFilter.filter(allWrappedCallbacks, mcpToolNames, intentToolWhitelist, target);
 
         // 构建选项
@@ -477,5 +495,22 @@ public class AgentLoopImpl implements AgentLoop {
             return conversationService.getConversationForUser(conversationId, userId);
         }
         return conversationService.createConversation(userId, "新对话");
+    }
+
+    /**
+     * 判断是否需要多步规划，需要时调用 TaskPlanner 生成执行计划。
+     */
+    private PlanContext maybePlan(String message, IntentType intent, AnalysisDepth depth,
+                                  IntentResult.ResolvedTarget target,
+                                  List<ToolCallback> allWrappedCallbacks) {
+        if (!taskPlanner.needsPlanning(message, intent, depth)) return null;
+        Set<String> availableTools = allWrappedCallbacks.stream()
+                .map(cb -> cb.getToolDefinition().name())
+                .collect(Collectors.toSet());
+        PlanContext planContext = taskPlanner.plan(message, intent, target, availableTools);
+        if (planContext != null) {
+            log.info("[Plan] 任务规划已启用: goal={}, steps={}", planContext.goal(), planContext.steps().size());
+        }
+        return planContext;
     }
 }

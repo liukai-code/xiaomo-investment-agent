@@ -2,7 +2,10 @@ package com.xiaomo.agent.agent.intent;
 
 /**
  * 用户意图类型枚举。
- * 用于 IntentClassifier 对用户消息进行分类，指导工具过滤和上下文构建。
+ * 只描述业务意图（用户想分析什么），不描述执行方式（怎么分析）。
+ * <p>
+ * "深度分析"不是独立的业务意图，而是通过 AnalysisDepth.DEEP 标记。
+ * 例如"深度分析茅台" → intent=STOCK_ANALYSIS, depth=DEEP。
  */
 public enum IntentType {
 
@@ -26,9 +29,6 @@ public enum IntentType {
 
     /** 数据库查询 —— SQL 查询 */
     DB_QUERY,
-
-    /** 深度分析触发 —— 用户要求深度分析，应路由到 Workflow 模式 */
-    DEEP_ANALYSIS,
 
     /** 通用对话 —— 问候、概念解释、闲聊，不需要工具 */
     GENERAL_CHAT

@@ -15,6 +15,7 @@ import com.xiaomo.agent.tool.guard.ToolBehaviorRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
@@ -59,6 +60,8 @@ public class MaxToolCallManager implements ToolCallingManager {
     public static final String RESOLVED_STOCK_NAME_KEY = "resolvedStockName";
     public static final String STATUS_SINK_KEY = "statusSink";
     public static final String PER_TOOL_CALL_COUNT_KEY = "perToolCallCount";
+    public static final String PLAN_CONTEXT_KEY = "planContext";
+    public static final String SCRATCHPAD_KEY = "scratchpad";
 
     private static final Set<String> FETCH_TOOL_NAMES = Set.of(
             "fetchArticleContent", "fetchWebpage"
@@ -344,6 +347,13 @@ public class MaxToolCallManager implements ToolCallingManager {
                 }
             }
 
+            // 记录中间结果到 scratchpad，并更新 SystemMessage 供 LLM 下轮参考
+            Scratchpad scratchpad = extractFromContext(prompt, SCRATCHPAD_KEY, Scratchpad.class);
+            if (scratchpad != null) {
+                scratchpad.record(step, tc.name(), resultText);
+                injectScratchpadToSystemMessage(prompt, scratchpad);
+            }
+
             InfoGainLevel infoGain = infoGainTracker.recordAndGetLevel(resultText);
 
             // Cache non-retriable errors
@@ -446,6 +456,23 @@ public class MaxToolCallManager implements ToolCallingManager {
             }
         }
         return null;
+    }
+
+    /**
+     * 将 scratchpad 中间结果追加到 SystemMessage，使 LLM 下轮工具调用时能看到已完成步骤的摘要。
+     */
+    private void injectScratchpadToSystemMessage(Prompt prompt, Scratchpad scratchpad) {
+        List<Message> messages = prompt.getInstructions();
+        for (int i = 0; i < messages.size(); i++) {
+            if (messages.get(i) instanceof SystemMessage sm) {
+                String content = sm.getText();
+                // 去掉上一次追加的 scratchpad 部分（如果有），再追加最新的
+                int markerIdx = content.indexOf("\n\n## 已完成步骤的结果摘要");
+                String base = markerIdx >= 0 ? content.substring(0, markerIdx) : content;
+                messages.set(i, new SystemMessage(base + "\n\n" + scratchpad.format()));
+                break;
+            }
+        }
     }
 
     private ToolExecutionResult executeSafely(Prompt prompt, ChatResponse chatResponse) {
