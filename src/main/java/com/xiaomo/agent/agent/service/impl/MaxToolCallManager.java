@@ -469,7 +469,9 @@ public class MaxToolCallManager implements ToolCallingManager {
                 // 去掉上一次追加的 scratchpad 部分（如果有），再追加最新的
                 int markerIdx = content.indexOf("\n\n## 已完成步骤的结果摘要");
                 String base = markerIdx >= 0 ? content.substring(0, markerIdx) : content;
-                messages.set(i, new SystemMessage(base + "\n\n" + scratchpad.format()));
+                String scratchpadText = scratchpad.format();
+                messages.set(i, new SystemMessage(base + "\n\n" + scratchpadText));
+                log.info("[Scratchpad] 更新 SystemMessage, 已完成步骤: {}", scratchpad.size());
                 break;
             }
         }

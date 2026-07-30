@@ -25,6 +25,10 @@ public class Scratchpad {
         return results.isEmpty();
     }
 
+    public int size() {
+        return results.size();
+    }
+
     public String format() {
         if (results.isEmpty()) return "";
         StringBuilder sb = new StringBuilder("## 已完成步骤的结果摘要\n");
