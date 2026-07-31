@@ -2,13 +2,13 @@ package com.xiaomo.agent.agent.service.impl;
 
 import com.xiaomo.agent.agent.config.PlanningProperties;
 import com.xiaomo.agent.agent.intent.AnalysisDepth;
+import com.xiaomo.agent.agent.intent.ExecutionMode;
 import com.xiaomo.agent.agent.intent.IntentType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.ai.chat.client.ChatClient;
 
@@ -34,94 +34,63 @@ class TaskPlannerTest {
     }
 
     @Nested
-    @DisplayName("needsPlanning — 不需要规划的意图")
-    class 不需要规划 {
-
-        @ParameterizedTest
-        @EnumSource(value = IntentType.class, names = {
-                "GENERAL_CHAT", "FINANCIAL_CALC", "DB_QUERY", "HOLDINGS_QUERY"
-        })
-        void 简单意图返回False(IntentType intent) {
-            injectPlanningProperties(enabledProps);
-            assertFalse(planner.needsPlanning("随便什么消息", intent, AnalysisDepth.NORMAL));
-        }
+    @DisplayName("determineExecutionMode — 禁用时返回 DIRECT")
+    class 禁用测试 {
 
         @Test
-        void planning禁用时所有意图返回False() {
+        void planning禁用时返回DIRECT() {
             injectPlanningProperties(disabledProps);
-            assertFalse(planner.needsPlanning("从估值和基本面分析茅台", IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
+            assertEquals(ExecutionMode.DIRECT,
+                    planner.determineExecutionMode("从估值和基本面分析茅台", IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
         }
 
         @Test
-        void null消息返回False() {
+        void null消息返回DIRECT() {
             injectPlanningProperties(enabledProps);
-            assertFalse(planner.needsPlanning(null, IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
+            assertEquals(ExecutionMode.DIRECT,
+                    planner.determineExecutionMode(null, IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
         }
 
         @Test
-        void 空消息返回False() {
+        void 空消息返回DIRECT() {
             injectPlanningProperties(enabledProps);
-            assertFalse(planner.needsPlanning("  ", IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
+            assertEquals(ExecutionMode.DIRECT,
+                    planner.determineExecutionMode("  ", IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
         }
 
         @Test
-        void null意图返回False() {
+        void null意图返回DIRECT() {
             injectPlanningProperties(enabledProps);
-            assertFalse(planner.needsPlanning("分析茅台", null, AnalysisDepth.NORMAL));
+            assertEquals(ExecutionMode.DIRECT,
+                    planner.determineExecutionMode("分析茅台", null, AnalysisDepth.NORMAL));
         }
     }
 
     @Nested
-    @DisplayName("needsPlanning — 深度分析始终触发规划")
+    @DisplayName("determineExecutionMode — DEEP 深度分析始终 PLANNING")
     class 深度分析 {
 
-        @Test
-        void 深度分析始终返回True() {
-            injectPlanningProperties(enabledProps);
-            assertTrue(planner.needsPlanning("分析茅台", IntentType.STOCK_ANALYSIS, AnalysisDepth.DEEP));
-        }
-
-        @Test
-        void 深度分析通用对话也触发规划() {
-            injectPlanningProperties(enabledProps);
-            assertTrue(planner.needsPlanning("随便聊聊", IntentType.GENERAL_CHAT, AnalysisDepth.DEEP));
-        }
-    }
-
-    @Nested
-    @DisplayName("needsPlanning — STOCK_ANALYSIS 多维度判断")
-    class 个股分析多维度 {
-
         @BeforeEach
         void setup() {
             injectPlanningProperties(enabledProps);
         }
 
-        @ParameterizedTest
-        @ValueSource(strings = {
-                "从估值、基本面、资金面三个角度分析茅台",
-                "分析茅台的估值和财务情况",
-                "帮我看看茅台的PE和ROE",
-                "茅台的技术面和资金流怎么样"
-        })
-        void 多维度关键词返回True(String msg) {
-            assertTrue(planner.needsPlanning(msg, IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
+        @Test
+        void 深度分析个股返回PLANNING() {
+            assertEquals(ExecutionMode.PLANNING,
+                    planner.determineExecutionMode("分析茅台", IntentType.STOCK_ANALYSIS, AnalysisDepth.DEEP));
         }
 
         @Test
-        void 包含角度一词返回True() {
-            assertTrue(planner.needsPlanning("从不同角度分析茅台", IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
-        }
-
-        @Test
-        void 单一维度返回False() {
-            assertFalse(planner.needsPlanning("茅台股价多少", IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
+        void 深度分析通用对话也返回PLANNING() {
+            assertEquals(ExecutionMode.PLANNING,
+                    planner.determineExecutionMode("随便聊聊", IntentType.GENERAL_CHAT, AnalysisDepth.DEEP));
         }
     }
 
     @Nested
-    @DisplayName("needsPlanning — MARKET_NEWS 多主题判断")
-    class 市场新闻多主题 {
+    @DisplayName("determineExecutionMode — DIRECT 场景")
+    class 直接执行 {
 
         @BeforeEach
         void setup() {
@@ -129,49 +98,157 @@ class TaskPlannerTest {
         }
 
         @Test
-        void 多个主题关键词返回True() {
-            assertTrue(planner.needsPlanning("今天大盘和央行的新闻", IntentType.MARKET_NEWS, AnalysisDepth.NORMAL));
+        void 单标的单维度返回DIRECT() {
+            assertEquals(ExecutionMode.DIRECT,
+                    planner.determineExecutionMode("茅台股价多少", IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
         }
 
         @Test
-        void 单主题返回False() {
-            assertFalse(planner.needsPlanning("最近有什么新闻", IntentType.MARKET_NEWS, AnalysisDepth.NORMAL));
+        void 简单问候返回DIRECT() {
+            assertEquals(ExecutionMode.DIRECT,
+                    planner.determineExecutionMode("你好", IntentType.GENERAL_CHAT, AnalysisDepth.NORMAL));
+        }
+
+        @Test
+        void 金融计算返回DIRECT() {
+            assertEquals(ExecutionMode.DIRECT,
+                    planner.determineExecutionMode("帮我算一下收益率", IntentType.FINANCIAL_CALC, AnalysisDepth.NORMAL));
+        }
+
+        @Test
+        void 单维度查询返回DIRECT() {
+            assertEquals(ExecutionMode.DIRECT,
+                    planner.determineExecutionMode("茅台PE是多少", IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
         }
     }
 
     @Nested
-    @DisplayName("needsPlanning — SECTOR_ANALYSIS 对比判断")
-    class 板块分析对比 {
+    @DisplayName("determineExecutionMode — PARALLEL 场景")
+    class 并行执行 {
 
         @BeforeEach
         void setup() {
             injectPlanningProperties(enabledProps);
         }
 
-        @ParameterizedTest
-        @ValueSource(strings = {
-                "对比新能源和半导体板块",
-                "新能源和半导体哪个好",
-                "新能源 vs 半导体"
-        })
-        void 包含对比词返回True(String msg) {
-            assertTrue(planner.needsPlanning(msg, IntentType.SECTOR_ANALYSIS, AnalysisDepth.NORMAL));
+        @Test
+        void 多标的单维度返回PARALLEL() {
+            // 两个标的、一个维度：可以并行查询
+            assertEquals(ExecutionMode.PARALLEL,
+                    planner.determineExecutionMode("茅台和五粮液的PE", IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
         }
 
         @Test
-        void 无对比词返回False() {
-            assertFalse(planner.needsPlanning("新能源板块怎么样", IntentType.SECTOR_ANALYSIS, AnalysisDepth.NORMAL));
+        void 两维度无综合需求返回PARALLEL() {
+            // 两个维度、无综合决策需求：可以并行查询
+            assertEquals(ExecutionMode.PARALLEL,
+                    planner.determineExecutionMode("帮我看看茅台的ROE和PB", IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
+        }
+
+        @Test
+        void 对比单维度返回PARALLEL() {
+            // 对比两个标的但只有一个维度
+            assertEquals(ExecutionMode.PARALLEL,
+                    planner.determineExecutionMode("茅台和五粮液哪个PE更低", IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
         }
     }
 
     @Nested
-    @DisplayName("needsPlanning — TRADING_SENTIMENT")
-    class 打板情绪 {
+    @DisplayName("determineExecutionMode — PLANNING 场景")
+    class 规划执行 {
+
+        @BeforeEach
+        void setup() {
+            injectPlanningProperties(enabledProps);
+        }
 
         @Test
-        void 打板情绪始终返回False() {
+        void 依赖步骤返回PLANNING() {
+            assertEquals(ExecutionMode.PLANNING,
+                    planner.determineExecutionMode("先找低估银行股，再分析基本面最好的三只",
+                            IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
+        }
+
+        @Test
+        void 先再模式返回PLANNING() {
+            assertEquals(ExecutionMode.PLANNING,
+                    planner.determineExecutionMode("先查板块排名，然后再分析龙头股",
+                            IntentType.SECTOR_ANALYSIS, AnalysisDepth.NORMAL));
+        }
+
+        @Test
+        void 多标的多维度返回PLANNING() {
+            assertEquals(ExecutionMode.PLANNING,
+                    planner.determineExecutionMode("从估值、盈利和资金面比较茅台与五粮液",
+                            IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
+        }
+
+        @Test
+        void 综合决策需求返回PLANNING() {
+            assertEquals(ExecutionMode.PLANNING,
+                    planner.determineExecutionMode("结合估值和基本面判断茅台是否值得买入",
+                            IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
+        }
+
+        @Test
+        void 推荐需求返回PLANNING() {
+            assertEquals(ExecutionMode.PLANNING,
+                    planner.determineExecutionMode("分析茅台的估值和财务，给出投资建议",
+                            IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
+        }
+
+        @Test
+        void 三个以上子目标返回PLANNING() {
+            assertEquals(ExecutionMode.PLANNING,
+                    planner.determineExecutionMode("分析茅台的估值。研究行业趋势。判断投资风险",
+                            IntentType.STOCK_ANALYSIS, AnalysisDepth.NORMAL));
+        }
+
+        @Test
+        void 根据结果继续执行返回PLANNING() {
+            assertEquals(ExecutionMode.PLANNING,
+                    planner.determineExecutionMode("找出资金流入明显的板块，根据结果分析龙头股",
+                            IntentType.SECTOR_ANALYSIS, AnalysisDepth.NORMAL));
+        }
+    }
+
+    @Nested
+    @DisplayName("extractFeatures — 特征提取")
+    class 特征提取 {
+
+        @BeforeEach
+        void setup() {
             injectPlanningProperties(enabledProps);
-            assertFalse(planner.needsPlanning("今天涨停多少家", IntentType.TRADING_SENTIMENT, AnalysisDepth.NORMAL));
+        }
+
+        @Test
+        void 多维度关键词正确计数() {
+            var features = planner.extractFeatures("从估值、基本面、资金面分析茅台");
+            assertEquals(3, features.dimensionCount());
+        }
+
+        @Test
+        void 依赖步骤正确识别() {
+            var features = planner.extractFeatures("先查板块排名，然后再分析龙头股");
+            assertTrue(features.hasDependentSteps());
+        }
+
+        @Test
+        void 综合决策正确识别() {
+            var features = planner.extractFeatures("判断茅台是否值得买入");
+            assertTrue(features.hasSynthesisRequirement());
+        }
+
+        @Test
+        void 对比需求正确识别() {
+            var features = planner.extractFeatures("对比茅台和五粮液");
+            assertTrue(features.hasComparisonRequirement());
+        }
+
+        @Test
+        void 多标的正确识别() {
+            var features = planner.extractFeatures("茅台和五粮液的PE");
+            assertEquals(2, features.targetCount());
         }
     }
 

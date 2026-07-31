@@ -98,11 +98,12 @@ public final class IntentToolGroupMap {
     }
 
     /**
-     * 根据业务意图生成工具策略。
-     * 深度分析时返回 PLANNER_MANAGED，跳过静态白名单由 Planner 管理。
+     * 根据业务意图和执行模式生成工具策略。
+     * PLANNING / PARALLEL 模式返回 PLANNER_MANAGED，允许所有工具；
+     * DIRECT 模式走静态白名单。
      */
-    public static ToolPolicy getPolicy(IntentType intent, AnalysisDepth depth) {
-        if (depth == AnalysisDepth.DEEP) {
+    public static ToolPolicy getPolicy(IntentType intent, AnalysisDepth depth, ExecutionMode mode) {
+        if (mode == ExecutionMode.PLANNING || mode == ExecutionMode.PARALLEL) {
             return ToolPolicy.plannerManaged();
         }
         Set<String> tools = GROUP_MAP.getOrDefault(intent, Set.of());

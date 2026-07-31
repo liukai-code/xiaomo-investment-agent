@@ -3,6 +3,7 @@ package com.xiaomo.agent.agent.service.impl;
 import com.xiaomo.agent.agent.config.PlanningProperties;
 import com.xiaomo.agent.agent.config.ToolGuardProperties;
 import com.xiaomo.agent.agent.intent.AnalysisDepth;
+import com.xiaomo.agent.agent.intent.ExecutionMode;
 import com.xiaomo.agent.agent.intent.IntentClassifier;
 import com.xiaomo.agent.agent.intent.IntentResult;
 import com.xiaomo.agent.agent.intent.IntentType;
@@ -275,7 +276,8 @@ public class AgentLoopImpl implements AgentLoop {
         }
 
         // 自主任务规划
-        PlanContext planContext = maybePlan(message, intentResult.intent(), intentResult.depth(), target, allWrappedCallbacks);
+        PlanContext planContext = maybePlan(message, intentResult.intent(), intentResult.depth(),
+                intentResult.executionMode(), target, allWrappedCallbacks);
         Scratchpad scratchpad = planContext != null ? new Scratchpad(planningProperties.scratchpadMaxLength()) : null;
 
         List<Message> context = contextBuilder.buildContext(conversation.getId(), userId, target, intentResult.intent(), contextWindow, planContext);
@@ -392,7 +394,8 @@ public class AgentLoopImpl implements AgentLoop {
         }
 
         // 自主任务规划
-        PlanContext planContext = maybePlan(message, intentResult.intent(), intentResult.depth(), target, allWrappedCallbacks);
+        PlanContext planContext = maybePlan(message, intentResult.intent(), intentResult.depth(),
+                intentResult.executionMode(), target, allWrappedCallbacks);
         Scratchpad scratchpad = planContext != null ? new Scratchpad(planningProperties.scratchpadMaxLength()) : null;
 
         List<Message> context = contextBuilder.buildContext(conversation.getId(), userId, target, intentResult.intent(), contextWindow, planContext);
@@ -506,12 +509,17 @@ public class AgentLoopImpl implements AgentLoop {
     }
 
     /**
-     * 判断是否需要多步规划，需要时调用 TaskPlanner 生成执行计划。
+     * 根据执行模式决定是否生成执行计划。
+     * PLANNING 模式调用 TaskPlanner 生成计划；DIRECT / PARALLEL 模式直接返回 null。
      */
     private PlanContext maybePlan(String message, IntentType intent, AnalysisDepth depth,
+                                  ExecutionMode executionMode,
                                   IntentResult.ResolvedTarget target,
                                   List<ToolCallback> allWrappedCallbacks) {
-        if (!taskPlanner.needsPlanning(message, intent, depth)) return null;
+        if (executionMode != ExecutionMode.PLANNING) {
+            log.info("[Plan] 执行模式={}, 跳过规划", executionMode);
+            return null;
+        }
         Set<String> availableTools = allWrappedCallbacks.stream()
                 .map(cb -> cb.getToolDefinition().name())
                 .collect(Collectors.toSet());

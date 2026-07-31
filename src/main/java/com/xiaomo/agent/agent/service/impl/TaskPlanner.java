@@ -2,8 +2,10 @@ package com.xiaomo.agent.agent.service.impl;
 
 import com.xiaomo.agent.agent.config.PlanningProperties;
 import com.xiaomo.agent.agent.intent.AnalysisDepth;
+import com.xiaomo.agent.agent.intent.ExecutionMode;
 import com.xiaomo.agent.agent.intent.IntentResult;
 import com.xiaomo.agent.agent.intent.IntentType;
+import com.xiaomo.agent.agent.intent.RequestFeatures;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Resource;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * 对话场景下的任务规划器。
@@ -74,24 +77,35 @@ public class TaskPlanner {
     }
 
     /**
-     * 判断任务是否需要多步规划（纯规则，不走 LLM）。
-     * DEEP 深度分析始终触发规划；普通请求按业务意图和复杂度判断。
+     * 判断执行模式（纯规则，不走 LLM）。
+     * DEEP 深度分析始终触发 PLANNING；其余按结构特征判断。
      */
-    public boolean needsPlanning(String message, IntentType intent, AnalysisDepth depth) {
-        if (!planningProperties.enabled()) return false;
-        if (message == null || message.isBlank()) return false;
-        if (intent == null) return false;
+    public ExecutionMode determineExecutionMode(String message, IntentType intent, AnalysisDepth depth) {
+        if (!planningProperties.enabled()) return ExecutionMode.DIRECT;
+        if (message == null || message.isBlank()) return ExecutionMode.DIRECT;
+        if (intent == null) return ExecutionMode.DIRECT;
 
         // 深度分析始终触发 LLM 规划
-        if (depth == AnalysisDepth.DEEP) return true;
+        if (depth == AnalysisDepth.DEEP) return ExecutionMode.PLANNING;
 
-        return switch (intent) {
-            case GENERAL_CHAT, FINANCIAL_CALC, DB_QUERY, HOLDINGS_QUERY -> false;
-            case STOCK_ANALYSIS -> hasMultiDimensionKeywords(message);
-            case MARKET_NEWS -> hasMultiTopicKeywords(message);
-            case SECTOR_ANALYSIS -> hasComparisonKeywords(message);
-            case TRADING_SENTIMENT -> false;
-        };
+        RequestFeatures features = extractFeatures(message);
+
+        // 存在前后依赖 → PLANNING（最强信号）
+        if (features.hasDependentSteps()) return ExecutionMode.PLANNING;
+
+        // 多标的 × 多维度 → PLANNING
+        if (features.targetCount() >= 2 && features.dimensionCount() >= 2) return ExecutionMode.PLANNING;
+
+        // 多维度 + 综合决策需求 → PLANNING
+        if (features.dimensionCount() >= 2 && features.hasSynthesisRequirement()) return ExecutionMode.PLANNING;
+
+        // 3 个以上子目标 → PLANNING
+        if (features.subGoalCount() >= 3) return ExecutionMode.PLANNING;
+
+        // 预估 2 次以上工具调用 → PARALLEL
+        if (features.estimatedToolCalls() >= 2) return ExecutionMode.PARALLEL;
+
+        return ExecutionMode.DIRECT;
     }
 
     /**
@@ -198,40 +212,137 @@ public class TaskPlanner {
         return sb.toString();
     }
 
-    // ===== 复杂度判断规则 =====
+    // ===== 特征提取 =====
+
+    /** 信息维度关键词 */
+    private static final String[] DIMENSION_KEYWORDS = {
+            "估值", "基本面", "资金面", "技术面", "情绪面", "行情", "财务",
+            "盈利", "营收", "利润", "ROE", "PE", "PB", "K线",
+            "资金流", "北向", "龙虎榜", "融资", "研报",
+            "角度", "维度", "方面"
+    };
+
+    /** 依赖步骤关键词 — 需要前后对应不同动作才有效 */
+    private static final String[] DEPENDENCY_KEYWORDS = {
+            "先", "然后", "再", "之后",
+            "从中选择", "筛选出", "找出", "根据结果",
+            "其中", "分别分析"
+    };
+
+    /** 综合决策关键词 */
+    private static final String[] SYNTHESIS_KEYWORDS = {
+            "是否值得", "是否适合", "能不能买", "给出建议",
+            "投资价值", "风险收益", "综合判断", "形成结论",
+            "推荐", "买入区间", "目标价"
+    };
+
+    /** 对比关键词 */
+    private static final String[] COMPARISON_KEYWORDS = {
+            "对比", "比较", " vs ", "哪个好", "哪个强", "优劣"
+    };
+
+    /** 标的识别模式：股票名称/代码之间用"和"、"与"、"、"、顿号等连接 */
+    private static final Pattern MULTI_TARGET_PATTERN = Pattern.compile(
+            "[\\u4e00-\\u9fa5]{2,}[和、与,][\\u4e00-\\u9fa5]{2,}");
+
+    /** 子目标分隔模式：逗号、句号、分号分隔的不同动作 */
+    private static final Pattern SUB_GOAL_SEPARATOR = Pattern.compile("[，。；]");
 
     /**
-     * 个股分析是否包含多维度关键词（估值、基本面、资金面等）
+     * 从用户请求中提取结构化特征。
      */
-    private boolean hasMultiDimensionKeywords(String msg) {
-        String[] dimensions = {"估值", "基本面", "资金面", "技术面", "情绪面", "行情", "财务",
-                "盈利", "营收", "利润", "ROE", "PE", "PB", "K线",
-                "资金流", "北向", "龙虎榜", "融资", "研报"};
-        int matchCount = 0;
-        for (String kw : dimensions) {
-            if (msg.contains(kw)) matchCount++;
-        }
-        // 匹配 2 个以上维度关键词，或包含"角度"/"维度"/"方面"等规划类词
-        return matchCount >= 2 || msg.contains("角度") || msg.contains("维度") || msg.contains("方面");
+    RequestFeatures extractFeatures(String msg) {
+        int dimensionCount = countMatches(msg, DIMENSION_KEYWORDS);
+        boolean hasDependent = hasDependentSteps(msg);
+        boolean hasSynthesis = containsAny(msg, SYNTHESIS_KEYWORDS);
+        boolean hasComparison = containsAny(msg, COMPARISON_KEYWORDS);
+        int targetCount = estimateTargetCount(msg);
+        int subGoalCount = estimateSubGoalCount(msg);
+        int estimatedToolCalls = estimateToolCalls(msg, dimensionCount, targetCount, hasComparison);
+
+        return new RequestFeatures(
+                targetCount, dimensionCount, subGoalCount,
+                estimatedToolCalls, hasDependent, hasSynthesis, hasComparison
+        );
     }
 
     /**
-     * 市场新闻是否包含多个主题
+     * 判断是否存在前后依赖步骤。
+     * 不能只看"先"字出现，需要确认前后确实对应不同动作。
      */
-    private boolean hasMultiTopicKeywords(String msg) {
-        String[] topics = {"板块", "行业", "大盘", "指数", "央行", "政策", "美联储", "利率", "通胀"};
-        int matchCount = 0;
-        for (String kw : topics) {
-            if (msg.contains(kw)) matchCount++;
+    private boolean hasDependentSteps(String msg) {
+        // 快速检查：必须包含依赖关键词
+        if (!containsAny(msg, DEPENDENCY_KEYWORDS)) return false;
+
+        // "先...再/然后/之后..." 模式 — 至少两个不同动作
+        if (msg.contains("先") && (msg.contains("再") || msg.contains("然后") || msg.contains("之后"))) {
+            return true;
         }
-        return matchCount >= 2;
+        // "从中选择/筛选出/找出" — 需要先有结果才能筛选
+        if (msg.contains("从中") || msg.contains("筛选出")) return true;
+        // "根据结果" — 明确依赖前序步骤
+        if (msg.contains("根据结果")) return true;
+        // "分别分析" — 多标的需要分别处理
+        if (msg.contains("分别分析") || msg.contains("分别研究")) return true;
+
+        return false;
     }
 
     /**
-     * 板块分析是否包含对比词
+     * 估算标的数量。
      */
-    private boolean hasComparisonKeywords(String msg) {
-        return msg.contains("对比") || msg.contains("比较") || msg.contains(" vs ")
-                || msg.contains("哪个好") || msg.contains("哪个强") || msg.contains("优劣");
+    private int estimateTargetCount(String msg) {
+        // 检查多标的连接模式
+        if (MULTI_TARGET_PATTERN.matcher(msg).find()) return 2;
+        // "X和Y的PE" 模式
+        if (msg.matches(".*[\\u4e00-\\u9fa5]{2,}[和、与][\\u4e00-\\u9fa5]{2,}.*")) return 2;
+        return 1;
+    }
+
+    /**
+     * 估算子目标数量（按分隔符和动作词粗略估计）。
+     */
+    private int estimateSubGoalCount(String msg) {
+        String[] separators = {"，", "。", "；"};
+        int segments = 1;
+        for (String sep : separators) {
+            int idx = 0;
+            while ((idx = msg.indexOf(sep, idx)) >= 0) {
+                segments++;
+                idx += sep.length();
+            }
+        }
+        // 至少 1 个子目标
+        return Math.max(1, segments);
+    }
+
+    /**
+     * 估算工具调用次数。
+     */
+    private int estimateToolCalls(String msg, int dimensionCount, int targetCount, boolean hasComparison) {
+        int calls = 0;
+        // 每个维度至少一次工具调用
+        calls += Math.max(0, dimensionCount);
+        // 对比场景需要额外查询
+        if (hasComparison) calls = Math.max(calls, 2);
+        // 多标的倍增（但不是简单乘法，有些工具可以一次查多标的）
+        if (targetCount >= 2) calls = Math.max(calls, 2);
+        // 至少 1 次
+        return Math.max(1, calls);
+    }
+
+    private int countMatches(String msg, String[] keywords) {
+        int count = 0;
+        for (String kw : keywords) {
+            if (msg.contains(kw)) count++;
+        }
+        return count;
+    }
+
+    private boolean containsAny(String msg, String[] keywords) {
+        for (String kw : keywords) {
+            if (msg.contains(kw)) return true;
+        }
+        return false;
     }
 }

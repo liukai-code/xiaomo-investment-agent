@@ -1,5 +1,6 @@
 package com.xiaomo.agent.agent.intent;
 
+import com.xiaomo.agent.agent.service.impl.TaskPlanner;
 import com.xiaomo.agent.common.config.HttpClientService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -14,12 +15,23 @@ import static org.mockito.Mockito.*;
 class RuleBasedIntentClassifierTest {
 
     private HttpClientService httpClientService;
+    private TaskPlanner taskPlanner;
     private RuleBasedIntentClassifier classifier;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         httpClientService = mock(HttpClientService.class);
+        taskPlanner = mock(TaskPlanner.class);
         classifier = new RuleBasedIntentClassifier(httpClientService, true);
+
+        // 通过反射注入 mock TaskPlanner
+        var field = RuleBasedIntentClassifier.class.getDeclaredField("taskPlanner");
+        field.setAccessible(true);
+        field.set(classifier, taskPlanner);
+
+        // 默认 stub：简单意图返回 DIRECT，复杂意图返回 PLANNING
+        when(taskPlanner.determineExecutionMode(anyString(), any(), any()))
+                .thenReturn(ExecutionMode.DIRECT);
     }
 
     @Nested
@@ -33,6 +45,7 @@ class RuleBasedIntentClassifierTest {
             assertEquals(IntentType.GENERAL_CHAT, result.intent());
             assertNotNull(result.policy().toWhitelist());
             assertTrue(result.policy().toWhitelist().isEmpty());
+            assertEquals(ExecutionMode.DIRECT, result.executionMode());
         }
 
         @ParameterizedTest
@@ -242,24 +255,32 @@ class RuleBasedIntentClassifierTest {
         void 深度分析个股应返回STOCK_ANALYSIS加DEEP深度() throws Exception {
             when(httpClientService.get(anyString(), any())).thenReturn(
                     "{\"QuotationCodeTable\":{\"Data\":[{\"Code\":\"300750\",\"Name\":\"宁德时代\",\"MktNum\":\"0\"}]}}");
+            when(taskPlanner.determineExecutionMode(anyString(), eq(IntentType.STOCK_ANALYSIS), eq(AnalysisDepth.DEEP)))
+                    .thenReturn(ExecutionMode.PLANNING);
             IntentResult result = classifier.classify("深度分析宁德时代");
             assertEquals(IntentType.STOCK_ANALYSIS, result.intent());
             assertEquals(AnalysisDepth.DEEP, result.depth());
             assertEquals(ToolPolicyMode.PLANNER_MANAGED, result.policy().mode());
+            assertEquals(ExecutionMode.PLANNING, result.executionMode());
         }
 
         @Test
         void 深度分析板块应返回SECTOR_ANALYSIS加DEEP深度() {
+            when(taskPlanner.determineExecutionMode(anyString(), eq(IntentType.SECTOR_ANALYSIS), eq(AnalysisDepth.DEEP)))
+                    .thenReturn(ExecutionMode.PLANNING);
             IntentResult result = classifier.classify("深度分析半导体板块");
             assertEquals(IntentType.SECTOR_ANALYSIS, result.intent());
             assertEquals(AnalysisDepth.DEEP, result.depth());
             assertEquals(ToolPolicyMode.PLANNER_MANAGED, result.policy().mode());
+            assertEquals(ExecutionMode.PLANNING, result.executionMode());
         }
 
         @Test
         void 详细研究应触发DEEP深度() throws Exception {
             when(httpClientService.get(anyString(), any())).thenReturn(
                     "{\"QuotationCodeTable\":{\"Data\":[{\"Code\":\"600519\",\"Name\":\"贵州茅台\",\"MktNum\":\"1\"}]}}");
+            when(taskPlanner.determineExecutionMode(anyString(), eq(IntentType.STOCK_ANALYSIS), eq(AnalysisDepth.DEEP)))
+                    .thenReturn(ExecutionMode.PLANNING);
             IntentResult result = classifier.classify("详细研究茅台的基本面");
             assertEquals(IntentType.STOCK_ANALYSIS, result.intent());
             assertEquals(AnalysisDepth.DEEP, result.depth());
@@ -356,6 +377,33 @@ class RuleBasedIntentClassifierTest {
             assertEquals(IntentType.STOCK_ANALYSIS, result.intent());
             assertNotNull(result.target(), "今天国际应被识别为股票标的");
             assertEquals("300532", result.target().code());
+        }
+    }
+
+    @Nested
+    @DisplayName("执行模式集成")
+    class ExecutionModeIntegration {
+
+        @Test
+        void PARALLEL模式时工具策略为PLANNER_MANAGED() throws Exception {
+            when(httpClientService.get(anyString(), any())).thenReturn(
+                    "{\"QuotationCodeTable\":{\"Data\":[{\"Code\":\"600519\",\"Name\":\"贵州茅台\",\"MktNum\":\"1\"}]}}");
+            when(taskPlanner.determineExecutionMode(anyString(), eq(IntentType.STOCK_ANALYSIS), eq(AnalysisDepth.NORMAL)))
+                    .thenReturn(ExecutionMode.PARALLEL);
+            IntentResult result = classifier.classify("茅台股价和PE");
+            assertEquals(ExecutionMode.PARALLEL, result.executionMode());
+            assertEquals(ToolPolicyMode.PLANNER_MANAGED, result.policy().mode());
+        }
+
+        @Test
+        void DIRECT模式时工具策略为ALLOW_LIST() throws Exception {
+            when(httpClientService.get(anyString(), any())).thenReturn(
+                    "{\"QuotationCodeTable\":{\"Data\":[{\"Code\":\"600519\",\"Name\":\"贵州茅台\",\"MktNum\":\"1\"}]}}");
+            when(taskPlanner.determineExecutionMode(anyString(), eq(IntentType.STOCK_ANALYSIS), eq(AnalysisDepth.NORMAL)))
+                    .thenReturn(ExecutionMode.DIRECT);
+            IntentResult result = classifier.classify("茅台股价");
+            assertEquals(ExecutionMode.DIRECT, result.executionMode());
+            assertEquals(ToolPolicyMode.ALLOW_LIST, result.policy().mode());
         }
     }
 

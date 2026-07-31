@@ -1,7 +1,9 @@
 package com.xiaomo.agent.agent.intent;
 
+import com.xiaomo.agent.agent.service.impl.TaskPlanner;
 import com.xiaomo.agent.common.config.HttpClientService;
 import com.xiaomo.agent.workflow.util.StockResolver;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -36,8 +38,17 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
             "深入分析|深度分析|全面分析|详细分析|深度研究|深度调研|深度剖析|深入研究|全面研究|详细研究|个股分析|个股研究"
     );
 
+    /**
+     * 分类中间结果（不含 policy 和 executionMode，后续统一计算）
+     */
+    private record IntentDraft(IntentType intent, double confidence, IntentResult.ResolvedTarget target) {
+    }
+
     private final HttpClientService httpClientService;
     private final boolean enabled;
+
+    @Resource
+    private TaskPlanner taskPlanner;
 
     public RuleBasedIntentClassifier(HttpClientService httpClientService,
                                      @Value("${agent.intent.enabled:true}") boolean enabled) {
@@ -49,17 +60,18 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
     public IntentResult classify(String message) {
         if (!enabled) {
             return new IntentResult(IntentType.GENERAL_CHAT, AnalysisDepth.NORMAL, 0, null,
-                    ToolPolicy.plannerManaged());
+                    ToolPolicy.plannerManaged(), ExecutionMode.PLANNING);
         }
 
         if (message == null || message.isBlank()) {
             return new IntentResult(IntentType.GENERAL_CHAT, AnalysisDepth.NORMAL, 1.0, null,
-                    IntentToolGroupMap.getPolicy(IntentType.GENERAL_CHAT, AnalysisDepth.NORMAL));
+                    IntentToolGroupMap.getPolicy(IntentType.GENERAL_CHAT, AnalysisDepth.NORMAL, ExecutionMode.DIRECT),
+                    ExecutionMode.DIRECT);
         }
 
         String trimmed = message.trim();
 
-        // Step 1: 提取分析深度（只标记，不剥离文本，保留"分析"关键词供后续分类使用）
+        // Step 1: 提取分析深度
         AnalysisDepth depth = AnalysisDepth.NORMAL;
         Matcher depthMatcher = DEPTH_PATTERN.matcher(trimmed);
         if (depthMatcher.find()) {
@@ -67,80 +79,76 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
             log.info("[IntentClassifier] 检测到深度分析标记");
         }
 
-        // Step 2: 业务意图分类
-        IntentResult result = classifyBusinessIntent(trimmed, depth);
+        // Step 2: 业务意图分类（返回 draft，不含 policy/executionMode）
+        IntentDraft draft = classifyBusinessIntent(trimmed, depth);
 
-        // Step 3: 如果有深度标记但业务分类不是需要标的的意图，强制设为 PLANNER_MANAGED
-        if (depth == AnalysisDepth.DEEP && result.policy().mode() != ToolPolicyMode.PLANNER_MANAGED) {
-            result = new IntentResult(result.intent(), AnalysisDepth.DEEP, result.confidence(),
-                    result.target(), ToolPolicy.plannerManaged());
-        }
+        // Step 3: 确定执行模式
+        ExecutionMode mode = taskPlanner.determineExecutionMode(trimmed, draft.intent(), depth);
 
-        return result;
+        // Step 4: 根据执行模式计算工具策略
+        ToolPolicy policy = IntentToolGroupMap.getPolicy(draft.intent(), depth, mode);
+
+        log.info("[IntentClassifier] intent={}, depth={}, mode={}, confidence={}",
+                draft.intent(), depth, mode, draft.confidence());
+
+        return new IntentResult(draft.intent(), depth, draft.confidence(),
+                draft.target(), policy, mode);
     }
 
     /**
-     * 纯业务意图分类（不含深度判断）
+     * 纯业务意图分类（不含 policy/executionMode，后续统一计算）
      */
-    private IntentResult classifyBusinessIntent(String trimmed, AnalysisDepth depth) {
+    private IntentDraft classifyBusinessIntent(String trimmed, AnalysisDepth depth) {
         // === 第一优先级：高特异性意图 ===
 
         if (isHoldingsQuery(trimmed)) {
             log.info("[IntentClassifier] HOLDINGS_QUERY: {}", trimmed);
-            return new IntentResult(IntentType.HOLDINGS_QUERY, depth, 0.95, null,
-                    IntentToolGroupMap.getPolicy(IntentType.HOLDINGS_QUERY, depth));
+            return new IntentDraft(IntentType.HOLDINGS_QUERY, 0.95, null);
         }
 
         if (isGeneralChat(trimmed)) {
             log.info("[IntentClassifier] GENERAL_CHAT: {}", trimmed);
-            return new IntentResult(IntentType.GENERAL_CHAT, depth, 0.9, null,
-                    IntentToolGroupMap.getPolicy(IntentType.GENERAL_CHAT, depth));
+            return new IntentDraft(IntentType.GENERAL_CHAT, 0.9, null);
         }
 
         // === 第二优先级：金融专业意图 ===
 
         if (isSectorAnalysis(trimmed)) {
             log.info("[IntentClassifier] SECTOR_ANALYSIS: {}", trimmed);
-            return new IntentResult(IntentType.SECTOR_ANALYSIS, depth, 0.9, null,
-                    IntentToolGroupMap.getPolicy(IntentType.SECTOR_ANALYSIS, depth));
+            return new IntentDraft(IntentType.SECTOR_ANALYSIS, 0.9, null);
         }
 
         if (isFinancialCalc(trimmed)) {
             log.info("[IntentClassifier] FINANCIAL_CALC: {}", trimmed);
-            return new IntentResult(IntentType.FINANCIAL_CALC, depth, 0.9, null,
-                    IntentToolGroupMap.getPolicy(IntentType.FINANCIAL_CALC, depth));
+            return new IntentDraft(IntentType.FINANCIAL_CALC, 0.9, null);
         }
 
         if (isMarketNews(trimmed)) {
             log.info("[IntentClassifier] MARKET_NEWS: {}", trimmed);
-            return new IntentResult(IntentType.MARKET_NEWS, depth, 0.85, null,
-                    IntentToolGroupMap.getPolicy(IntentType.MARKET_NEWS, depth));
+            return new IntentDraft(IntentType.MARKET_NEWS, 0.85, null);
         }
 
         if (isTradingSentiment(trimmed)) {
             log.info("[IntentClassifier] TRADING_SENTIMENT: {}", trimmed);
-            return new IntentResult(IntentType.TRADING_SENTIMENT, depth, 0.9, null,
-                    IntentToolGroupMap.getPolicy(IntentType.TRADING_SENTIMENT, depth));
+            return new IntentDraft(IntentType.TRADING_SENTIMENT, 0.9, null);
         }
 
         if (isDbQuery(trimmed)) {
             log.info("[IntentClassifier] DB_QUERY: {}", trimmed);
-            return new IntentResult(IntentType.DB_QUERY, depth, 0.9, null,
-                    IntentToolGroupMap.getPolicy(IntentType.DB_QUERY, depth));
+            return new IntentDraft(IntentType.DB_QUERY, 0.9, null);
         }
 
         // === 第三优先级：个股分析（需要标的解析，成本最高） ===
 
         if (hasAnalysisIntent(trimmed)) {
-            IntentResult result = tryResolveStock(trimmed, depth);
-            log.info("[IntentClassifier] STOCK_ANALYSIS: target={}", result.target());
-            return result;
+            IntentDraft draft = tryResolveStock(trimmed);
+            log.info("[IntentClassifier] STOCK_ANALYSIS: target={}", draft.target());
+            return draft;
         }
 
         // === 兜底 ===
         log.info("[IntentClassifier] GENERAL_CHAT (fallback): {}", trimmed);
-        return new IntentResult(IntentType.GENERAL_CHAT, depth, 0.5, null,
-                IntentToolGroupMap.getPolicy(IntentType.GENERAL_CHAT, depth));
+        return new IntentDraft(IntentType.GENERAL_CHAT, 0.5, null);
     }
 
     /**
@@ -149,7 +157,7 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
      * Bug#3 修复：先用原文尝试解析（保留"今天国际"等股票名称），
      * 失败后再剥离时间词重试
      */
-    private IntentResult tryResolveStock(String msg, AnalysisDepth depth) {
+    private IntentDraft tryResolveStock(String msg) {
         // 先尝试提取6位数字代码
         Matcher m = CODE_PATTERN.matcher(msg);
         if (m.find()) {
@@ -162,8 +170,7 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
                 log.debug("[IntentClassifier] 代码反查名称失败: {}", e.getMessage());
             }
             var target = new IntentResult.ResolvedTarget(code, name);
-            return new IntentResult(IntentType.STOCK_ANALYSIS, depth, 0.85, target,
-                    IntentToolGroupMap.getPolicy(IntentType.STOCK_ANALYSIS, depth));
+            return new IntentDraft(IntentType.STOCK_ANALYSIS, 0.85, target);
         }
 
         // Bug#3 修复：先用原文尝试解析，保留"今天国际"等包含时间词的股票名称
@@ -172,8 +179,7 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
             try {
                 var resolved = StockResolver.resolve(cleaned, httpClientService);
                 var target = new IntentResult.ResolvedTarget(resolved.code(), resolved.name());
-                return new IntentResult(IntentType.STOCK_ANALYSIS, depth, 0.85, target,
-                        IntentToolGroupMap.getPolicy(IntentType.STOCK_ANALYSIS, depth));
+                return new IntentDraft(IntentType.STOCK_ANALYSIS, 0.85, target);
             } catch (IllegalArgumentException e) {
                 log.debug("[IntentClassifier] 原文解析失败，尝试剥离时间词: {}", e.getMessage());
             }
@@ -185,8 +191,7 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
             try {
                 var resolved = StockResolver.resolve(cleanedWithTimeStripped, httpClientService);
                 var target = new IntentResult.ResolvedTarget(resolved.code(), resolved.name());
-                return new IntentResult(IntentType.STOCK_ANALYSIS, depth, 0.85, target,
-                        IntentToolGroupMap.getPolicy(IntentType.STOCK_ANALYSIS, depth));
+                return new IntentDraft(IntentType.STOCK_ANALYSIS, 0.85, target);
             } catch (IllegalArgumentException e) {
                 log.warn("[IntentClassifier] 标的解析失败: {}", e.getMessage());
             }
@@ -194,11 +199,9 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
 
         // 两次都失败，降级
         if (isMarketNews(msg)) {
-            return new IntentResult(IntentType.MARKET_NEWS, depth, 0.6, null,
-                    IntentToolGroupMap.getPolicy(IntentType.MARKET_NEWS, depth));
+            return new IntentDraft(IntentType.MARKET_NEWS, 0.6, null);
         }
-        return new IntentResult(IntentType.GENERAL_CHAT, depth, 0.5, null,
-                IntentToolGroupMap.getPolicy(IntentType.GENERAL_CHAT, depth));
+        return new IntentDraft(IntentType.GENERAL_CHAT, 0.5, null);
     }
 
     // ===== 判断方法 =====

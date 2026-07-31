@@ -3,18 +3,20 @@ package com.xiaomo.agent.agent.intent;
 /**
  * 意图分类结果
  *
- * @param intent     业务意图类型（个股分析、板块分析、新闻等）
- * @param depth      分析深度（普通 / 深度）
- * @param confidence 分类置信度 0.0-1.0
- * @param target     解析出的标的信息（需要标的的意图且解析成功时非 null）
- * @param policy     工具策略（白名单 / 禁用 / Planner 管理）
+ * @param intent        业务意图类型（个股分析、板块分析、新闻等）
+ * @param depth         分析深度（普通 / 深度）
+ * @param confidence    分类置信度 0.0-1.0
+ * @param target        解析出的标的信息（需要标的的意图且解析成功时非 null）
+ * @param policy        工具策略（白名单 / 禁用 / Planner 管理）
+ * @param executionMode 执行模式（直接 / 并行 / 规划）
  */
 public record IntentResult(
         IntentType intent,
         AnalysisDepth depth,
         double confidence,
         ResolvedTarget target,
-        ToolPolicy policy
+        ToolPolicy policy,
+        ExecutionMode executionMode
 ) {
     /**
      * 解析出的标的
