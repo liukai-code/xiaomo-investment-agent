@@ -1,10 +1,18 @@
+export interface PlanStepDto {
+  id: number
+  action: string
+  tool?: string
+}
+
 export interface StatusEvent {
-  type: 'THINKING' | 'TOOL_CALL' | 'TOOL_RESULT' | 'CONTENT'
+  type: 'THINKING' | 'TOOL_CALL' | 'TOOL_RESULT' | 'CONTENT' | 'PLAN'
   toolName?: string
   operation?: string
   content?: string
   step?: number
   totalSteps?: number
+  planGoal?: string
+  planSteps?: PlanStepDto[]
 }
 
 export interface StreamCallbacks {

@@ -401,6 +401,14 @@ public class AgentLoopImpl implements AgentLoop {
         // 创建状态事件 Sink
         Sinks.Many<ChatStreamEvent> statusSink = Sinks.many().multicast().onBackpressureBuffer();
 
+        // 发射执行计划事件（前端可视化）
+        if (planContext != null) {
+            List<ChatStreamEvent.PlanStepDto> planStepDtos = planContext.steps().stream()
+                    .map(s -> new ChatStreamEvent.PlanStepDto(s.id(), s.action(), s.tool()))
+                    .toList();
+            statusSink.tryEmitNext(ChatStreamEvent.plan(planContext.goal(), planStepDtos));
+        }
+
         // 构建工具上下文
         Map<String, Object> toolCtx = toolContextBuilder.build(userId, convId, target, statusSink, planContext, scratchpad);
         toolCtx.put("memoryEnabled", memoryEnabled);

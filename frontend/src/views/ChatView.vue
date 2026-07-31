@@ -3,10 +3,10 @@ import { ref, nextTick, onMounted, onUnmounted, computed, watch, watchEffect } f
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
-import { streamChat, type StatusEvent } from '@/api/chat'
+import { streamChat, type StatusEvent, type PlanStepDto } from '@/api/chat'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
 import { useRafThrottle } from '@/composables/useMarkdownBlocks'
-import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen, Bell, Square, Loader2, Brain } from 'lucide-vue-next'
+import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen, Bell, Square, Loader2, Brain, CheckCircle, Circle, Target } from 'lucide-vue-next'
 import { useYangjibaoStore } from '@/stores/yangjibao'
 import { useAnalysisStore } from '@/stores/analysis'
 import { useNotificationStore } from '@/stores/notification'
@@ -53,6 +53,10 @@ let abortController: AbortController | null = null
 
 // 工具调用状态
 const currentStatus = ref<StatusEvent | null>(null)
+const currentPlan = ref<{ goal: string; steps: PlanStepDto[] } | null>(null)
+const completedStepIds = ref<Set<number>>(new Set())
+const runningStepId = ref<number | null>(null)
+const planCollapsed = ref(false)
 
 // 工具名 → 用户友好的状态描述
 // 支持两种 key：精确匹配 "toolName:operation"，通用匹配 "toolName"
@@ -141,6 +145,12 @@ function getStatusLabel(status: StatusEvent): string {
     return toolLabelMap[status.toolName] || '正在获取数据'
   }
   return '处理中'
+}
+
+function getStepStatus(step: PlanStepDto): 'done' | 'running' | 'pending' {
+  if (completedStepIds.value.has(step.id)) return 'done'
+  if (runningStepId.value === step.id) return 'running'
+  return 'pending'
 }
 
 const currentTitle = computed(() => {
@@ -313,6 +323,10 @@ async function handleSend() {
   chatStore.isGenerating = true
   statusText.value = '生成中...'
   currentStatus.value = { type: 'THINKING' }
+  currentPlan.value = null
+  completedStepIds.value = new Set()
+  runningStepId.value = null
+  planCollapsed.value = false
 
   chatStore.addStreamingAiMessage()
   scrollToBottom()
@@ -324,6 +338,32 @@ async function handleSend() {
     onStatus(event: StatusEvent) {
       // 会话已切换，忽略回调
       if (chatStore.currentConvId !== convId) return
+
+      // 处理计划事件
+      if (event.type === 'PLAN' && event.planGoal && event.planSteps) {
+        currentPlan.value = { goal: event.planGoal, steps: event.planSteps }
+        completedStepIds.value = new Set()
+        runningStepId.value = null
+        return
+      }
+
+      // 跟踪步骤进度
+      if (event.type === 'TOOL_CALL' && currentPlan.value && event.toolName) {
+        // 通过 toolName 匹配计划步骤
+        const matched = currentPlan.value.steps.find(s => s.tool === event.toolName)
+        if (matched) {
+          // 将上一个 running 步骤标记为 done
+          if (runningStepId.value !== null) {
+            completedStepIds.value = new Set([...completedStepIds.value, runningStepId.value])
+          }
+          runningStepId.value = matched.id
+        }
+      }
+      if (event.type === 'TOOL_RESULT' && runningStepId.value !== null) {
+        completedStepIds.value = new Set([...completedStepIds.value, runningStepId.value])
+        runningStepId.value = null
+      }
+
       // TOOL_RESULT 没有有用信息，跳过，保持显示 TOOL_CALL 标签
       if (event.type !== 'TOOL_RESULT') {
         currentStatus.value = event
@@ -349,6 +389,11 @@ async function handleSend() {
       chatStore.isGenerating = false
       statusText.value = 'READY'
       currentStatus.value = null
+      // 保留计划面板显示，折叠为摘要
+      if (currentPlan.value) {
+        planCollapsed.value = true
+      }
+      runningStepId.value = null
       abortController = null
       scrollToBottom()
       chatStore.loadConversations()
@@ -594,6 +639,35 @@ watch(() => yjbStore.cardVisible, (visible) => {
                 <div class="bubble">
                   <template v-if="msg.role === 'USER'">{{ msg.content }}</template>
                   <template v-else>
+                    <!-- 执行计划面板 -->
+                    <div
+                      v-if="currentPlan && msg === chatStore.messages[chatStore.messages.length - 1]"
+                      class="plan-panel"
+                      :class="{ collapsed: planCollapsed }"
+                    >
+                      <div class="plan-header" @click="planCollapsed = !planCollapsed">
+                        <Target :size="14" class="plan-icon" />
+                        <span class="plan-goal-text">{{ currentPlan.goal }}</span>
+                        <span class="plan-toggle">{{ planCollapsed ? '展开' : '收起' }}</span>
+                      </div>
+                      <div v-if="!planCollapsed" class="plan-steps">
+                        <div
+                          v-for="step in currentPlan.steps"
+                          :key="step.id"
+                          class="plan-step"
+                          :class="getStepStatus(step)"
+                        >
+                          <Loader2 v-if="getStepStatus(step) === 'running'" :size="14" class="step-spinner" />
+                          <CheckCircle v-else-if="getStepStatus(step) === 'done'" :size="14" class="step-done-icon" />
+                          <Circle v-else :size="14" class="step-pending-icon" />
+                          <span class="step-action">{{ step.action }}</span>
+                          <span v-if="step.tool" class="step-tool">{{ step.tool }}</span>
+                        </div>
+                      </div>
+                      <div v-if="planCollapsed" class="plan-summary">
+                        已完成 {{ completedStepIds.size }} / {{ currentPlan.steps.length }} 步
+                      </div>
+                    </div>
                     <!-- 工具调用状态指示器：只要正在生成且有状态事件就显示 -->
                     <div
                       v-if="currentStatus && chatStore.isGenerating && msg === chatStore.messages[chatStore.messages.length - 1]"
@@ -862,6 +936,115 @@ watch(() => yjbStore.cardVisible, (visible) => {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* 执行计划面板 */
+.plan-panel {
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.plan-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.plan-header:hover {
+  background: var(--bg-hover);
+}
+
+.plan-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.plan-goal-text {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-toggle {
+  font-size: 12px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.plan-steps {
+  padding: 0 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.plan-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+
+.plan-step.running {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.plan-step.done {
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
+.plan-step.pending {
+  opacity: 0.5;
+}
+
+.step-spinner {
+  animation: spin 1s linear infinite;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.step-done-icon {
+  color: #22c55e;
+  flex-shrink: 0;
+}
+
+.step-pending-icon {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.step-action {
+  flex: 1;
+}
+
+.step-tool {
+  font-size: 11px;
+  color: var(--text-dim);
+  background: var(--bg-tertiary, var(--bg-secondary));
+  padding: 1px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.plan-summary {
+  padding: 0 12px 10px;
+  font-size: 12px;
+  color: var(--text-dim);
 }
 
 /* 退出登录滑动确认 */
