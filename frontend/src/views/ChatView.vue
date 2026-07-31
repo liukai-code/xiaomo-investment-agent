@@ -391,9 +391,11 @@ async function handleSend() {
       currentStatus.value = null
       // 保留计划面板显示，折叠为摘要
       if (currentPlan.value) {
+        // 生成结束，标记所有步骤为完成
+        completedStepIds.value = new Set(currentPlan.value.steps.map(s => s.id))
+        runningStepId.value = null
         planCollapsed.value = true
       }
-      runningStepId.value = null
       abortController = null
       scrollToBottom()
       chatStore.loadConversations()
