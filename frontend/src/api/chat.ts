@@ -5,7 +5,7 @@ export interface PlanStepDto {
 }
 
 export interface StatusEvent {
-  type: 'THINKING' | 'TOOL_CALL' | 'TOOL_RESULT' | 'CONTENT' | 'PLAN'
+  type: 'THINKING' | 'TOOL_CALL' | 'TOOL_RESULT' | 'CONTENT' | 'PLAN' | 'PLANNING'
   toolName?: string
   operation?: string
   content?: string

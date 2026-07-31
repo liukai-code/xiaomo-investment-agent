@@ -54,6 +54,7 @@ let abortController: AbortController | null = null
 // 工具调用状态
 const currentStatus = ref<StatusEvent | null>(null)
 const currentPlan = ref<{ goal: string; steps: PlanStepDto[] } | null>(null)
+const planConvId = ref<number | null>(null)
 const completedStepIds = ref<Set<number>>(new Set())
 const runningStepId = ref<number | null>(null)
 const planCollapsed = ref(false)
@@ -135,6 +136,7 @@ const toolLabelMap: Record<string, string> = {
 }
 
 function getStatusLabel(status: StatusEvent): string {
+  if (status.type === 'PLANNING') return '任务规划中'
   if (status.type === 'THINKING') return '思考中'
   if (status.type === 'TOOL_CALL' && status.toolName) {
     // 优先精确匹配 toolName:operation，再通用匹配 toolName
@@ -206,6 +208,11 @@ async function handleCreateConversation() {
     statusText.value = 'READY'
     currentStatus.value = null
   }
+  currentPlan.value = null
+  planConvId.value = null
+  completedStepIds.value = new Set()
+  runningStepId.value = null
+  planCollapsed.value = false
   chatStore.currentConvId = null
   chatStore.messages = []
 }
@@ -324,6 +331,7 @@ async function handleSend() {
   statusText.value = '生成中...'
   currentStatus.value = { type: 'THINKING' }
   currentPlan.value = null
+  planConvId.value = null
   completedStepIds.value = new Set()
   runningStepId.value = null
   planCollapsed.value = false
@@ -342,8 +350,11 @@ async function handleSend() {
       // 处理计划事件
       if (event.type === 'PLAN' && event.planGoal && event.planSteps) {
         currentPlan.value = { goal: event.planGoal, steps: event.planSteps }
+        planConvId.value = convId
         completedStepIds.value = new Set()
         runningStepId.value = null
+        currentStatus.value = { type: 'PLANNING' }
+        statusText.value = '任务规划中'
         return
       }
 
@@ -643,7 +654,7 @@ watch(() => yjbStore.cardVisible, (visible) => {
                   <template v-else>
                     <!-- 执行计划面板 -->
                     <div
-                      v-if="currentPlan && msg === chatStore.messages[chatStore.messages.length - 1]"
+                      v-if="currentPlan && planConvId === chatStore.currentConvId && msg === chatStore.messages[chatStore.messages.length - 1]"
                       class="plan-panel"
                       :class="{ collapsed: planCollapsed }"
                     >
