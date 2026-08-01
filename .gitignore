@@ -39,8 +39,16 @@ app.log
 
 ### Local config ###
 .env
+.env.local
+.env.production
 src/main/resources/application-local.yml
 /.claude/settings.local.json
+
+### Certificates & keys ###
+*.key
+*.pem
+*.p12
+*.jks
 
 ### Frontend ###
 frontend/node_modules/
