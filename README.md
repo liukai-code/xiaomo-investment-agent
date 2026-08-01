@@ -266,6 +266,27 @@ frontend/src/
 
 详细结构请查看 [项目文档](docs/)。
 
+## 技术亮点文档
+
+项目在 `docs/Highlights/` 目录下提供了 12 篇保姆级技术深度解读，从问题出发逐步拆解各模块的设计思路与实现细节，适合初次接触项目的开发者阅读。
+
+| # | 文档 | 说明 |
+|---|------|------|
+| 01 | [多智能体深度分析工作流](docs/Highlights/01-MultiAgentWorkflow.md) | 5 层 DAG 工作流：并行数据采集 → 多空辩论 → 交易员提案 → 风险辩论 → 风险裁决 |
+| 02 | [工具调用防护 + 幻觉防护](docs/Highlights/02-ToolGuardSystem.md) | 6 个协作组件防止 Agent 陷入无限调用循环，标的锁定 + 数据污染过滤阻止 AI 幻觉 |
+| 03 | [意图分类 + 工具过滤](docs/Highlights/03-IntentClassificationAndToolFiltering.md) | 4 级优先匹配 9 种意图，从 44 个工具中筛选相关子集交给 LLM |
+| 04 | [A 股数据工具集 + Router 架构](docs/Highlights/04-AStockDataAndRouterTool.md) | 8 个 Router Tool 封装 59 个路由操作，东财串行限流器防封禁 |
+| 05 | [两层记忆系统](docs/Highlights/05-MemorySystem.md) | 用户画像（6 维度 AI 提取）+ 对话摘要（10:1 压缩），让 Agent 记住用户偏好 |
+| 06 | [SSE 流式架构 + 通知系统](docs/Highlights/06-SSEStreamingAndNotification.md) | 后端 Flux 驱动、前端 ReadableStream 消费的实时推送体系 |
+| 07 | [用户配置系统](docs/Highlights/07-UserConfigSystem.md) | Per-User API Key 路由、多渠道管理、连接测试 |
+| 08 | [自主任务规划](docs/Highlights/08-AutonomousTaskPlanning.md) | LLM 为自己制定结构化执行计划，Scratchpad 暂存中间结果 |
+| 09 | [认证与安全架构](docs/Highlights/09-AuthAndSecurity.md) | Redis 双 Key 单设备登录、AES-GCM 加密、滑动过期 |
+| 10 | [会话数据与用量统计](docs/Highlights/10-ConversationAndUsageStats.md) | 三级 Redis 缓存、逐请求 Token 计量、软重置统计 |
+| 11 | [流式 Markdown 渲染器](docs/Highlights/11-StreamingMarkdownRenderer.md) | 自研状态机解析器、djb2 块级稳定 Key、Canvas 动画 |
+| 12 | [养基宝基金集成](docs/Highlights/12-YangJiBaoIntegration.md) | QR 码登录、MD5 请求签名、CompletableFuture 并行同步 |
+
+完整索引见 [docs/Highlights/README.md](docs/Highlights/README.md)。
+
 ## 快速开始
 
 ### 方式一：Docker Compose 部署（推荐）
