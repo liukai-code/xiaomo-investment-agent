@@ -383,5 +383,4 @@ open http://localhost:5656
 
 ## 致谢
 
-- [Spring AI](https://spring.io/projects/spring-ai) - AI Agent 框架
-- [a-stock-data](https://github.com/simonlin1212/a-stock-data) - A 股数据工具参考
+项目开发过程中借鉴了许多优秀的开源项目，在此一并致谢。 感谢所有开源社区的贡献者。
