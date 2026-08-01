@@ -16,13 +16,17 @@ class RuleBasedIntentClassifierTest {
 
     private HttpClientService httpClientService;
     private TaskPlanner taskPlanner;
+    private LlmIntentClassifier llmClassifier;
     private RuleBasedIntentClassifier classifier;
 
     @BeforeEach
     void setUp() throws Exception {
         httpClientService = mock(HttpClientService.class);
         taskPlanner = mock(TaskPlanner.class);
-        classifier = new RuleBasedIntentClassifier(httpClientService, true);
+        llmClassifier = mock(LlmIntentClassifier.class);
+        // 默认：LLM 分类器返回 GENERAL_CHAT（模拟未命中场景，具体测试可覆盖）
+        when(llmClassifier.classify(anyString())).thenReturn(IntentType.GENERAL_CHAT);
+        classifier = new RuleBasedIntentClassifier(httpClientService, llmClassifier, true);
 
         // 通过反射注入 mock TaskPlanner
         var field = RuleBasedIntentClassifier.class.getDeclaredField("taskPlanner");
@@ -177,7 +181,13 @@ class RuleBasedIntentClassifierTest {
                 "人气榜",
                 "热搜",
                 "市场情绪怎么样",
-                "情绪面分析"
+                "情绪面分析",
+                "昨天涨的最好的前十只A股股票",
+                "今天涨幅最大的股票",
+                "涨幅排行榜",
+                "领涨股票有哪些",
+                "涨的最多的股票排名",
+                "跌的最惨的股票前十"
         })
         void 打板情绪查询应分类为TRADING_SENTIMENT(String msg) {
             IntentResult result = classifier.classify(msg);
@@ -413,7 +423,7 @@ class RuleBasedIntentClassifierTest {
 
         @Test
         void 禁用时应返回confidence0且policy为PLANNER_MANAGED() {
-            RuleBasedIntentClassifier disabledClassifier = new RuleBasedIntentClassifier(httpClientService, false);
+            RuleBasedIntentClassifier disabledClassifier = new RuleBasedIntentClassifier(httpClientService, llmClassifier, false);
             IntentResult result = disabledClassifier.classify("分析茅台");
             assertEquals(0, result.confidence());
             assertEquals(ToolPolicyMode.PLANNER_MANAGED, result.policy().mode());
@@ -442,6 +452,45 @@ class RuleBasedIntentClassifierTest {
             assertEquals(IntentType.MARKET_NEWS, result.intent());
             assertNotNull(result.policy().toWhitelist());
             assertFalse(result.policy().toWhitelist().contains("a_stock_quote"));
+        }
+    }
+
+    @Nested
+    @DisplayName("LLM 兜底分类")
+    class LlmFallback {
+
+        @Test
+        void 规则未命中时应调用LLM分类器() {
+            // "给我推荐几只基金" 不命中任何规则关键词
+            when(llmClassifier.classify("给我推荐几只基金")).thenReturn(IntentType.TRADING_SENTIMENT);
+            IntentResult result = classifier.classify("给我推荐几只基金");
+            assertEquals(IntentType.TRADING_SENTIMENT, result.intent());
+            assertEquals(0.7, result.confidence());
+        }
+
+        @Test
+        void LLM返回GENERAL_CHAT时应保持兜底() {
+            when(llmClassifier.classify("随便聊聊")).thenReturn(IntentType.GENERAL_CHAT);
+            IntentResult result = classifier.classify("随便聊聊");
+            assertEquals(IntentType.GENERAL_CHAT, result.intent());
+            assertEquals(0.5, result.confidence());
+        }
+
+        @Test
+        void LLM返回STOCK_ANALYSIS时应尝试解析标的() throws Exception {
+            when(llmClassifier.classify("那个白酒龙头最近怎么样")).thenReturn(IntentType.STOCK_ANALYSIS);
+            when(httpClientService.get(anyString(), any())).thenReturn(
+                    "{\"QuotationCodeTable\":{\"Data\":[{\"Code\":\"600519\",\"Name\":\"贵州茅台\",\"MktNum\":\"1\"}]}}");
+            IntentResult result = classifier.classify("那个白酒龙头最近怎么样");
+            assertEquals(IntentType.STOCK_ANALYSIS, result.intent());
+        }
+
+        @Test
+        void 规则命中时不应调用LLM() {
+            // "涨停池" 命中 SENTIMENT_KEYWORDS，不应调用 LLM
+            IntentResult result = classifier.classify("涨停池");
+            assertEquals(IntentType.TRADING_SENTIMENT, result.intent());
+            verify(llmClassifier, never()).classify(anyString());
         }
     }
 }

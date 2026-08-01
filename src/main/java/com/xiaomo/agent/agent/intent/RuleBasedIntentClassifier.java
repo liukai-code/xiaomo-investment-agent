@@ -45,14 +45,17 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
     }
 
     private final HttpClientService httpClientService;
+    private final LlmIntentClassifier llmClassifier;
     private final boolean enabled;
 
     @Resource
     private TaskPlanner taskPlanner;
 
     public RuleBasedIntentClassifier(HttpClientService httpClientService,
+                                     LlmIntentClassifier llmClassifier,
                                      @Value("${agent.intent.enabled:true}") boolean enabled) {
         this.httpClientService = httpClientService;
+        this.llmClassifier = llmClassifier;
         this.enabled = enabled;
     }
 
@@ -146,9 +149,34 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
             return draft;
         }
 
-        // === 兜底 ===
-        log.info("[IntentClassifier] GENERAL_CHAT (fallback): {}", trimmed);
-        return new IntentDraft(IntentType.GENERAL_CHAT, 0.5, null);
+        // === 兜底：规则未命中，交给 LLM ===
+        log.info("[IntentClassifier] 规则未命中, 尝试 LLM 分类: {}", trimmed);
+        return fallbackToLlm(trimmed);
+    }
+
+    /**
+     * 规则未命中时，调用 LLM 进行意图分类。
+     * 如果 LLM 返回 STOCK_ANALYSIS，仍需尝试解析标的。
+     */
+    private IntentDraft fallbackToLlm(String msg) {
+        IntentType llmIntent = llmClassifier.classify(msg);
+        log.info("[IntentClassifier] LLM 分类结果: {}", llmIntent);
+
+        if (llmIntent == IntentType.GENERAL_CHAT) {
+            return new IntentDraft(IntentType.GENERAL_CHAT, 0.5, null);
+        }
+
+        if (llmIntent == IntentType.STOCK_ANALYSIS) {
+            // LLM 判断为个股分析，但仍需解析标的
+            IntentDraft draft = tryResolveStock(msg);
+            // 如果标的解析失败，降级为 LLM 返回的意图（带较低置信度）
+            if (draft.intent() == IntentType.GENERAL_CHAT) {
+                return new IntentDraft(llmIntent, 0.6, null);
+            }
+            return draft;
+        }
+
+        return new IntentDraft(llmIntent, 0.7, null);
     }
 
     /**
@@ -353,7 +381,12 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
             "涨停", "跌停", "炸板", "连板", "打板", "情绪", "龙虎榜",
             "涨停池", "跌停池", "封板", "炸板率", "涨停揭秘",
             "热榜", "人气榜", "热度", "热门股票", "热搜",
-            "市场情绪", "情绪面"
+            "市场情绪", "情绪面",
+            // 行情排名类
+            "涨的最好", "涨的最多", "涨的最猛", "涨的最高",
+            "跌的最多", "跌的最惨", "跌的最猛",
+            "排名", "前十", "前五", "前三", "排行榜",
+            "涨幅榜", "跌幅榜", "领涨", "领跌", "涨幅最大"
     };
 
     private static final String[] CALC_KEYWORDS = {
