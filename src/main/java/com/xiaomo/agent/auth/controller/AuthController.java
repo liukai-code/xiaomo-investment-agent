@@ -6,6 +6,7 @@ import com.xiaomo.agent.common.entity.Result;
 import com.xiaomo.agent.user.entity.User;
 import com.xiaomo.agent.user.repository.UserRepository;
 import com.xiaomo.agent.user.service.AccountIdGenerator;
+import com.xiaomo.agent.user.service.UserPreferencesCacheService;
 import jakarta.annotation.Resource;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -29,6 +30,9 @@ public class AuthController {
 
     @Resource
     private ApplicationEventPublisher eventPublisher;
+
+    @Resource
+    private UserPreferencesCacheService userPreferencesCacheService;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -227,6 +231,7 @@ public class AuthController {
         }
 
         userRepository.save(user);
+        userPreferencesCacheService.evict(userId);
         return Result.success();
     }
 

@@ -29,8 +29,8 @@ import com.xiaomo.agent.tool.GetAnalysisReportTool;
 import com.xiaomo.agent.tool.astock.*;
 import com.xiaomo.agent.user.config.UserConfigDTO;
 import com.xiaomo.agent.user.config.UserConfigService;
-import com.xiaomo.agent.user.entity.User;
-import com.xiaomo.agent.user.repository.UserRepository;
+import com.xiaomo.agent.user.dto.UserPreferences;
+import com.xiaomo.agent.user.service.UserPreferencesCacheService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
@@ -110,7 +110,7 @@ public class AgentLoopImpl implements AgentLoop {
     private com.xiaomo.agent.user.service.FreeQuotaService freeQuotaService;
 
     @Resource
-    private UserRepository userRepository;
+    private UserPreferencesCacheService userPreferencesCacheService;
 
     @Resource
     private MemoryService memoryService;
@@ -246,12 +246,12 @@ public class AgentLoopImpl implements AgentLoop {
 
         chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
 
-        // 读取用户偏好
-        User user = userRepository.findById(userId).orElse(null);
-        double temperature = user != null && user.getTemperature() != null ? user.getTemperature() : 0.7;
-        int maxTokens = user != null && user.getMaxTokens() != null ? user.getMaxTokens() : 4096;
-        int contextWindow = user != null && user.getContextWindow() != null ? user.getContextWindow() : 50;
-        boolean memoryEnabled = user == null || user.getMemoryEnabled() == null || user.getMemoryEnabled();
+        // 读取用户偏好（Redis 缓存）
+        UserPreferences prefs = userPreferencesCacheService.getPreferences(userId);
+        double temperature = prefs != null ? prefs.temperature() : 0.7;
+        int maxTokens = prefs != null ? prefs.maxTokens() : 4096;
+        int contextWindow = prefs != null ? prefs.contextWindow() : 50;
+        boolean memoryEnabled = prefs == null || prefs.memoryEnabled();
 
         // 用户主动记忆检测（"记住XXX"），记忆关闭时仍保留主动记忆
         MemoryService.DetectResult detectResult = memoryService.detectExplicitMemory(message);
@@ -364,12 +364,12 @@ public class AgentLoopImpl implements AgentLoop {
 
         chatMessageService.saveMessage(conversation, MessageRole.USER, message, null, null);
 
-        // 读取用户偏好
-        User user = userRepository.findById(userId).orElse(null);
-        double temperature = user != null && user.getTemperature() != null ? user.getTemperature() : 0.7;
-        int maxTokens = user != null && user.getMaxTokens() != null ? user.getMaxTokens() : 4096;
-        int contextWindow = user != null && user.getContextWindow() != null ? user.getContextWindow() : 50;
-        boolean memoryEnabled = user == null || user.getMemoryEnabled() == null || user.getMemoryEnabled();
+        // 读取用户偏好（Redis 缓存）
+        UserPreferences prefs = userPreferencesCacheService.getPreferences(userId);
+        double temperature = prefs != null ? prefs.temperature() : 0.7;
+        int maxTokens = prefs != null ? prefs.maxTokens() : 4096;
+        int contextWindow = prefs != null ? prefs.contextWindow() : 50;
+        boolean memoryEnabled = prefs == null || prefs.memoryEnabled();
 
         // 用户主动记忆检测（"记住XXX"），记忆关闭时仍保留主动记忆
         MemoryService.DetectResult detectResult = memoryService.detectExplicitMemory(message);

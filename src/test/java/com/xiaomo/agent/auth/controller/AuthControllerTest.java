@@ -5,6 +5,7 @@ import com.xiaomo.agent.common.entity.Result;
 import com.xiaomo.agent.user.entity.User;
 import com.xiaomo.agent.user.repository.UserRepository;
 import com.xiaomo.agent.user.service.AccountIdGenerator;
+import com.xiaomo.agent.user.service.UserPreferencesCacheService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,9 @@ class AuthControllerTest {
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private UserPreferencesCacheService userPreferencesCacheService;
 
     @InjectMocks
     private AuthController authController;

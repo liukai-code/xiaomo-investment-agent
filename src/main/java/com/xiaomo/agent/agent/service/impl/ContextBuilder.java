@@ -10,8 +10,8 @@ import com.xiaomo.agent.conversation.entity.MessageRole;
 import com.xiaomo.agent.conversation.repository.ChatMessageRepository;
 import com.xiaomo.agent.conversation.service.ChatHistoryCacheService;
 import com.xiaomo.agent.memory.service.MemoryService;
-import com.xiaomo.agent.user.entity.User;
-import com.xiaomo.agent.user.repository.UserRepository;
+import com.xiaomo.agent.user.dto.UserPreferences;
+import com.xiaomo.agent.user.service.UserPreferencesCacheService;
 import com.xiaomo.agent.workflow.util.StockResolver;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +40,7 @@ public class ContextBuilder {
     private String systemPrompt;
 
     @Resource
-    private UserRepository userRepository;
+    private UserPreferencesCacheService userPreferencesCacheService;
 
     @Resource
     private ChatHistoryCacheService cacheService;
@@ -68,13 +68,13 @@ public class ContextBuilder {
         List<Message> context = new ArrayList<>();
 
         String enrichedPrompt = systemPrompt;
-        User user = userRepository.findById(userId).orElse(null);
-        if (user != null) {
-            enrichedPrompt += "\n\n[用户信息]\n当前用户：" + user.getAccountId() + "（邮箱: " + user.getEmail() + "）";
+        UserPreferences prefs = userPreferencesCacheService.getPreferences(userId);
+        if (prefs != null) {
+            enrichedPrompt += "\n\n[用户信息]\n当前用户：" + prefs.accountId() + "（邮箱: " + prefs.email() + "）";
         }
 
         // 注入用户画像记忆和对话摘要（用户关闭记忆时跳过）
-        boolean memoryEnabled = user != null && (user.getMemoryEnabled() == null || user.getMemoryEnabled());
+        boolean memoryEnabled = prefs != null && prefs.memoryEnabled();
         if (memoryEnabled) {
             String memoryPrompt = memoryService.buildMemoryPrompt(userId, conversationId);
             if (memoryPrompt != null && !memoryPrompt.isEmpty()) {

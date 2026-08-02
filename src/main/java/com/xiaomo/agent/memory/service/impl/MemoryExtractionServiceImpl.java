@@ -11,6 +11,7 @@ import com.xiaomo.agent.memory.repository.MemoryExtractionTaskRepository;
 import com.xiaomo.agent.memory.repository.UserProfileRepository;
 import com.xiaomo.agent.memory.service.MemoryExtractionService;
 import com.xiaomo.agent.memory.service.MemoryService;
+import com.xiaomo.agent.user.dto.UserPreferences;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
@@ -51,7 +52,7 @@ public class MemoryExtractionServiceImpl implements MemoryExtractionService {
     private MemoryExtractionTaskRepository extractionTaskRepository;
 
     @Resource
-    private com.xiaomo.agent.user.repository.UserRepository userRepository;
+    private com.xiaomo.agent.user.service.UserPreferencesCacheService userPreferencesCacheService;
 
     @Resource
     private MemoryService memoryService;
@@ -95,9 +96,8 @@ public class MemoryExtractionServiceImpl implements MemoryExtractionService {
                 int compressedSoFar = existing != null ? existing.getCompressedCount() : 0;
                 int uncompactedCount = (int) (messageCount - compressedSoFar);
 
-                boolean compressionEnabled = userRepository.findById(userId)
-                        .map(u -> u.getCompressionEnabled() == null || u.getCompressionEnabled())
-                        .orElse(true);
+                UserPreferences prefs = userPreferencesCacheService.getPreferences(userId);
+                boolean compressionEnabled = prefs == null || prefs.compressionEnabled();
                 if (compressionEnabled && uncompactedCount >= COMPRESSION_THRESHOLD) {
                     compressConversation(userId, conversationId, existing);
                 }

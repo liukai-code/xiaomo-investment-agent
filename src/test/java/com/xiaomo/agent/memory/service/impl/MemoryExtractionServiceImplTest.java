@@ -10,6 +10,8 @@ import com.xiaomo.agent.memory.repository.ConversationSummaryRepository;
 import com.xiaomo.agent.memory.repository.MemoryExtractionTaskRepository;
 import com.xiaomo.agent.memory.repository.UserProfileRepository;
 import com.xiaomo.agent.memory.service.MemoryService;
+import com.xiaomo.agent.user.dto.UserPreferences;
+import com.xiaomo.agent.user.service.UserPreferencesCacheService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -37,6 +39,7 @@ class MemoryExtractionServiceImplTest {
     @Mock private ConversationSummaryRepository summaryRepository;
     @Mock private MemoryExtractionTaskRepository extractionTaskRepository;
     @Mock private MemoryService memoryService;
+    @Mock private UserPreferencesCacheService userPreferencesCacheService;
     @Mock private ChatModel chatModel;
     @Mock private ObjectMapper objectMapper;
 
@@ -57,6 +60,10 @@ class MemoryExtractionServiceImplTest {
         assistantMsg.setId(2L);
         assistantMsg.setRole(MessageRole.ASSISTANT);
         assistantMsg.setContent("好的，了解您的投资偏好。");
+
+        // 默认 mock 用户偏好缓存（compressionEnabled=true）
+        UserPreferences defaultPrefs = new UserPreferences(100L, "user_123456", "test@example.com", 0.7, 4096, 50, true, true);
+        lenient().when(userPreferencesCacheService.getPreferences(100L)).thenReturn(defaultPrefs);
     }
 
     // ==================== extractMemoriesAsync ====================
