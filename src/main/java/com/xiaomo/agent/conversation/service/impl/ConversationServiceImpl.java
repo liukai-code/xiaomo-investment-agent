@@ -5,12 +5,14 @@ import com.xiaomo.agent.conversation.repository.ConversationRepository;
 import com.xiaomo.agent.conversation.service.ChatHistoryCacheService;
 import com.xiaomo.agent.conversation.service.ConversationService;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
+@Slf4j
 public class ConversationServiceImpl implements ConversationService {
 
     @Resource
@@ -39,9 +41,18 @@ public class ConversationServiceImpl implements ConversationService {
     public List<Conversation> listConversations(Long userId) {
         List<Conversation> cached = cacheService.getCachedConversations(userId);
         if (cached != null) {
+            log.debug("listConversations: 缓存命中, userId={}, count={}", userId, cached.size());
             return cached;
         }
-        List<Conversation> conversations = conversationRepository.findByUserIdOrderByUpdatedAtDesc(userId);
+        List<Conversation> conversations = conversationRepository.findByUserIdOrderByPinnedAndUpdatedAt(userId);
+        // 修复旧数据：pinned 为 null 的统一设为 false
+        for (Conversation c : conversations) {
+            if (c.getPinned() == null) {
+                c.setPinned(false);
+            }
+        }
+        log.info("listConversations: DB查询, userId={}, count={}, pinned={}", userId, conversations.size(),
+                conversations.stream().filter(c -> Boolean.TRUE.equals(c.getPinned())).count());
         cacheService.cacheConversations(userId, conversations);
         return conversations;
     }
@@ -73,5 +84,17 @@ public class ConversationServiceImpl implements ConversationService {
         conversationRepository.deleteById(conversationId);
         cacheService.evictConversationList(userId);
         cacheService.evictMessageCache(conversationId);
+    }
+
+    @Override
+    @Transactional
+    public Conversation togglePin(Long userId, Long conversationId) {
+        Conversation conversation = getConversationForUser(conversationId, userId);
+        boolean oldValue = Boolean.TRUE.equals(conversation.getPinned());
+        conversation.setPinned(!oldValue);
+        Conversation saved = conversationRepository.save(conversation);
+        log.info("togglePin: convId={}, userId={}, pinned {} -> {}, saved.id={}", conversationId, userId, oldValue, saved.getPinned(), saved.getId());
+        cacheService.evictConversationList(userId);
+        return saved;
     }
 }

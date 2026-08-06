@@ -12,6 +12,7 @@ export interface Conversation {
   userId: number
   createdAt: string
   updatedAt: string
+  pinned: boolean
 }
 
 export interface ChatMessage {
@@ -51,6 +52,11 @@ export async function generateTitle(convId: number) {
 
 export async function deleteConversation(convId: number) {
   const { data } = await request.delete<Result<void>>(`/agent/conversation/${convId}`)
+  return data
+}
+
+export async function togglePinConversation(convId: number) {
+  const { data } = await request.put<Result<Conversation>>(`/agent/conversation/${convId}/pin`)
   return data
 }
 

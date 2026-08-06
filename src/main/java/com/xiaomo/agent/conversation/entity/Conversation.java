@@ -28,6 +28,9 @@ public class Conversation {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "pinned", columnDefinition = "boolean default false")
+    private Boolean pinned = false;
+
     @JsonIgnore
     @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id ASC")

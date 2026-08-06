@@ -105,7 +105,7 @@ class ConversationServiceImplTest {
             List<Conversation> result = conversationService.listConversations(1L);
 
             assertEquals(cached, result, "应返回缓存数据");
-            verify(conversationRepository, never()).findByUserIdOrderByUpdatedAtDesc(any());
+            verify(conversationRepository, never()).findByUserIdOrderByPinnedAndUpdatedAt(any());
         }
 
         @Test
@@ -113,7 +113,7 @@ class ConversationServiceImplTest {
         void cacheMiss() {
             List<Conversation> dbResult = List.of(new Conversation());
             when(cacheService.getCachedConversations(1L)).thenReturn(null);
-            when(conversationRepository.findByUserIdOrderByUpdatedAtDesc(1L)).thenReturn(dbResult);
+            when(conversationRepository.findByUserIdOrderByPinnedAndUpdatedAt(1L)).thenReturn(dbResult);
 
             List<Conversation> result = conversationService.listConversations(1L);
 

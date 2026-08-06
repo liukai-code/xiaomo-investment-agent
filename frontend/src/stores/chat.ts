@@ -6,6 +6,7 @@ import {
   getMessages,
   generateTitle as apiGenerateTitle,
   deleteConversation as apiDeleteConversation,
+  togglePinConversation as apiTogglePinConversation,
   type Conversation,
   type ChatMessage,
 } from '@/api/conversation'
@@ -84,6 +85,23 @@ export const useChatStore = defineStore('chat', () => {
     return conversations.value.find((c) => c.id === currentConvId.value)
   }
 
+  async function togglePin(convId: number) {
+    const res = await apiTogglePinConversation(convId)
+    if (res.code === 1) {
+      const conv = conversations.value.find((c) => c.id === convId)
+      if (conv) {
+        conv.pinned = res.data.pinned
+      }
+      // 重新排序：置顶在前，组内按更新时间倒序
+      conversations.value.sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      })
+      return true
+    }
+    return false
+  }
+
   async function deleteConversation(convId: number) {
     const res = await apiDeleteConversation(convId)
     if (res.code === 1) {
@@ -122,6 +140,7 @@ export const useChatStore = defineStore('chat', () => {
     updateLastAiMessage,
     generateTitle,
     getCurrentConversation,
+    togglePin,
     deleteConversation,
     reset,
   }

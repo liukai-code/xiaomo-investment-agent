@@ -6,7 +6,7 @@ import { useChatStore } from '@/stores/chat'
 import { streamChat, type StatusEvent, type PlanStepDto } from '@/api/chat'
 import MarkdownRenderer from '@/components/blocks/MarkdownRenderer.vue'
 import { useRafThrottle } from '@/composables/useMarkdownBlocks'
-import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen, Bell, Square, Loader2, Brain, CheckCircle, Circle, Target } from 'lucide-vue-next'
+import { Settings, LogOut, MoreHorizontal, User, PanelLeftClose, PanelLeftOpen, Bell, Square, Loader2, Brain, CheckCircle, Circle, Target, Pin } from 'lucide-vue-next'
 import { useYangjibaoStore } from '@/stores/yangjibao'
 import { useAnalysisStore } from '@/stores/analysis'
 import { useNotificationStore } from '@/stores/notification'
@@ -271,6 +271,11 @@ async function handleDeleteConversation(convId: number) {
   deleteConfirmConvId.value = convId
 }
 
+async function handleTogglePin(convId: number) {
+  closeMenu()
+  await chatStore.togglePin(convId)
+}
+
 async function confirmDelete() {
   if (deleteConfirmConvId.value !== null) {
     await chatStore.deleteConversation(deleteConfirmConvId.value)
@@ -517,13 +522,17 @@ watch(() => yjbStore.cardVisible, (visible) => {
           @click="handleSwitchConversation(conv.id)"
         >
           <div class="conv-content">
-            <div class="conv-title">{{ conv.title }}</div>
+            <div class="conv-title">
+              <Pin v-if="conv.pinned" :size="12" class="conv-pin-icon" />
+              {{ conv.title }}
+            </div>
             <div class="conv-time">{{ formatTime(conv.updatedAt) }}</div>
           </div>
           <div class="conv-actions">
             <button class="conv-action-btn" @click="toggleMenu(conv.id, $event)"><MoreHorizontal :size="18" /></button>
             <Transition name="menu-fade">
               <div v-if="activeMenuConvId === conv.id" class="conv-menu" @click.stop>
+                <div class="conv-menu-item" @click="handleTogglePin(conv.id)">{{ conv.pinned ? '取消置顶' : '置顶' }}</div>
                 <div class="conv-menu-item conv-menu-item--danger" @click="handleDeleteConversation(conv.id)">删除</div>
               </div>
             </Transition>

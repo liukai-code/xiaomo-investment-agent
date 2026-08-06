@@ -16,4 +16,6 @@ public interface ConversationService {
     void checkOwnership(Conversation conversation, Long userId);
 
     void deleteConversation(Long userId, Long conversationId);
+
+    Conversation togglePin(Long userId, Long conversationId);
 }

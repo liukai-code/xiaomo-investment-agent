@@ -232,11 +232,19 @@ body.portal-scrollable {
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .conv-item.active .conv-title {
   color: var(--accent);
   font-weight: 600;
+}
+
+.conv-pin-icon {
+  color: var(--accent);
+  flex-shrink: 0;
 }
 
 .conv-item .conv-actions {

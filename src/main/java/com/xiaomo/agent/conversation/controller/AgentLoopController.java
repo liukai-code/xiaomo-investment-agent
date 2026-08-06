@@ -92,6 +92,14 @@ public class AgentLoopController {
         return Result.success(title);
     }
 
+    @PutMapping("/conversation/{id}/pin")
+    public Result<Conversation> togglePin(
+            @PathVariable Long id,
+            HttpServletRequest request) {
+        Long userId = getUserId(request);
+        return Result.success(conversationService.togglePin(userId, id));
+    }
+
     @PostMapping("/conversation/{id}/message")
     public Result<Void> saveMessage(
             @PathVariable Long id,
